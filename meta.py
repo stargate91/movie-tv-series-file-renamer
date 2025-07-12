@@ -1,0 +1,139 @@
+import re
+import os
+
+def remove_resolution_from_title(title):
+    title = re.sub(r"\b(?:720|1080|1440|2160)p\b", "", title)
+    title = re.sub(r"\b(?:HD|SD|BluRay|HDRip|WEBRip|WEB-DL|HDTV|CAM|DVDRip)\b", "", title)
+    return title.strip()
+
+def extract_metadata_from_filename(filename, file_type):
+    filename = remove_resolution_from_title(filename)
+    
+    if file_type == "series":
+        match = re.match(r"([^\d]+?)\s*S(\d{1,2})E(\d{1,2})\s*(\d{4})", filename.strip())
+        if match:
+            title = match.group(1).strip().replace(' ', '.')
+            season = match.group(2).strip()
+            episode = match.group(3).strip()
+            year = match.group(4).strip()
+            return {"title": title, "season": season, "episode": episode, "year": year}
+        else:
+            return {"title": filename.strip().replace('.', ' '), "season": "Unknown", "episode": "Unknown", "year": "Unknown Year"}
+    
+    else:
+        match = re.match(r"(.*?)(\d{4})", filename.strip())
+        if match:
+            title = match.group(1).strip().replace(' ', '.')
+            year = match.group(2).strip()
+            return {"title": title, "year": year}
+        else:
+            return {"title": filename.strip().replace('.', ' '), "year": "Unknown Year"}
+
+def extract_metadata_from_folder(folder_name, file_type):
+    folder_name = remove_resolution_from_title(folder_name)
+
+    if file_type == "series":
+        match = re.match(r"([^\d]+?)\s*S(\d{1,2})E(\d{1,2})\s*(\d{4})", folder_name.strip().replace('.', ' '))
+        if match:
+            title = match.group(1).strip().replace(' ', '.')
+            season = match.group(2).strip()
+            episode = match.group(3).strip()
+            year = match.group(4).strip()
+            return {"title": title, "season": season, "episode": episode, "year": year}
+        else:
+            return {"title": folder_name.strip().replace('.', ' '), "season": "Unknown", "episode": "Unknown", "year": "Unknown Year"}
+
+    else:
+        match = re.match(r"(.*?)(\d{4})", folder_name.replace('.', ' '))
+        if match:
+            title = match.group(1).strip().replace(' ', '.')
+            year = match.group(2).strip()
+            return {"title": title, "year": year}
+        else:
+            return {"title": folder_name.strip().replace('.', ' '), "year": "Unknown Year"}
+
+def clean_title(title):
+    title = title.replace('.', ' ')
+    title = title.replace(',', ' ')
+    return title.strip()
+
+def process_video_files(video_files, meta, file_type):
+    processed_files = []
+
+    for file in video_files:
+        file_name = os.path.basename(file)
+        folder_name = os.path.basename(os.path.dirname(file))
+
+        metadata = {"title": "Unknown Title", "year": "Unknown Year"}
+
+        if meta == "folder":
+            metadata = extract_metadata_from_folder(folder_name, file_type)
+        else:
+            metadata = extract_metadata_from_filename(file_name, file_type)
+
+        metadata['title'] = clean_title(metadata['title'])
+
+        if 'year' not in metadata or metadata['year'] == "":
+            metadata['year'] = "Unknown Year"
+
+        if file_type == "series":
+            if "season" not in metadata:
+                metadata["season"] = "Unknown"
+            if "episode" not in metadata:
+                metadata["episode"] = "Unknown"
+
+        processed_files.append({"file_path": file, "metadata": metadata})
+
+    return processed_files
+
+def transfer_metadata_to_api(processed_files, api_client, api_source, file_type):
+
+    no_results = []
+    one_result = []
+    multiple_results = []
+
+    for file_data in processed_files:
+        metadata = file_data['metadata']
+        for key, value in metadata.items():
+            if key == 'title':
+                title = value
+            elif key == 'year':
+                year = value
+
+        if title and year:
+            if api_source == "omdb" and file_type == "movie":
+                data = api_client.get_from_omdb(title, year)
+            elif api_source == "tmdb" and file_type == "movie":
+                data = api_client.get_from_tmdb_movie(title, year)
+            elif file_type == "series":
+                data = api_client.get_from_tmdb_tv(title, year)
+            else:
+                print("[ERROR] Incorrect arguments for API source or content type.")
+                data = None
+        else:
+            print("[ERROR] Missing title or year in metadata.")
+            data = None
+
+        if data:
+            if api_source == "omdb":
+                if data.get("Response") == "False":
+                    print(f"No results found for {file_data['file_path']}: {data['Error']}")
+                    no_results.append(file_data)
+                elif data.get("Response") == "True":
+                    one_result.append({"file_path": file_data['file_path'], "data": data})
+                    print(f"One result found for {file_data['file_path']}: {data}")
+            elif api_source == "tmdb":
+                if data.get("total_results") == 0:
+                    print(f"No results found for {file_data['file_path']}: No results in TMDB response.")
+                    no_results.append(file_data)
+                elif data.get("total_results") == 1:
+                    one_result.append({"file_path": file_data['file_path'], "data": data})
+                    print(f"One result found for {file_data['file_path']}: {data}")
+                elif data.get("total_results") > 1:
+                    multiple_results.append({"file_path": file_data['file_path'], "data": data})
+                    print(f"Multiple results found for {file_data['file_path']}: {data}")
+        else:
+            print(f"No data found for {file_data['file_path']}.")
+            no_results.append(file_data)
+
+    return no_results, one_result, multiple_results
