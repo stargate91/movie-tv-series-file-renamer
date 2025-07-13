@@ -35,6 +35,11 @@ def parse_args():
         "--second",
         help="To do an opposite source of metadata search, after we get the results from the api.",
         action="store_true"
-    )    
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Preview the planned renaming without modifying any files."
+    )   
 
     return parser.parse_args()
