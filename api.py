@@ -2,13 +2,14 @@ from cache import CacheHandler
 import requests
 
 class APIClient:
-    def __init__(self, omdb_key, tmdb_key, tmdb_bearer_token, omdb_cache_file="omdb_cache.json", tmdb_movie_cache_file="tmdb_movie_cache.json", tmdb_tv_cache_file="tmdb_tv_cache.json"):
+    def __init__(self, omdb_key, tmdb_key, tmdb_bearer_token, omdb_cache_file="omdb_cache.json", tmdb_movie_cache_file="tmdb_movie_cache.json", tmdb_tv_cache_file="tmdb_tv_cache.json", tmdb_tv_episode_cache_file="tmdb_tv_episode_cache.json"):
         self.omdb_key = omdb_key
         self.tmdb_key = tmdb_key
         self.tmdb_bearer_token = tmdb_bearer_token
         self.omdb_cache = CacheHandler(omdb_cache_file)
         self.tmdb_movie_cache = CacheHandler(tmdb_movie_cache_file)
         self.tmdb_tv_cache = CacheHandler(tmdb_tv_cache_file)
+        self.tmdb_tv_episode_cache = CacheHandler(tmdb_tv_episode_cache_file)
 
     def _get_from_api(self, api_url, cache_key, cache_handler, headers=None):
 
@@ -68,4 +69,4 @@ class APIClient:
         
         api_url = f"https://api.themoviedb.org/3/tv/{id}/season/{season}/episode/{episode}?api_key={self.tmdb_key}"
 
-        return self._get_from_api(api_url, cache_key, self.tmdb_tv_cache)
+        return self._get_from_api(api_url, cache_key, self.tmdb_tv_episode_cache)

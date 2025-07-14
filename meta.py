@@ -139,10 +139,6 @@ def transfer_metadata_to_api(processed_files, api_client, api_source, file_type)
     one_result = []
     multiple_results = []
 
-    '''print("Processed files:")
-    for file_data in processed_files:
-        print(file_data)'''
-
     for file_data in processed_files:
         metadata = file_data.get('metadata', {})
         title = metadata.get('title')
@@ -170,7 +166,7 @@ def transfer_metadata_to_api(processed_files, api_client, api_source, file_type)
         if file_type == "series" and data:
             if data.get("total_results") == 0:
                 print(f"No results found for {file_data['file_path']}: No results in TMDB response.")
-                no_results.append(file_data)
+                no_results.append({"file_path": file_data['file_path'], "season": season, "episode": episode})
             elif data.get("total_results") == 1:
                 one_result.append({"file_path": file_data['file_path'], "season": season, "episode": episode, "data": data})
                 print(f"One result found for {file_data['file_path']}: {data}")
@@ -181,7 +177,7 @@ def transfer_metadata_to_api(processed_files, api_client, api_source, file_type)
                 print(f"No data found for {file_data['file_path']}.")
                 no_results.append(file_data)         
 
-        if data:
+        if file_type == "movie" and data:
             if api_source == "omdb":
                 if data.get("Response") == "False":
                     print(f"No results found for {file_data['file_path']}: {data['Error']}")
@@ -199,19 +195,5 @@ def transfer_metadata_to_api(processed_files, api_client, api_source, file_type)
                 elif data.get("total_results") > 1:
                     multiple_results.append({"file_path": file_data['file_path'], "data": data})
                     print(f"Multiple results found for {file_data['file_path']}: {data}")
-        else:
-            print(f"No data found for {file_data['file_path']}.")
-            no_results.append(file_data)
 
     return no_results, one_result, multiple_results
-
-def transfer_id_season_episode_to_api(files_with_id, api_client):
-    episode_results = []
-
-    for file_data in files_with_id:
-        metadata = file_data['metadata']
-        for key, value in metadata.items():
-            if key == 'title':
-                title = value
-            elif key == 'year':
-                year = value

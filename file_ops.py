@@ -194,8 +194,194 @@ def handle_no_results(no_results, api_client, api_source):
 
     return handled_files
 
-def handling_series(api_results):
+def handling_series_one_result(one_result):
+    handled_files = []
 
-    for file_data in api_results:
-        for key, value in file_data.items():
-            print(f"Key: {key}, Value: {value}")
+    for file_data in one_result:
+        file_path = file_data.get('file_path')
+        season = file_data.get('season')
+        episode = file_data.get('episode')
+        result_data = file_data['data']['results'][0]
+        series_id = result_data.get('id')
+        handled_files.append({"file_path": file_path, "season": season, "episode": episode, "data": {"id": series_id}})
+
+    return handled_files
+
+
+def handle_series_multiple_results(multiple_results):
+    handled_files = []
+    for file_data in multiple_results:
+        print(f"\nMultiple series results found for: {file_data['file_path']}")
+        results = file_data['data']['results']
+        
+        for idx, result in enumerate(results, start=1):
+            first_air_date = result.get("first_air_date")
+            name = result.get("name")
+            print(f"{idx}. {name} ({first_air_date})")
+
+        try:
+            choice = int(input(f"Please select a series by number (1-{len(results)}): "))
+            if 1 <= choice <= len(results):
+                selected_result = results[choice - 1]
+                selected_id = selected_result.get('id')
+                selected_first_air_date = selected_result.get("first_air_date")
+                selected_name = selected_result.get('name')
+                print(f"User selected: {selected_name} ({selected_first_air_date})")
+                
+                handled_files.append({
+                    "file_path": file_data['file_path'],
+                    "season": file_data['season'],
+                    "episode": file_data['episode'],
+                    "data": {
+                        "id": selected_id,
+                        "first_air_date": selected_first_air_date,
+                        "name": selected_name
+                    }
+                })
+            else:
+                print("Invalid choice. No series selected.")
+        except ValueError:
+            print("Invalid input. Please enter a number.")
+    
+
+    return handled_files
+
+def handle_series_no_results(no_results, api_client):
+    handled_files = []
+    folders = {}
+    
+    for file_data in no_results:
+        file_path = file_data['file_path']
+        directory = os.path.dirname(file_path)
+        
+        if directory not in folders:
+            folders[directory] = []
+        
+        folders[directory].append(file_data)
+
+    for directory, files_in_directory in folders.items():
+        print(f"\nProcessing files in directory: {directory}")
+        
+        selected_series = None
+        
+        first_file = files_in_directory[0]
+        print(f"\nAttempting manual search for: {first_file['file_path']}")
+        
+        manual_search = input(f"\nWould you like to search manually for this file? (y/n): ").strip().lower()
+        
+        if manual_search == 'y':
+            search_title = input("Enter series name: ").strip()
+            search_first_air_date = input("Enter series first air date (or leave empty to skip): ").strip()
+
+            if not search_first_air_date:
+                search_first_air_date = None
+
+            data = api_client.get_from_tmdb_tv(search_title, search_first_air_date)
+
+            if data and data.get("total_results") > 0:
+                results = data['results']
+                print("Found results:")
+                for idx, result in enumerate(results, start=1):
+                    print(f"{idx}. {result['name']} ({result['first_air_date']})")
+
+                try:
+                    choice = int(input(f"Please select a series by number (1-{len(results)}): "))
+                    if 1 <= choice <= len(results):
+                        selected_result = results[choice - 1]
+                        selected_series = {
+                            "id": selected_result['id'],
+                            "name": selected_result['name'],
+                            "first_air_date": selected_result['first_air_date']
+                        }
+                        print(f"User selected: {selected_series['name']} ({selected_series['first_air_date']})")
+                    else:
+                        print("Invalid choice. No series selected.")
+                except ValueError:
+                    print("Invalid input. Please enter a number.")
+            else:
+                print(f"No results found for {search_title}.")
+        else:
+            print(f"Skipping manual search for {first_file['file_path']}.")
+
+        if selected_series:
+            season = first_file.get('season')
+            episode = first_file.get('episode')
+            
+            if season and episode:
+                print(f"\nSeason: {season}, Episode: {episode}")
+                print(f"Applying selected series to {first_file['file_path']}: {selected_series['name']} ({selected_series['first_air_date']})")
+                handled_files.append({
+                    "file_path": first_file['file_path'],
+                    "season": season,
+                    "episode": episode,
+                    "data": selected_series
+                })
+            
+            # Felajánlás a többi fájlra is az adott mappában
+            apply_to_others = input(f"\nDo you want to apply this series to the other files in the directory? (y/n): ").strip().lower()
+            
+            if apply_to_others == 'y':
+                for file_data in files_in_directory[1:]:
+                    print(f"Applying selected series to {file_data['file_path']}")
+                    handled_files.append({
+                        "file_path": file_data['file_path'],
+                        "season": file_data.get('season'),
+                        "episode": file_data.get('episode'),
+                        "data": selected_series
+                    })
+            else:
+                print(f"Proceeding with manual search for the other files in the directory: {directory}")
+                
+                for file_data in files_in_directory[1:]:
+                    print(f"\nAttempting manual search for: {file_data['file_path']}")
+                    
+                    manual_search = input(f"\nWould you like to search manually for this file? (y/n): ").strip().lower()
+                    
+                    if manual_search == 'y':
+                        search_title = input("Enter series name: ").strip()
+                        search_first_air_date = input("Enter series first air date (or leave empty to skip): ").strip()
+
+                        if not search_first_air_date:
+                            search_first_air_date = None
+
+                        data = api_client.get_from_tmdb_tv(search_title, search_first_air_date)
+
+                        if data and data.get("total_results") > 0:
+                            results = data['results']
+                            print("Found results:")
+                            for idx, result in enumerate(results, start=1):
+                                print(f"{idx}. {result['name']} ({result['first_air_date']})")
+
+                            try:
+                                choice = int(input(f"Please select a series by number (1-{len(results)}): "))
+                                if 1 <= choice <= len(results):
+                                    selected_result = results[choice - 1]
+                                    selected_id = selected_result.get('id')
+                                    selected_name = selected_result.get('name')
+                                    selected_first_air_date = selected_result.get('first_air_date')
+                                    print(f"User selected: {selected_name} ({selected_first_air_date})")
+
+                                    handled_files.append({
+                                        "file_path": file_data['file_path'],
+                                        "season": file_data['season'],
+                                        "episode": file_data['episode'],
+                                        "data": {
+                                            "id": selected_id,
+                                            "first_air_date": selected_first_air_date,
+                                            "name": selected_name
+                                        }
+                                    })
+                                else:
+                                    print("Invalid choice. No series selected.")
+                            except ValueError:
+                                print("Invalid input. Please enter a number.")
+                        else:
+                            print(f"No manual results found for {search_title}.")
+                    else:
+                        print(f"Skipping manual search for {file_data['file_path']}.")
+        else:
+            print(f"Skipping all files in directory: {directory}")
+    
+    return handled_files
+
+

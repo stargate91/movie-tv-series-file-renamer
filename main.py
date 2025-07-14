@@ -1,5 +1,5 @@
 from cli import parse_args
-from file_ops import get_video_files, rename_files, handle_multiple_movie_results, handle_no_results, handling_series
+from file_ops import get_video_files, rename_files, handle_multiple_movie_results, handle_no_results, handling_series_one_result, handle_series_multiple_results, handle_series_no_results
 from meta import process_video_files, transfer_metadata_to_api
 from api import APIClient
 from dotenv import load_dotenv
@@ -29,7 +29,20 @@ def main():
 
     no_results, one_result, multiple_results = transfer_metadata_to_api(processed_files, api_client, api_source, file_type)
 
-    handling_series(one_result)
+    handled_files_one = handling_series_one_result(one_result)
+    handled_files_multiple = handle_series_multiple_results(multiple_results)
+    handled_files_no = handle_series_no_results(no_results, api_client)
+
+
+    for file_data in handled_files_one:
+        print(file_data)
+
+    for file_data in handled_files_multiple:
+        print(file_data)
+
+    for file_data in handled_files_no:
+        print(file_data)
+
 
 
     '''if second_meta and meta == "file":
