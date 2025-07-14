@@ -193,3 +193,9 @@ def handle_no_results(no_results, api_client, api_source):
             print(f"Skipping manual search for {file_data['file_path']}.")
 
     return handled_files
+
+def handling_series(api_results):
+
+    for file_data in api_results:
+        for key, value in file_data.items():
+            print(f"Key: {key}, Value: {value}")
