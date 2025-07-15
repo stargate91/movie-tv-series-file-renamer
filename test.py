@@ -1,6 +1,6 @@
 from guessit import guessit
 
-filename = "Dzsungelből Dzsungelbe 1080p.mkv"
+filename = "Hitch.2005.1080p.Bluray.Remux.MPEG2.TrueHD.5.1.HUN-KuNgZi.mkv"
 result = guessit(filename)
 
 for key, value in result.items():

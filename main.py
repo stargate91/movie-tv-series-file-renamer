@@ -1,9 +1,10 @@
 from api_client import APIClient
 from config import Config
-from file_ops import get_video_files, rename_files
+from file_ops import get_video_files, rename_movie_files, rename_series_files
 from meta import process_video_files, transfer_metadata_to_api
 from movie_handler import handle_no_movie_results, handle_multiple_movie_results
-from series_handler import handle_no_series_results, handle_one_series_result, handle_multiple_series_results
+from series_handler_id import handle_no_series_results, handle_one_series_result, handle_multiple_series_results
+from series_handler_episode import transfer_metadata_to_api_to_get_episode
 
 
 def main():
@@ -45,11 +46,11 @@ def main():
             mult_res += s_mult_res
 
     if file_type == "movie":
-        rename_files(one_res, dry_run)
+        rename_movie_files(one_res, dry_run)
         mult_handled = handle_multiple_movie_results(mult_res)
-        rename_files(mult_handled, dry_run)
+        rename_movie_files(mult_handled, dry_run)
         no_handled = handle_no_movie_results(no_res, api_client, api_source)
-        rename_files(no_handled, dry_run)
+        rename_movie_files(no_handled, dry_run)
 
     if second_meta and file_type == "series":
         no_res_paths = [file_data['file_path'] for file_data in no_res]
@@ -68,6 +69,15 @@ def main():
         no_handled = handle_no_series_results(no_res, api_client)
         one_handled = handle_one_series_result(one_res)
         mult_handled = handle_multiple_series_results(mult_res)
+
+        one_handled += no_handled
+        mult_handled += one_handled
+
+        id_handled = mult_handled
+
+        episodes, unknown = transfer_metadata_to_api_to_get_episode(id_handled, api_client)
+
+        rename_series_files(episodes, dry_run)
 
 
 if __name__ == "__main__":

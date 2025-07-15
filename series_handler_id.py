@@ -58,13 +58,8 @@ def get_series_choice(max_choice):
 
 def pick_result(results, choice):
     selected_result = results[choice - 1]
-    selected_series = {
-        "id": selected_result["id"],
-        "name": selected_result["name"],
-        "first_air_date": selected_result["first_air_date"],
-    }
-    print(f"User selected: {selected_series['name']} ({selected_series['first_air_date']})")
-    return selected_series
+    print(f"User selected: {selected_result['name']} ({selected_result['first_air_date']})")
+    return selected_result
 
 def handle_append(handled_files, file_data, selected_series):
     handled_files.append({
@@ -175,14 +170,22 @@ def handle_one_series_result(one_res):
 
     for file_data in one_res:
         file_path = file_data.get('file_path')
-        season = file_data.get('season')
-        episode = file_data.get('episode')
-        result_data = file_data['data']['results'][0]
-        series_id = result_data.get('id')
+        season    = file_data.get('season')
+        episode   = file_data.get('episode')
 
-        handled_files.append({"file_path": file_path, "season": season, "episode": episode, "data": {"id": series_id}})
+        raw = file_data['data']
+        data = raw['results'][0]
+
+        handled_files.append({
+            "file_path": file_path,
+            "season":    season,
+            "episode":   episode,
+            "data":      data
+        })
 
     return handled_files
+
+
 
 def select_for_group(files):
     prototype = files[0]

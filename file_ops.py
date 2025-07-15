@@ -52,7 +52,7 @@ def get_resolution_from_file(file_path):
         return "Unknown"
 
 
-def rename_files(api_results, dry_run):
+def rename_movie_files(api_results, dry_run):
     renamed_files = []
 
     for file_data in api_results: 
@@ -78,6 +78,38 @@ def rename_files(api_results, dry_run):
         resolution = get_resolution_from_file(file_path)
         file_extension = os.path.splitext(file_path)[1].lower()
         new_filename = f"{title} - {year}_{resolution}p{file_extension}"
+        directory = os.path.dirname(file_path)
+        new_file_path = os.path.join(directory, new_filename)
+
+        print(f"Old name: {file_path} -> New name: {new_filename}")
+
+        if not dry_run:
+            os.rename(file_path, new_file_path)
+            renamed_files.append(new_file_path)
+
+    return renamed_files
+
+def rename_series_files(api_results, dry_run):
+    renamed_files = []
+
+    for file_data in api_results: 
+        file_path = file_data['file_path']
+
+        series_details = file_data['series_details']
+        episode_details = file_data['episode_details']
+
+        episode_title = episode_details['name']
+        season = episode_details['season_number']
+        episode = episode_details['episode_number']
+        air_date = episode_details['air_date']
+
+        series_title = series_details['name']
+        first_air_date = series_details['first_air_date']
+
+
+        resolution = get_resolution_from_file(file_path)
+        file_extension = os.path.splitext(file_path)[1].lower()
+        new_filename = f"{series_title} - S{season}E{episode} - {episode_title} - {air_date}_{resolution}p{file_extension}"
         directory = os.path.dirname(file_path)
         new_file_path = os.path.join(directory, new_filename)
 
