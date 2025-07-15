@@ -19,11 +19,9 @@ def process_search_results(api_source, data, file_data):
             print(f"Found result: {data['Title']} ({data['Year']})")
             return {
                 "file_path": file_data['file_path'],
-                "data": {
-                    "Title": data['Title'],
-                    "Year": data['Year']
+                "data": data,
+                "extras": extras
                 }
-            }
         else:
             print(f"No manual results found.")
             return None
@@ -40,11 +38,9 @@ def process_search_results(api_source, data, file_data):
                 print(f"User selected: {selected_result['title']} ({selected_result['release_date']})")
                 return {
                     "file_path": file_data['file_path'],
-                    "data": {
-                        "title": selected_result['title'],
-                        "release_date": selected_result['release_date']
+                    "data": selected_result,
+                    "extras": extras
                     }
-                }
             else:
                 print("Invalid choice. No movie selected.")
                 return None
@@ -67,6 +63,7 @@ def handle_no_movie_results(no_res, api_client, api_source):
     handled_files = []
 
     for file_data in no_res:
+        extras = file_data.get('extras')
         print(f"\nAttempting manual search for: {file_data['file_path']}")
         
         if ask_manual_search():
@@ -111,6 +108,7 @@ def handle_multiple_movie_results(mult_res):
     handled_files = []
 
     for file_data in mult_res:
+        extras = file_data.get('extras') 
         print(f"\nMultiple movie results found for: {file_data['file_path']}")
         results = file_data['data']['results']
         
@@ -126,11 +124,9 @@ def handle_multiple_movie_results(mult_res):
             
             handled_files.append({
                 "file_path": file_data['file_path'],
-                "data": {
-                    "title": selected_title,
-                    "release_date": selected_release_date
-                }
-            })
+                "data": selected_result,
+                "extras": extras
+                })
         else:
             print("Invalid choice. No movie selected.")
     

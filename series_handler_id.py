@@ -66,7 +66,8 @@ def handle_append(handled_files, file_data, selected_series):
         "file_path": file_data['file_path'],
         "season": file_data['season'],
         "episode": file_data['episode'],
-        "data": selected_series
+        "data": selected_series,
+        "extras": file_data['extras']
     })
 
 def group_by_folders(mult_res):
@@ -170,17 +171,19 @@ def handle_one_series_result(one_res):
 
     for file_data in one_res:
         file_path = file_data.get('file_path')
-        season    = file_data.get('season')
-        episode   = file_data.get('episode')
+        season = file_data.get('season')
+        episode = file_data.get('episode')
+        extras = file_data.get('extras')
 
         raw = file_data['data']
         data = raw['results'][0]
 
         handled_files.append({
             "file_path": file_path,
-            "season":    season,
-            "episode":   episode,
-            "data":      data
+            "season": season,
+            "episode": episode,
+            "data": data,
+            "extras": extras
         })
 
     return handled_files
