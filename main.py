@@ -1,25 +1,27 @@
-from cli import parse_args
-from file_ops import get_video_files, rename_files, handle_multiple_movie_results, handle_no_results, handling_series_one_result, handle_series_multiple_results, handle_series_no_results
+from api_client import APIClient
+from config import Config
+from file_ops import get_video_files, rename_files
 from meta import process_video_files, transfer_metadata_to_api
-from api import APIClient
-from dotenv import load_dotenv
-import os
+from movie_handler import handle_no_movie_results, handle_multiple_movie_results
+from series_handler import handle_no_series_results, handle_one_series_result, handle_multiple_series_results
+
 
 def main():
-    args = parse_args()
-    folder_path = args.folder
-    recursive = args.recursive
-    meta = args.meta
-    api_source = args.source
-    file_type = args.type
-    second_meta = args.second
-    dry_run = args.dry_run
 
-    load_dotenv()
+    config = Config()
+    config_data = config.get_config()
 
-    omdb_key = os.getenv('OMDB_KEY')
-    tmdb_key = os.getenv('TMDB_KEY')
-    tmdb_bearer_token = os.getenv('TMDB_BEARER_TOKEN')
+    folder_path = config_data["folder_path"]
+    recursive = config_data["recursive"]
+    meta = config_data["meta"]
+    api_source = config_data["api_source"]
+    file_type = config_data["file_type"]
+    second_meta = config_data["second_meta"]
+    dry_run = config_data["dry_run"]
+    
+    omdb_key = config_data["omdb_key"]
+    tmdb_key = config_data["tmdb_key"]
+    tmdb_bearer_token = config_data["tmdb_bearer_token"]
 
     api_client = APIClient(omdb_key, tmdb_key, tmdb_bearer_token)
 
@@ -27,44 +29,45 @@ def main():
     
     processed_files = process_video_files(video_files, meta, file_type)
 
-    no_results, one_result, multiple_results = transfer_metadata_to_api(processed_files, api_client, api_source, file_type)
+    no_res, one_res, mult_res = transfer_metadata_to_api(processed_files, api_client, api_source, file_type)
 
-    handled_files_one = handling_series_one_result(one_result)
-    handled_files_multiple = handle_series_multiple_results(multiple_results)
-    handled_files_no = handle_series_no_results(no_results, api_client)
+    if second_meta and file_type == "movie":
+        no_res_paths = [file_data['file_path'] for file_data in no_res]
+        if meta == "file":
+            processed_files = process_video_files(no_res_paths, "folder", file_type)
+            no_res, s_one_res, s_mult_res = transfer_metadata_to_api(processed_files, api_client, api_source, file_type)
+            one_res += s_one_res
+            mult_res += s_mult_res
+        if meta == "folder":
+            processed_files = process_video_files(no_res_paths, "file", file_type)
+            no_res, s_one_res, s_mult_res = transfer_metadata_to_api(processed_files, api_client, api_source, file_type)
+            one_res += s_one_res
+            mult_res += s_mult_res
 
+    if file_type == "movie":
+        rename_files(one_res, dry_run)
+        mult_handled = handle_multiple_movie_results(mult_res)
+        rename_files(mult_handled, dry_run)
+        no_handled = handle_no_movie_results(no_res, api_client, api_source)
+        rename_files(no_handled, dry_run)
 
-    for file_data in handled_files_one:
-        print(file_data)
+    if second_meta and file_type == "series":
+        no_res_paths = [file_data['file_path'] for file_data in no_res]
+        if meta == "file":
+            processed_files = process_video_files(no_res_paths, "folder", file_type)
+            no_res, s_one_res, s_mult_res = transfer_metadata_to_api(processed_files, api_client, api_source, file_type)
+            one_res += s_one_res
+            mult_res += s_mult_res
+        if meta == "folder":
+            processed_files = process_video_files(no_res_paths, "file", file_type)
+            no_res, s_one_res, s_mult_res = transfer_metadata_to_api(processed_files, api_client, api_source, file_type)
+            one_res += s_one_res
+            mult_res += s_mult_res
 
-    for file_data in handled_files_multiple:
-        print(file_data)
-
-    for file_data in handled_files_no:
-        print(file_data)
-
-
-
-    '''if second_meta and meta == "file":
-        no_results_paths = [file_data['file_path'] for file_data in no_results]
-
-        second_processed_files = process_video_files(no_results_paths, "folder", file_type)
-        no_results, second_one_result, second_multiple_results = transfer_metadata_to_api(second_processed_files, api_client, api_source, file_type)
-        one_result += second_one_result
-        multiple_results += second_multiple_results
-    if second_meta and meta == "folder":
-        second_processed_files = process_video_files(no_results, "file", file_type)
-        no_results, second_one_result, second_multiple_results = transfer_metadata_to_api(second_processed_files, api_client, api_source, file_type)
-        one_result += second_one_result
-        multiple_results += second_multiple_results
-
-
-    rename_files(one_result, dry_run)
-    handled_files = handle_multiple_movie_results(multiple_results)
-    rename_files(handled_files, dry_run)
-    manually_handled_files = handle_no_results(no_results, api_client, api_source)
-    rename_files(manually_handled_files, dry_run)'''
-
+    if file_type == "series":
+        no_handled = handle_no_series_results(no_res, api_client)
+        one_handled = handle_one_series_result(one_res)
+        mult_handled = handle_multiple_series_results(mult_res)
 
 
 if __name__ == "__main__":
