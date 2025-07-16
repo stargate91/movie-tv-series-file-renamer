@@ -70,7 +70,7 @@ def main():
     episodes, unknown = transfer_metadata_to_api_to_get_episode(id_handled, api_client)
 
     rename_episode_files(episodes, dry_run)
-    print("Done.")
+    print("\n Done.")
     print("\n Unexpected files:")
     for file_data in unknown:
         print(f"\n {file_data['file_path']} manual renaming required.")

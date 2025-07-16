@@ -1,5 +1,9 @@
 import os
 from guessit import guessit
+from outputs import unknown_file_type_message
+from outputs import episode_files_success_message, movie_files_success_message, unknown_files_success_message
+from outputs import incorrect_api_arguments_message
+from outputs import no_result_message, one_result_message, multiple_results_tmdb_message, no_data_found_message
 
 def extract_metadata(item):
 
@@ -11,7 +15,7 @@ def extract_metadata(item):
     elif file_type == "movie":
         wanted_keys = ['title', 'year']
     else:
-        print(f"[ERROR] Unknown file type for {item}: {file_type}")
+        unknown_file_type_message(item, file_type)
 
     wanted = {key: result.get(key, 'Unknown') for key in wanted_keys}
     extras = {key: value for key, value in result.items() if key not in wanted_keys}
@@ -43,10 +47,13 @@ def process_video_files(video_files, meta):
 
         if file_type == "episode":
             episode_files.append(file_data)
+            episode_files_success_message(file)
         if file_type == "movie":
             movie_files.append(file_data)
+            movie_files_success_message(file)
         if file_type == "Unknown":
             unknown_files.append(file_data)
+            unknown_files_success_message(file)
 
     return movie_files, episode_files, unknown_files
 
@@ -75,7 +82,7 @@ def transfer_metadata_to_api(processed_files, api_client, api_source):
         elif file_type == "episode":
             data = api_client.get_from_tmdb_tv(title, year)
         else:
-            print(f"[ERROR] Incorrect arguments for API source or file type for {file_path}.")
+            incorrect_api_arguments_message()
             data = None
 
         episode_no_res = {
@@ -111,35 +118,35 @@ def transfer_metadata_to_api(processed_files, api_client, api_source):
         if data:
             if file_type == "episode":
                 if data.get("total_results") == 0:
-                    print(f"No results found for {file_path}: No results in TMDB response.")
                     no_results.append(episode_no_res)
+                    no_result_message(file_path)
                 elif data.get("total_results") == 1:
                     one_result.append(episode_res)
-                    print(f"One result found for {file_path}: {data}")
+                    one_result_message(file_path, data)
                 elif data.get("total_results") > 1:
                     multiple_results.append(episode_res)
-                    print(f"Multiple results found for {file_path}: {data}")
+                    multiple_results_tmdb_message(file_path, data)
                 else:
-                    print(f"No data found for {file_path}.")
                     no_results.append(file_data)
+                    no_data_found_message(file_path)
 
             if file_type == "movie":
                 if api_source == "omdb":
                     if data.get("Response") == "False":
-                        print(f"No results found for {file_path}: {data['Error']}")
                         no_results.append(movie_no_res)
+                        no_result_message(file_path)
                     elif data.get("Response") == "True":
                         one_result.append(movie_res)
-                        print(f"One result found for {file_data['file_path']}: {data}")
+                        one_result_message(file_path, data)
                 elif api_source == "tmdb":
                     if data.get("total_results") == 0:
-                        print(f"No results found for {file_data['file_path']}: No results in TMDB response.")
                         no_results.append(movie_no_res)
+                        no_result_message(file_path)
                     elif data.get("total_results") == 1:
                         one_result.append(movie_res)
-                        print(f"One result found for {file_data['file_path']}: {data}")
+                        one_result_message(file_path, data)
                     elif data.get("total_results") > 1:
                         multiple_results.append(movie_res)
-                        print(f"Multiple results found for {file_path}: {data}")    
+                        multiple_results_tmdb_message(file_path, data)    
 
     return no_results, one_result, multiple_results

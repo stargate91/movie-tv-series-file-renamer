@@ -1,20 +1,14 @@
 import os
 import ffmpeg
-
-def is_video_file(file_path, min_size_bytes):
-    file_extension = os.path.splitext(file_path)[1].lower()
-    valid_extensions = ['.mp4', '.mkv', '.avi', '.mov', '.wmv', '.mpeg', '.mpg']
-
-    if file_extension in valid_extensions:
-        file_size = os.path.getsize(file_path)
-        return file_size >= min_size_bytes
-    return False
+from outputs import processing_file_message, getting_resolution_error_message, rename_success_message, dry_rename_success_message
+from validators import is_video_file
 
 def get_video_files_from_directory(directory, min_size_bytes):
     video_files = []
     for file in os.listdir(directory):
         file_path = os.path.join(directory, file)
         if os.path.isfile(file_path) and is_video_file(file_path, min_size_bytes):
+            processing_file_message(file_path)
             video_files.append(file_path)
 
     video_files = sorted(video_files)
@@ -48,7 +42,7 @@ def get_resolution_from_file(file_path):
         else:
             return 480
     except ffmpeg._run.Error as e:
-        print(f"Error getting resolution for {file_path}: {e}")
+        getting_resolution_error_message(file_path, e)
         return "Unknown"
 
 
@@ -70,9 +64,6 @@ def rename_movie_files(api_results, dry_run):
             title = metadata['results'][0]['title']
             release_date = metadata['results'][0]['release_date']
             year = release_date.split('-')[0]
-        else:
-            print("[ERROR] Missing title or year from API response.")
-            continue
 
 
         resolution = get_resolution_from_file(file_path)
@@ -81,11 +72,12 @@ def rename_movie_files(api_results, dry_run):
         directory = os.path.dirname(file_path)
         new_file_path = os.path.join(directory, new_filename)
 
-        print(f"Old name: {file_path} -> New name: {new_filename}")
-
         if not dry_run:
             os.rename(file_path, new_file_path)
             renamed_files.append(new_file_path)
+            rename_success_message(file_path, new_filename)
+
+        dry_rename_success_message(file_path, new_filename)
 
     return renamed_files
 
@@ -113,10 +105,11 @@ def rename_episode_files(api_results, dry_run):
         directory = os.path.dirname(file_path)
         new_file_path = os.path.join(directory, new_filename)
 
-        print(f"Old name: {file_path} -> New name: {new_filename}")
-
         if not dry_run:
             os.rename(file_path, new_file_path)
             renamed_files.append(new_file_path)
+            rename_success_message(file_path, new_filename)
+
+        dry_rename_success_message(file_path, new_filename)
 
     return renamed_files
