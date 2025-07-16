@@ -46,6 +46,16 @@ class Config:
             action="store_true"
         )
         parser.add_argument(
+            "--movie_template",
+            help="The template used for renaming movie files",
+            default="{movie_title} {movie_year}-{resolution})"
+        )
+        parser.add_argument(
+            "--episode_template",
+            help="The template used for renaming episode files",
+            default="{series_title} - S{season}E{episode} - {episode_title}-{air_date}-{resolution}"
+        )
+        parser.add_argument(
             "--dry-run",
             action="store_true",
             help="Preview the planned renaming without modifying any files."
@@ -59,6 +69,8 @@ class Config:
             "meta": self.args.meta,
             "api_source": self.args.source,
             "second_meta": self.args.second,
+            "movie_template": self.args.movie_template,
+            "episode_template": self.args.episode_template,
             "dry_run": self.args.dry_run,
             "omdb_key": self.omdb_key,
             "tmdb_key": self.tmdb_key,

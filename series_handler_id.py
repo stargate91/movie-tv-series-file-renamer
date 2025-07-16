@@ -3,9 +3,9 @@ import os
 def user_menu_for_selection(files, folders, main_folders):
     menu_text = (
         "\nChoose how you want to apply the selected metadata for the files above:\n"
-        f"  1. Apply to a single file only (e.g: {files[0]['file_path']}\n"
+        f"  1. Apply to a single file only (e.g: {files[0]['file_path']})\n"
         f"  2. Apply to the entire folder (e.g: {folders})\n"
-        f"  3. Apply to the main (parent) folder and all sub‑folders (e.g: {main_folders}\n"
+        f"  3. Apply to the main (parent) folder and all sub‑folders (e.g: {main_folders})\n"
         "  4. Cancel\n"
         "Enter your choice (1–4): "
     )
