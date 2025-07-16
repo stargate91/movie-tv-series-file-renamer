@@ -51,7 +51,7 @@ def rename_movie_files(api_results, dry_run):
 
     for file_data in api_results: 
         file_path = file_data['file_path']
-        metadata = file_data['data']
+        metadata = file_data['movie_details']
 
         if 'Title' in metadata:
             title = metadata['Title']

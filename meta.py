@@ -98,7 +98,7 @@ def transfer_metadata_to_api(processed_files, api_client, api_source):
                 "file_type": file_type,
                 "season": season,
                 "episode": episode,
-                "data": data,
+                "series_details": data,
                 "extras": extras
         }
 
@@ -111,7 +111,7 @@ def transfer_metadata_to_api(processed_files, api_client, api_source):
         movie_res = {
                 "file_path": file_path,
                 "file_type": file_type,
-                "data": data,
+                "movie_details": data,
                 "extras": extras
         }
 

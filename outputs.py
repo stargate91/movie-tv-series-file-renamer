@@ -30,7 +30,7 @@ def unknown_files_success_message(file):
     print(f"{rel_path} added to unknown type files")
 
 def incorrect_api_arguments_message():
-    print("[ERROR] Incorrect arguments for API source")
+    print("[ERROR] Unsupported API source for manual search")
 
 def no_result_message(file_path):
     rel_path = os.path.relpath(file_path)

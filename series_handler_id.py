@@ -1,11 +1,11 @@
 import os
 
-def user_menu_for_selection():
+def user_menu_for_selection(files, folders, main_folders):
     menu_text = (
-        "\nChoose how you want to apply the selected metadata:\n"
-        "  1. Apply to a single file only\n"
-        "  2. Apply to the entire folder\n"
-        "  3. Apply to the main (parent) folder and all sub‑folders\n"
+        "\nChoose how you want to apply the selected metadata for the files above:\n"
+        f"  1. Apply to a single file only (e.g: {files[0]['file_path']}\n"
+        f"  2. Apply to the entire folder (e.g: {folders})\n"
+        f"  3. Apply to the main (parent) folder and all sub‑folders (e.g: {main_folders}\n"
         "  4. Cancel\n"
         "Enter your choice (1–4): "
     )
@@ -64,9 +64,10 @@ def pick_result(results, choice):
 def handle_append(handled_files, file_data, selected_series):
     handled_files.append({
         "file_path": file_data['file_path'],
+        "file_type": file_data['file_type'],
         "season": file_data['season'],
         "episode": file_data['episode'],
-        "data": selected_series,
+        "series_details": selected_series,
         "extras": file_data['extras']
     })
 
@@ -93,8 +94,20 @@ def group_by_folders(mult_res):
 
 def handle_no_series_results(no_res, api_client):
     handled_files = []
-    
-    action_choice = user_menu_for_selection()
+
+    folders, main_folders = group_by_folders(no_res)
+
+    for file_data in no_res:
+        print(f"Manual series search required for {file_data['file_path']}")
+
+    first_folder_key = next(iter(folders))
+    first_folder_data = folders[first_folder_key]
+
+    first_main_folder_key = next(iter(main_folders))
+    first_main_folder_data = main_folders[first_main_folder_key]
+
+
+    action_choice = user_menu_for_selection(no_res, first_folder_key, first_main_folder_key)
 
     if action_choice == 1:
         for file_data in no_res:
@@ -118,7 +131,6 @@ def handle_no_series_results(no_res, api_client):
                 return None
 
     elif action_choice == 2:
-        folders, _ = group_by_folders(no_res)
         for season_dir, files in folders.items():
             print(f"\nAttempting manual search for: {season_dir}")
 
@@ -140,7 +152,6 @@ def handle_no_series_results(no_res, api_client):
             else:
                 return None
     elif action_choice == 3:
-        _, main_folders = group_by_folders(no_res)
         for series_dir, files in main_folders.items():
             print(f"\nAttempting manual search for: {series_dir}")
 
@@ -171,18 +182,20 @@ def handle_one_series_result(one_res):
 
     for file_data in one_res:
         file_path = file_data.get('file_path')
+        file_type = file_data.get('file_type')
         season = file_data.get('season')
         episode = file_data.get('episode')
         extras = file_data.get('extras')
 
-        raw = file_data['data']
+        raw = file_data['series_details']
         data = raw['results'][0]
 
         handled_files.append({
             "file_path": file_path,
+            "file_type": file_type,
             "season": season,
             "episode": episode,
-            "data": data,
+            "series_details": data,
             "extras": extras
         })
 
@@ -192,7 +205,7 @@ def handle_one_series_result(one_res):
 
 def select_for_group(files):
     prototype = files[0]
-    results = prototype["data"]["results"]
+    results = prototype["series_details"]["results"]
 
     display_results(results)
 
@@ -208,7 +221,17 @@ def handle_multiple_series_results(mult_res):
 
     folders, main_folders = group_by_folders(mult_res)
 
-    action_choice = user_menu_for_selection()
+    for file_data in mult_res:
+        print(f"Multiple series results found for: {file_data['file_path']}")
+
+    first_folder_key = next(iter(folders))
+    first_folder_data = folders[first_folder_key]
+
+    first_main_folder_key = next(iter(main_folders))
+    first_main_folder_data = main_folders[first_main_folder_key]
+
+
+    action_choice = user_menu_for_selection(mult_res, first_folder_key, first_main_folder_key)
 
     if action_choice == 1:
         for file_data in mult_res:

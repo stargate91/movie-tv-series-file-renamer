@@ -1,4 +1,5 @@
 from inputs import ask_manual_search, get_manual_search_data, ask_for_movie_choice
+from outputs import incorrect_api_arguments_message
 
 def search_movie_tmdb(api_client, title, year):
     return api_client.get_from_tmdb_movie(title, year)
@@ -12,7 +13,8 @@ def process_search_results(api_source, data, file_data):
             print(f"Found result: {data['Title']} ({data['Year']})")
             return {
                 "file_path": file_data['file_path'],
-                "data": data,
+                "file_type": file_data['file_type'],
+                "movie_details": data,
                 "extras": extras
                 }
         else:
@@ -31,7 +33,8 @@ def process_search_results(api_source, data, file_data):
                 print(f"User selected: {selected_result['title']} ({selected_result['release_date']})")
                 return {
                     "file_path": file_data['file_path'],
-                    "data": selected_result,
+                    "file_type": file_data['file_type'],
+                    "movie_details": selected_result,
                     "extras": file_data['extras']
                     }
             else:
@@ -45,6 +48,7 @@ def handle_no_movie_results(no_res, api_client, api_source):
     handled_files = []
 
     for file_data in no_res:
+        file_type = file_data.get('file_type')
         extras = file_data.get('extras')
         print(f"\nAttempting manual search for: {file_data['file_path']}")
         
@@ -56,7 +60,7 @@ def handle_no_movie_results(no_res, api_client, api_source):
             elif api_source == "tmdb":
                 data = search_movie_tmdb(api_client, search_title, search_year)
             else:
-                print("[ERROR] Unsupported API source for manual search.")
+                incorrect_api_arguments_message()
                 continue
 
             if data:
@@ -79,9 +83,12 @@ def handle_multiple_movie_results(mult_res):
     handled_files = []
 
     for file_data in mult_res:
+        file_type = file_data.get('file_type')
         extras = file_data.get('extras')
+
+
         print(f"\nMultiple movie results found for: {file_data['file_path']}")
-        results = file_data['data']['results']
+        results = file_data['movie_details']['results']
         
         display_results(results)
 
@@ -95,7 +102,8 @@ def handle_multiple_movie_results(mult_res):
             
             handled_files.append({
                 "file_path": file_data['file_path'],
-                "data": selected_result,
+                "file_type": file_data['file_type'],
+                "movie_details": selected_result,
                 "extras": extras
                 })
         else:
