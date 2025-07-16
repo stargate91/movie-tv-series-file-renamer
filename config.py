@@ -41,12 +41,6 @@ class Config:
             default="omdb"
         )
         parser.add_argument(
-            "--type",
-            help="Type of content ('movie' or 'series'). Movie is the default.",
-            choices=["movie", "series"],
-            default="movie"
-        )
-        parser.add_argument(
             "--second",
             help="To do an opposite source of metadata search after getting results from the API.",
             action="store_true"
@@ -64,7 +58,6 @@ class Config:
             "recursive": self.args.recursive,
             "meta": self.args.meta,
             "api_source": self.args.source,
-            "file_type": self.args.type,
             "second_meta": self.args.second,
             "dry_run": self.args.dry_run,
             "omdb_key": self.omdb_key,

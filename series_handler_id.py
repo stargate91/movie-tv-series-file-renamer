@@ -226,11 +226,13 @@ def handle_multiple_series_results(mult_res):
 
     elif action_choice == 2:
         for season_dir, files in folders.items():
+            print(f"\nMultiple series results found for: {season_dir}")
             selected_series = select_for_group(files)
             for file_data in files:
                 handle_append(handled_files, file_data, selected_series)
     elif action_choice == 3:
         for series_dir, files in main_folders.items():
+            print(f"\nMultiple series results found for: {series_dir}")
             selected_series = select_for_group(files)
             for file_data in files:
                 handle_append(handled_files, file_data, selected_series)

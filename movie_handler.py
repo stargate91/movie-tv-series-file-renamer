@@ -39,7 +39,7 @@ def process_search_results(api_source, data, file_data):
                 return {
                     "file_path": file_data['file_path'],
                     "data": selected_result,
-                    "extras": extras
+                    "extras": file_data['extras']
                     }
             else:
                 print("Invalid choice. No movie selected.")
@@ -108,7 +108,7 @@ def handle_multiple_movie_results(mult_res):
     handled_files = []
 
     for file_data in mult_res:
-        extras = file_data.get('extras') 
+        extras = file_data.get('extras')
         print(f"\nMultiple movie results found for: {file_data['file_path']}")
         results = file_data['data']['results']
         

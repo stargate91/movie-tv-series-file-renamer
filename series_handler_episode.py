@@ -21,7 +21,7 @@ def transfer_metadata_to_api_to_get_episode(id_handled, api_client):
 			})
 
 		else:
-			unknown.append(file_path)
+			unknown.append(file_data)
 			print(f"No episode found for {file_path}")
 
 	return episodes, unknown

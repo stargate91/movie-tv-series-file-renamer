@@ -89,7 +89,7 @@ def rename_movie_files(api_results, dry_run):
 
     return renamed_files
 
-def rename_series_files(api_results, dry_run):
+def rename_episode_files(api_results, dry_run):
     renamed_files = []
 
     for file_data in api_results: 
