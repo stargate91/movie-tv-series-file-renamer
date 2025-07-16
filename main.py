@@ -29,10 +29,10 @@ def main():
     
     movie_files, episode_files, unknown_files = process_video_files(video_files, meta)
 
-    #no_res_movie, one_res_movie, mult_res_movie = transfer_metadata_to_api(movie_files, api_client, api_source)
+    no_res_movie, one_res_movie, mult_res_movie = transfer_metadata_to_api(movie_files, api_client, api_source)
     no_res_episode, one_res_episode, mult_res_episode = transfer_metadata_to_api(episode_files, api_client, api_source)
 
-    '''if second_meta:
+    if second_meta:
         no_res_movie_paths = [file_data['file_path'] for file_data in no_res_movie]
         no_res_episode_paths = [file_data['file_path'] for file_data in no_res_episode]
 
@@ -57,7 +57,7 @@ def main():
     mult_movie_handled = handle_multiple_movie_results(mult_res_movie)
     rename_movie_files(mult_movie_handled, dry_run)
     no_movie_handled = handle_no_movie_results(no_res_movie, api_client, api_source)
-    rename_movie_files(no_movie_handled, dry_run)'''
+    rename_movie_files(no_movie_handled, dry_run)
 
     one_series_handled = handle_one_series_result(one_res_episode)
     mult_series_handled = handle_multiple_series_results(mult_res_episode)
