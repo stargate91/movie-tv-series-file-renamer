@@ -46,7 +46,7 @@ class APIClient:
 
     def get_from_omdb(self, title, year):
         cache_key = f"{title}-{year}"
-        if year == "Unknown Year":
+        if year == "unknown":
             api_url = f"http://www.omdbapi.com/?t={title}&apikey={self.omdb_key}&"
         else:
             api_url = f"http://www.omdbapi.com/?t={title}&y={year}&apikey={self.omdb_key}"
@@ -55,7 +55,7 @@ class APIClient:
 
     def get_from_tmdb_movie(self, title, year):
         cache_key = f"{title}-{year}"
-        if year == "Unknown":
+        if year == "unknown":
             api_url = f"https://api.themoviedb.org/3/search/movie?api_key={self.tmdb_key}&query={title}"
         else:
             api_url = f"https://api.themoviedb.org/3/search/movie?api_key={self.tmdb_key}&query={title}&year={year}"
@@ -67,7 +67,7 @@ class APIClient:
     
     def get_from_tmdb_tv(self, title, year):
         cache_key = f"{title}-{year}"
-        if year == "Unknown":
+        if year == "unknown":
             api_url = f"https://api.themoviedb.org/3/search/tv?api_key={self.tmdb_key}&query={title}"
         else:
             api_url = f"https://api.themoviedb.org/3/search/tv?api_key={self.tmdb_key}&query={title}&year={year}"

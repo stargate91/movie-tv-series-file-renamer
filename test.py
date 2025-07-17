@@ -1,6 +1,6 @@
 from guessit import guessit
 
-filename = "50.First.Dates.2004.1080p.RETAiL.BluRay.Remux.MPEG-2.TrueHD.5.1.HuN-Essence"
+filename = "Raiders.Of.The.Lost.Ark.1981.1080p.BluRay.DTS.x264.HuN-TRiNiTY\i1.1080p-trinity.mkv"
 result = guessit(filename)
 
 for key, value in result.items():

@@ -1,65 +1,13 @@
 import os
-
-def user_menu_for_selection(files, folders, main_folders):
-    menu_text = (
-        "\nChoose how you want to apply the selected metadata for the files above:\n"
-        f"  1. Apply to a single file only (e.g: {files[0]['file_path']})\n"
-        f"  2. Apply to the entire folder (e.g: {folders})\n"
-        f"  3. Apply to the main (parent) folder and all sub‑folders (e.g: {main_folders})\n"
-        "  4. Cancel\n"
-        "Enter your choice (1–4): "
-    )
-    while True:
-        try:
-            raw = input(menu_text).strip()
-            if not raw:
-                print("Please enter a number between 1 and 4.")
-                continue
-
-            choice = int(raw)
-            if 1 <= choice <= 4:
-                return choice
-            else:
-                print("Invalid choice. Only 1, 2, 3, or 4 are allowed.")
-        except ValueError:
-            print("Invalid input. Please type a number (1–4).")
-        except (KeyboardInterrupt, EOFError):
-            print("\nOperation cancelled. Exiting menu.")
-            return None
-
-def ask_manual_search():
-    return input("\nWould you like to search manually? (y/n): ").strip().lower() == 'y'
-
-def get_manual_search_data():
-    search_title = input("Enter series title: ").strip()
-    search_year = input("Enter series year (or leave empty to skip): ").strip()
-    return search_title, search_year if search_year else "Unknown"
+from inputs import user_menu_for_selection, get_series_choice, get_manual_series_search_data, ask_manual_search
+from outputs import display_series_results, pick_result
+from outputs import manual_series_search_message, attempting_manual_search_message
+from outputs import attempting_manual_search_message_for_dir
+from outputs import found_results_message, attempting_manual_search_message_for_main_dir
+from outputs import multiple_series_results_message
 
 def search_series_tmdb(api_client, title, year):
     return api_client.get_from_tmdb_tv(title, year)
-
-def display_results(results):
-    for idx, result in enumerate(results, start=1):
-        first_air_date = result.get('first_air_date')
-        name = result.get('name')
-        print(f"{idx}. {name} ({first_air_date})")
-
-def get_series_choice(max_choice):
-    try:
-        choice = int(input(f"Please select a series by number (1-{max_choice}): "))
-        if 1 <= choice <= max_choice:
-            return choice
-        else:
-            print(f"Please enter a number between 1 and {max_choice}.")
-            return None
-    except ValueError:
-        print("Invalid input. Please enter a number.")
-        return None
-
-def pick_result(results, choice):
-    selected_result = results[choice - 1]
-    print(f"User selected: {selected_result['name']} ({selected_result['first_air_date']})")
-    return selected_result
 
 def handle_append(handled_files, file_data, selected_series):
     handled_files.append({
@@ -95,31 +43,30 @@ def group_by_folders(mult_res):
 def handle_no_series_results(no_res, api_client):
     handled_files = []
 
+    if not no_res:
+        print("No results to handle.")
+        return handled_files    
+
     folders, main_folders = group_by_folders(no_res)
 
     for file_data in no_res:
-        print(f"Manual series search required for {file_data['file_path']}")
+        manual_series_search_message(file_data)
 
     first_folder_key = next(iter(folders))
-    first_folder_data = folders[first_folder_key]
-
     first_main_folder_key = next(iter(main_folders))
-    first_main_folder_data = main_folders[first_main_folder_key]
-
 
     action_choice = user_menu_for_selection(no_res, first_folder_key, first_main_folder_key)
 
     if action_choice == 1:
         for file_data in no_res:
-            print(f"\nAttempting manual search for: {file_data['file_path']}")
-
+            attempting_manual_search_message(file_data)
             if ask_manual_search():
-                search_title, search_year = get_manual_search_data()
+                search_title, search_year = get_manual_series_search_data()
                 data = search_series_tmdb(api_client, search_title, search_year)
 
                 results = file_data['data']['results']
 
-                display_results(results)
+                display_series_results(results)
 
                 choice = None
                 while choice is None:
@@ -132,14 +79,13 @@ def handle_no_series_results(no_res, api_client):
 
     elif action_choice == 2:
         for season_dir, files in folders.items():
-            print(f"\nAttempting manual search for: {season_dir}")
-
+            attempting_manual_search_message_for_dir(season_dir)
             if ask_manual_search():
-                search_title, search_year = get_manual_search_data()
+                search_title, search_year = get_manual_series_search_data()
                 data = search_series_tmdb(api_client, search_title, search_year)
                 results = data['results']
-                print("Found results:")
-                display_results(results)
+                found_results_message()
+                display_series_results(results)
 
                 choice = None
                 while choice is None:
@@ -153,14 +99,13 @@ def handle_no_series_results(no_res, api_client):
                 return None
     elif action_choice == 3:
         for series_dir, files in main_folders.items():
-            print(f"\nAttempting manual search for: {series_dir}")
-
+            attempting_manual_search_message_for_main_dir(series_dir)
             if ask_manual_search():
-                search_title, search_year = get_manual_search_data()
+                search_title, search_year = get_manual_series_search_data()
                 data = search_series_tmdb(api_client, search_title, search_year)
                 results = data['results']
-                print("Found results:")
-                display_results(results)
+                found_results_message()
+                display_series_results(results)
 
                 choice = None
                 while choice is None:
@@ -201,13 +146,11 @@ def handle_one_series_result(one_res):
 
     return handled_files
 
-
-
 def select_for_group(files):
     prototype = files[0]
     results = prototype["series_details"]["results"]
 
-    display_results(results)
+    display_series_results(results)
 
     choice = None
     while choice is None:
@@ -219,26 +162,26 @@ def select_for_group(files):
 def handle_multiple_series_results(mult_res):
     handled_files = []
 
+    if not mult_res:
+        print("No results to handle.")
+        return handled_files
+
     folders, main_folders = group_by_folders(mult_res)
 
     for file_data in mult_res:
-        print(f"Multiple series results found for: {file_data['file_path']}")
+        multiple_series_results_message(file_data)
 
     first_folder_key = next(iter(folders))
-    first_folder_data = folders[first_folder_key]
-
     first_main_folder_key = next(iter(main_folders))
-    first_main_folder_data = main_folders[first_main_folder_key]
-
 
     action_choice = user_menu_for_selection(mult_res, first_folder_key, first_main_folder_key)
 
     if action_choice == 1:
         for file_data in mult_res:
-            print(f"\nMultiple series results found for: {file_data['file_path']}")
+            multiple_series_results_message(file_data)
             results = file_data['data']['results']
 
-            display_results(results)
+            display_series_results(results)
 
             choice = None
             while choice is None:
@@ -249,13 +192,13 @@ def handle_multiple_series_results(mult_res):
 
     elif action_choice == 2:
         for season_dir, files in folders.items():
-            print(f"\nMultiple series results found for: {season_dir}")
+            attempting_manual_search_message_for_dir(season_dir)
             selected_series = select_for_group(files)
             for file_data in files:
                 handle_append(handled_files, file_data, selected_series)
     elif action_choice == 3:
         for series_dir, files in main_folders.items():
-            print(f"\nMultiple series results found for: {series_dir}")
+            attempting_manual_search_message_for_main_dir(series_dir)
             selected_series = select_for_group(files)
             for file_data in files:
                 handle_append(handled_files, file_data, selected_series)

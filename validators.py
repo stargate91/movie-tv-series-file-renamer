@@ -1,6 +1,6 @@
 import os
 
-def is_video_file(file_path, min_size_bytes):
+def is_vid_file(file_path, min_size_bytes):
     file_extension = os.path.splitext(file_path)[1].lower()
     valid_extensions = ['.mp4', '.mkv', '.avi', '.mov', '.wmv', '.mpeg', '.mpg']
 

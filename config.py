@@ -3,11 +3,9 @@ import argparse
 from dotenv import load_dotenv
 
 class Config:
-    def __init__(self, env_path=None):
-        if env_path:
-            load_dotenv(env_path)
-        else:
-            load_dotenv()
+    def __init__(self):
+        
+        load_dotenv()
         
         self.omdb_key = os.getenv('OMDB_KEY')
         self.tmdb_key = os.getenv('TMDB_KEY')
@@ -41,11 +39,6 @@ class Config:
             default="omdb"
         )
         parser.add_argument(
-            "--second",
-            help="To do an opposite source of metadata search after getting results from the API.",
-            action="store_true"
-        )
-        parser.add_argument(
             "--movie_template",
             help="The template used for renaming movie files",
             default="{movie_title} {movie_year}-{resolution})"
@@ -56,9 +49,9 @@ class Config:
             default="{series_title} - S{season}E{episode} - {episode_title}-{air_date}-{resolution}"
         )
         parser.add_argument(
-            "--dry-run",
+            "--live-run",
             action="store_true",
-            help="Preview the planned renaming without modifying any files."
+            help="Perform the actual renaming, modifying files."
         )
         return parser.parse_args()
 
@@ -68,10 +61,9 @@ class Config:
             "recursive": self.args.recursive,
             "meta": self.args.meta,
             "api_source": self.args.source,
-            "second_meta": self.args.second,
             "movie_template": self.args.movie_template,
             "episode_template": self.args.episode_template,
-            "dry_run": self.args.dry_run,
+            "live_run": self.args.live_run,
             "omdb_key": self.omdb_key,
             "tmdb_key": self.tmdb_key,
             "tmdb_bearer_token": self.tmdb_bearer_token

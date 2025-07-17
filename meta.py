@@ -1,9 +1,6 @@
 import os
 from guessit import guessit
-from outputs import unknown_file_type_message
-from outputs import episode_files_success_message, movie_files_success_message, unknown_files_success_message
-from outputs import incorrect_api_arguments_message
-from outputs import no_result_message, one_result_message, multiple_results_tmdb_message, no_data_found_message
+from outputs import unknown_type_msg, sorted_success_msg, api_arg_error_msg, result_message
 
 def extract_metadata(item):
 
@@ -15,19 +12,18 @@ def extract_metadata(item):
     elif file_type == "movie":
         wanted_keys = ['title', 'year']
     else:
-        unknown_file_type_message(item, file_type)
+        unknown_type_msg(item, file_type)
 
-    wanted = {key: result.get(key, 'Unknown') for key in wanted_keys}
+    wanted = {key: result.get(key, 'unknown') for key in wanted_keys}
     extras = {key: value for key, value in result.items() if key not in wanted_keys}
 
     return file_type, wanted, extras
 
-def process_video_files(video_files, meta):
+def process_vid_files(video_files, meta):
 
     movie_files = []
     episode_files = []
     unknown_files = []
-
 
     for file in video_files:
         file_name = os.path.basename(file)
@@ -47,17 +43,17 @@ def process_video_files(video_files, meta):
 
         if file_type == "episode":
             episode_files.append(file_data)
-            episode_files_success_message(file)
-        if file_type == "movie":
+            sorted_success_msg(file, file_type)
+        elif file_type == "movie":
             movie_files.append(file_data)
-            movie_files_success_message(file)
-        if file_type == "Unknown":
+            sorted_success_msg(file, file_type)
+        elif file_type == "unknown":
             unknown_files.append(file_data)
-            unknown_files_success_message(file)
+            sorted_success_msg(file, file_type)
 
     return movie_files, episode_files, unknown_files
 
-def transfer_metadata_to_api(processed_files, api_client, api_source):
+def transfer_meta_to_api(processed_files, api_client, api_source):
 
     no_results = []
     one_result = []
@@ -82,7 +78,7 @@ def transfer_metadata_to_api(processed_files, api_client, api_source):
         elif file_type == "episode":
             data = api_client.get_from_tmdb_tv(title, year)
         else:
-            incorrect_api_arguments_message()
+            api_arg_error_msg()
             data = None
 
         episode_no_res = {
@@ -119,34 +115,34 @@ def transfer_metadata_to_api(processed_files, api_client, api_source):
             if file_type == "episode":
                 if data.get("total_results") == 0:
                     no_results.append(episode_no_res)
-                    no_result_message(file_path)
+                    result_message(file_path, total_results=0)
                 elif data.get("total_results") == 1:
                     one_result.append(episode_res)
-                    one_result_message(file_path, data)
+                    result_message(file_path, total_results=1, data=data)
                 elif data.get("total_results") > 1:
                     multiple_results.append(episode_res)
-                    multiple_results_tmdb_message(file_path, data)
+                    result_message(file_path, total_results=data.get("total_results"), data=data)
                 else:
                     no_results.append(file_data)
-                    no_data_found_message(file_path)
+                    result_message(file_path)
 
             if file_type == "movie":
                 if api_source == "omdb":
                     if data.get("Response") == "False":
                         no_results.append(movie_no_res)
-                        no_result_message(file_path)
+                        result_message(file_path, Response="False")
                     elif data.get("Response") == "True":
                         one_result.append(movie_res)
-                        one_result_message(file_path, data)
+                        result_message(file_path, Response="True", data=data)
                 elif api_source == "tmdb":
                     if data.get("total_results") == 0:
                         no_results.append(movie_no_res)
-                        no_result_message(file_path)
+                        result_message(file_path, total_results=0)
                     elif data.get("total_results") == 1:
                         one_result.append(movie_res)
-                        one_result_message(file_path, data)
+                        result_message(file_path, total_results=1, data=data)
                     elif data.get("total_results") > 1:
                         multiple_results.append(movie_res)
-                        multiple_results_tmdb_message(file_path, data)    
+                        result_message(file_path, total_results=data.get("total_results"), data=data)   
 
     return no_results, one_result, multiple_results
