@@ -2,8 +2,9 @@ import os
 
 # ----- File operations messages -----
 
-def proc_file_msg(file_path):
-    print(f"Processing file: {file_path}")
+def proc_file_msg(file_path, root_folder):
+    rel_path = os.path.relpath(file_path, os.path.dirname(root_folder))
+    print(f"Processing file: {rel_path}")
 
 def res_error_msg(file_path, e):
     print(f"[ERROR] Error getting resolution for {file_path}: {e}")

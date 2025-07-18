@@ -81,9 +81,6 @@ def transfer_meta_to_api(processed_files, api_client, api_source):
             data = api_client.get_from_tmdb_movie(title, year)
         elif file_type == "episode":
             data = api_client.get_from_tmdb_tv(title, year)
-        else:
-            api_arg_error_msg()
-            data = None
 
         episode_no_res = {
                 "file_path": file_path,

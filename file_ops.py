@@ -4,12 +4,12 @@ from datetime import datetime
 import ffmpeg
 import os
 
-def get_vid_files(directory, min_size_bytes):
+def get_vid_files(directory, min_size_bytes, root_folder):
     video_files = []
     for file in os.listdir(directory):
         file_path = os.path.join(directory, file)
         if os.path.isfile(file_path) and is_vid_file(file_path, min_size_bytes):
-            proc_file_msg(file_path)
+            proc_file_msg(file_path, root_folder)
             video_files.append(file_path)
 
     video_files = sorted(video_files)
@@ -24,9 +24,9 @@ def get_vid_files_all(root_folder, recursive):
 
     if recursive:
         for root, dirs, files in os.walk(root_folder):
-            video_files.extend(get_vid_files(root, min_size_bytes))
+            video_files.extend(get_vid_files(root, min_size_bytes, root_folder))
     else:
-        video_files.extend(get_vid_files(root_folder, min_size_bytes))
+        video_files.extend(get_vid_files(root_folder, min_size_bytes, root_folder))
 
     return video_files
 
@@ -44,7 +44,7 @@ def get_res(file_path):
             return '480p'
     except ffmpeg._run.Error as e:
         res_error_msg(file_path, e)
-        return "Unknown"
+        return "unknown"
 
 def rename_vid_files(api_results, live_run, zero_padding, movie_template, episode_template):
     renamed_files = []
