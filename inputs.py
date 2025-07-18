@@ -1,19 +1,22 @@
-def ask_manual_search():
+def ask_search():
     return input("\nWould you like to search manually? (y/n): ").strip().lower() == 'y'
 
-def get_manual_movie_search_data():
-    search_title = input("Enter movie title: ").strip()
-    search_year = input("Enter movie release year (or leave empty to skip): ").strip()
-    return search_title, search_year if search_year else None
+def get_data(file_type):
 
-def get_manual_series_search_data():
-    search_title = input("Enter series title: ").strip()
-    search_year = input("Enter series year (or leave empty to skip): ").strip()
-    return search_title, search_year if search_year else "Unknown"
+    if file_type == "episode":
+        file_type = "series"
 
-def ask_for_movie_choice(max_choice):
+    search_title = input(f"Enter {file_type} title: ").strip()
+    search_year = input(f"Enter {file_type} release year (or leave empty to skip): ").strip()
+    return search_title, search_year if search_year else "unknown"
+
+def ask_choice(max_choice, file_type):
+    
+    if file_type == "episode":
+        file_type = "series"
+
     try:
-        choice = int(input(f"Please select a movie by number (1-{max_choice}): "))
+        choice = int(input(f"Please select a {file_type} by number (1-{max_choice}): "))
         if 1 <= choice <= max_choice:
             return choice
         else:
@@ -22,20 +25,8 @@ def ask_for_movie_choice(max_choice):
         print("Invalid input. Please enter a number.")
         return None
 
-def get_series_choice(max_choice):
-    try:
-        choice = int(input(f"Please select a series by number (1-{max_choice}): "))
-        if 1 <= choice <= max_choice:
-            return choice
-        else:
-            print(f"Please enter a number between 1 and {max_choice}.")
-            return None
-    except ValueError:
-        print("Invalid input. Please enter a number.")
-        return None
 
-
-def user_menu_for_selection(files, folders, main_folders):
+def user_menu(files, folders, main_folders):
     menu_text = (
         "\nChoose how you want to apply the selected metadata for the files above:\n"
         f"  1. Apply to a single file only (e.g: {files[0]['file_path']})\n"
@@ -61,3 +52,4 @@ def user_menu_for_selection(files, folders, main_folders):
         except (KeyboardInterrupt, EOFError):
             print("\nOperation cancelled. Exiting menu.")
             return None
+            

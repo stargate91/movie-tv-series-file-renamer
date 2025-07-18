@@ -8,3 +8,9 @@ def is_vid_file(file_path, min_size_bytes):
         file_size = os.path.getsize(file_path)
         return file_size >= min_size_bytes
     return False
+
+def not_empty_list(res, handled_files):
+    
+    if not res:
+        print("No results to handle.")
+        return handled_files

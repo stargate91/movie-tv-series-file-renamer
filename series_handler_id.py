@@ -1,15 +1,16 @@
 import os
-from inputs import user_menu_for_selection, get_series_choice, get_manual_series_search_data, ask_manual_search
-from outputs import display_series_results, pick_result
-from outputs import manual_series_search_message, attempting_manual_search_message
-from outputs import attempting_manual_search_message_for_dir
-from outputs import found_results_message, attempting_manual_search_message_for_main_dir
-from outputs import multiple_series_results_message
+from inputs import user_menu, ask_choice, get_data, ask_search
+from outputs import display_res, pick_res
+from outputs import manual_series_search_msg
+from outputs import manual_search_dir_msg
+from outputs import manual_search_main_dir_msg
+from outputs import found_results_msg
+from validators import not_empty_list
 
 def search_series_tmdb(api_client, title, year):
     return api_client.get_from_tmdb_tv(title, year)
 
-def handle_append(handled_files, file_data, selected_series):
+def handling_files(handled_files, file_data, selected_series):
     handled_files.append({
         "file_path": file_data['file_path'],
         "file_type": file_data['file_type'],
@@ -40,81 +41,79 @@ def group_by_folders(mult_res):
 
     return folders, main_folders
 
-def handle_no_series_results(no_res, api_client):
+def handle_no_series_res(no_res, api_client):
     handled_files = []
 
-    if not no_res:
-        print("No results to handle.")
-        return handled_files    
+    not_empty_list(no_res, handled_files)    
 
     folders, main_folders = group_by_folders(no_res)
 
     for file_data in no_res:
-        manual_series_search_message(file_data)
+        manual_series_search_msg(file_data)
 
     first_folder_key = next(iter(folders))
     first_main_folder_key = next(iter(main_folders))
 
-    action_choice = user_menu_for_selection(no_res, first_folder_key, first_main_folder_key)
+    action_choice = user_menu(no_res, first_folder_key, first_main_folder_key)
 
     if action_choice == 1:
         for file_data in no_res:
-            attempting_manual_search_message(file_data)
-            if ask_manual_search():
-                search_title, search_year = get_manual_series_search_data()
+            file_type = file_data['file_type']
+            manual_series_search_msg(file_data)
+            if ask_search():
+                search_title, search_year = get_data(file_type="episode")
                 data = search_series_tmdb(api_client, search_title, search_year)
-
                 results = file_data['data']['results']
-
-                display_series_results(results)
+                found_results_msg()
+                display_res(results, file_type)
 
                 choice = None
                 while choice is None:
-                    choice = get_series_choice(len(results))
+                    choice = ask_choice(len(results), file_type)
 
-                selected_series = pick_result(results, choice)
-                handle_append(handled_files, file_data, selected_series)
+                selected_series = pick_res(results, choice)
+                handling_files(handled_files, file_data, selected_series)
             else:
                 return None
 
     elif action_choice == 2:
         for season_dir, files in folders.items():
-            attempting_manual_search_message_for_dir(season_dir)
-            if ask_manual_search():
-                search_title, search_year = get_manual_series_search_data()
+            manual_search_dir_msg(season_dir)
+            if ask_search():
+                search_title, search_year = get_data(file_type="episode")
                 data = search_series_tmdb(api_client, search_title, search_year)
                 results = data['results']
-                found_results_message()
-                display_series_results(results)
+                found_results_msg()
+                display_res(results, file_type="episode")
 
                 choice = None
                 while choice is None:
-                    choice = get_series_choice(len(results))
+                    choice = ask_choice(len(results), file_type="episode")
 
                 selected_series = pick_result(results, choice)
 
                 for file_data in files:
-                    handle_append(handled_files, file_data, selected_series)
+                    handling_files(handled_files, file_data, selected_series)
             else:
                 return None
     elif action_choice == 3:
         for series_dir, files in main_folders.items():
-            attempting_manual_search_message_for_main_dir(series_dir)
-            if ask_manual_search():
-                search_title, search_year = get_manual_series_search_data()
+            manual_search_main_dir_msg(series_dir)
+            if ask_search():
+                search_title, search_year = get_data(file_type="episode")
                 data = search_series_tmdb(api_client, search_title, search_year)
                 results = data['results']
-                found_results_message()
-                display_series_results(results)
+                found_results_msg()
+                display_res(results, file_type="episode")
 
                 choice = None
                 while choice is None:
-                    choice = get_series_choice(len(results))
+                    choice = ask_choice(len(results), file_type="episode")
 
-                selected_series = pick_result(results, choice)
+                selected_series = pick_res(results, choice)
 
                 for file_data in files:
-                    handle_append(handled_files, file_data, selected_series)
+                    handling_files(handled_files, file_data, selected_series)
             else:
                 return None
     elif action_choice == 4:
@@ -122,86 +121,78 @@ def handle_no_series_results(no_res, api_client):
 
     return handled_files
 
-def handle_one_series_result(one_res):
+def handle_one_series_res(one_res):
     handled_files = []
 
     for file_data in one_res:
-        file_path = file_data.get('file_path')
-        file_type = file_data.get('file_type')
-        season = file_data.get('season')
-        episode = file_data.get('episode')
-        extras = file_data.get('extras')
+        file_path = file_data['file_path']
+        file_type = file_data['file_type']
+        season = file_data['season']
+        episode = file_data['episode']
+        extras = file_data['extras']
 
         raw = file_data['series_details']
         data = raw['results'][0]
 
-        handled_files.append({
-            "file_path": file_path,
-            "file_type": file_type,
-            "season": season,
-            "episode": episode,
-            "series_details": data,
-            "extras": extras
-        })
+        handling_files(handled_files, file_data, data)
 
     return handled_files
 
-def select_for_group(files):
+def select_for_group(files, file_type):
     prototype = files[0]
     results = prototype["series_details"]["results"]
 
-    display_series_results(results)
+    display_res(results, file_type)
 
     choice = None
     while choice is None:
-        choice = get_series_choice(len(results))
+        choice = ask_choice(len(results), file_type)
 
-    return pick_result(results, choice)
+    return pick_res(results, choice)
 
 
-def handle_multiple_series_results(mult_res):
+def handle_mult_series_res(mult_res):
     handled_files = []
 
-    if not mult_res:
-        print("No results to handle.")
-        return handled_files
+    not_empty_list(mult_res, handled_files)
 
     folders, main_folders = group_by_folders(mult_res)
 
     for file_data in mult_res:
-        multiple_series_results_message(file_data)
+        file_type = file_data['file_type']
+        found_results_msg(file_data=file_data, file_type="episode")
 
     first_folder_key = next(iter(folders))
     first_main_folder_key = next(iter(main_folders))
 
-    action_choice = user_menu_for_selection(mult_res, first_folder_key, first_main_folder_key)
+    action_choice = user_menu(mult_res, first_folder_key, first_main_folder_key)
 
     if action_choice == 1:
         for file_data in mult_res:
-            multiple_series_results_message(file_data)
+            file_type = file_data['file_type']
             results = file_data['data']['results']
-
-            display_series_results(results)
+            found_results_msg(file_data=file_data, file_type="episode")
+            display_res(results, file_type)
 
             choice = None
             while choice is None:
-                choice = get_series_choice(len(results))
+                choice = ask_choice(len(results), file_type)
 
-            selected_series = pick_result(results, choice)
-            handle_append(handled_files, file_data, selected_series)
+            selected_series = pick_res(results, choice)
+            handling_files(handled_files, file_data, selected_series)
 
     elif action_choice == 2:
         for season_dir, files in folders.items():
-            attempting_manual_search_message_for_dir(season_dir)
-            selected_series = select_for_group(files)
+            manual_search_dir_msg(season_dir)
+            selected_series = select_for_group(files, file_type="episode")
             for file_data in files:
-                handle_append(handled_files, file_data, selected_series)
+                handling_files(handled_files, file_data, selected_series)
     elif action_choice == 3:
         for series_dir, files in main_folders.items():
-            attempting_manual_search_message_for_main_dir(series_dir)
-            selected_series = select_for_group(files)
+            manual_search_main_dir_msg(series_dir)
+            selected_series = select_for_group(files, file_type="episode")
             for file_data in files:
-                handle_append(handled_files, file_data, selected_series)
+                handling_files(handled_files, file_data, selected_series)
     elif action_choice == 4:
         return None
 

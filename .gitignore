@@ -1,7 +1,3 @@
 __pycache__/
-.env
-omdb_cache.json
-tmdb_movie_cache.json
-tmdb_tv_cache.json
-tmdb_episode_cache.json
+data/
 test.py

@@ -3,7 +3,11 @@ import json
 
 class CacheHandler:
     def __init__(self, cache_file):
-        self.cache_file = cache_file
+        self.cache_dir = "data"
+        if not os.path.exists(self.cache_dir):
+            os.makedirs(self.cache_dir)
+
+        self.cache_file = os.path.join(self.cache_dir, cache_file)
 
     def load_cache(self):
         if os.path.exists(self.cache_file):

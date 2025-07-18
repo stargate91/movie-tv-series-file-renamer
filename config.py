@@ -4,8 +4,9 @@ from dotenv import load_dotenv
 
 class Config:
     def __init__(self):
-        
-        load_dotenv()
+
+        dotenv_path = os.path.join("data", ".env")
+        load_dotenv(dotenv_path)
         
         self.omdb_key = os.getenv('OMDB_KEY')
         self.tmdb_key = os.getenv('TMDB_KEY')
