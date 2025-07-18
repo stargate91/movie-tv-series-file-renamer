@@ -26,7 +26,6 @@ def choice(results, file_type, handled_files, file_data):
     selected_res_msg(data)
     handling_files(handled_files, file_data, data)
 
-
 def handle_no_movie_res(no_res, api_client, api_source):
     handled_files = []
 
@@ -39,9 +38,9 @@ def handle_no_movie_res(no_res, api_client, api_source):
             search_title, search_year = get_data(file_type)
 
             if api_source == "omdb":
-                data = search_movie_omdb(api_client, search_title, search_year)
+                data = search_omdb(api_client, search_title, search_year)
             elif api_source == "tmdb":
-                data = search_movie_tmdb(api_client, search_title, search_year)
+                data = search_tmdb(api_client, search_title, search_year)
 
             if data:
                 if api_source == "omdb":
@@ -80,4 +79,27 @@ def handle_mult_movie_res(mult_res):
 
         choice(results, file_type, handled_files, file_data)
     
+    return handled_files
+
+def extract_movie_details(raw):
+    if 'results' in raw and isinstance(raw['results'], list):
+        return raw['results'][0]
+    elif 'Title' in raw:
+        return raw
+    else:
+        raise ValueError("Unknown movie details format")
+
+def handle_one_movie_res(one_res):
+    handled_files = []
+
+    for file_data in one_res:
+        file_path = file_data['file_path']
+        file_type = file_data['file_type']
+        extras = file_data['extras']
+        raw = file_data.get('movie_details')
+
+        movie_details = extract_movie_details(raw)
+
+        handling_files(handled_files, file_data, movie_details)
+
     return handled_files

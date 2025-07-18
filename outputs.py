@@ -108,10 +108,18 @@ def divider2():
     print("\n========== CATEGORIZING VIDEO FILES ==========\n")
 
 def divider3():
+    print("\n========== PROCESSING MOVIE FILES ==========\n")
     print("\n========== CHECKING API RESULTS ==========\n")
 
 def divider4():
     print("\n========== MANUAL SEARCH OR SELECTION REQUIRED ==========\n")
 
 def divider5():
+    print("\n========== RENAMING ==========\n")
+
+def divider6():
+    print("\n========== PROCESSING EPISODE FILES ==========\n")
+    print("\n========== CHECKING API RESULTS ==========\n")
+
+def divider7():
     print("\n========== GETTING EPISODE DETAILS ==========\n")
