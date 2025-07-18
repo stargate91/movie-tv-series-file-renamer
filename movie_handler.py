@@ -1,5 +1,5 @@
 from inputs import ask_search, get_data, ask_choice
-from outputs import api_arg_error_msg, found_omdb_msg, no_manual_results_msg, invalid_choice_msg
+from outputs import api_arg_error_msg, found_omdb_msg, no_manual_results_msg
 from outputs import found_results_msg, manual_search_msg, skip_manual_search_msg
 from outputs import display_res, selected_res_msg
 
@@ -18,14 +18,13 @@ def handling_files(handled_files, file_data, data):
     })
 
 def choice(results, file_type, handled_files, file_data):
-    choice = ask_choice(len(results), file_type)
+    choice = None
+    while choice is None:
+        choice = ask_choice(len(results), file_type)
 
-    if choice:
-        data = results[choice - 1]
-        selected_res_msg(data)
-        handling_files(handled_files, file_data, data)
-    else:
-        invalid_choice_msg()
+    data = results[choice - 1]
+    selected_res_msg(data)
+    handling_files(handled_files, file_data, data)
 
 
 def handle_no_movie_res(no_res, api_client, api_source):
@@ -43,9 +42,6 @@ def handle_no_movie_res(no_res, api_client, api_source):
                 data = search_movie_omdb(api_client, search_title, search_year)
             elif api_source == "tmdb":
                 data = search_movie_tmdb(api_client, search_title, search_year)
-            else:
-                api_arg_error_msg()
-                continue
 
             if data:
                 if api_source == "omdb":

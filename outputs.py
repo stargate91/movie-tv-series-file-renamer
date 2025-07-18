@@ -48,14 +48,11 @@ def found_omdb_msg(data):
 def no_manual_results_msg():
     print(f"No manual results found.")
 
-def invalid_choice_msg():
-    print("Invalid choice. No movie selected.")
-
 def found_results_msg(file_data=None, file_type=None):
     if file_data and file_type:
         if file_type == "episode":
             file_type = "series"
-        print(f"\nMultiple {file_type} results found for: {file_data['file_path']}")
+        print(f"Multiple {file_type} results found for: {file_data['file_path']}")
     else:
         print("Found results:")
 
@@ -103,3 +100,18 @@ def done_msg(unknown):
     print("\n Unexpected files:")
     for file_data in unknown:
         print(f"\n [MANUAL RENAMING REQ] {file_data['file_path']}")
+
+def divider1():
+    print("\n========== PROCESSING FILES ==========\n")
+
+def divider2():
+    print("\n========== CATEGORIZING VIDEO FILES ==========\n")
+
+def divider3():
+    print("\n========== CHECKING API RESULTS ==========\n")
+
+def divider4():
+    print("\n========== MANUAL SEARCH OR SELECTION REQUIRED ==========\n")
+
+def divider5():
+    print("\n========== GETTING EPISODE DETAILS ==========\n")

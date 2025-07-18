@@ -1,11 +1,12 @@
 import os
 from guessit import guessit
 from outputs import unknown_type_msg, sorted_success_msg, api_arg_error_msg, result_message
+from validators import empty_vid_files
 
 def extract_metadata(item):
 
     result = guessit(item)
-    file_type = result.get('type', None)
+    file_type = result.get('type', 'unknown')
 
     if file_type == "episode":
         wanted_keys = ['title', 'season', 'episode', 'year']
@@ -20,6 +21,9 @@ def extract_metadata(item):
     return file_type, wanted, extras
 
 def process_vid_files(video_files, meta):
+
+    if empty_vid_files(video_files):
+        return
 
     movie_files = []
     episode_files = []
@@ -61,10 +65,10 @@ def transfer_meta_to_api(processed_files, api_client, api_source):
 
     for file_data in processed_files:
 
-        file_path = file_data.get('file_path')
-        file_type = file_data.get('file_type')
-        wanted = file_data.get('wanted')
-        extras = file_data.get('extras')
+        file_path = file_data['file_path']
+        file_type = file_data['file_type']
+        wanted = file_data['wanted']
+        extras = file_data['extras']
 
         title = wanted.get('title')
         season = wanted.get('season')

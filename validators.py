@@ -10,7 +10,11 @@ def is_vid_file(file_path, min_size_bytes):
     return False
 
 def not_empty_list(res, handled_files):
-    
     if not res:
         print("No results to handle.")
         return handled_files
+
+def empty_vid_files(video_files):
+    if not video_files:
+        print("[WARNING] No valid video files, please select another folder.")
+        return True

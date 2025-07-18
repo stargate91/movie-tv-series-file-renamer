@@ -1,5 +1,6 @@
 from outputs import proc_file_msg, res_error_msg, rename_success_msg, dry_rename_msg
 from validators import is_vid_file
+from datetime import datetime
 import ffmpeg
 import os
 
@@ -45,7 +46,7 @@ def get_res(file_path):
         res_error_msg(file_path, e)
         return "Unknown"
 
-def rename_vid_files(api_results, live_run, movie_template, episode_template):
+def rename_vid_files(api_results, live_run, zero_padding, movie_template, episode_template):
     renamed_files = []
 
     for file_data in api_results:
@@ -60,6 +61,8 @@ def rename_vid_files(api_results, live_run, movie_template, episode_template):
             if 'Title' in movie_details:
                 movie_title = movie_details['Title']
                 movie_year = movie_details['Year']
+                released = movie_details['Released']
+                movie_release_date = datetime.strptime(released, "%d %b %Y").strftime("%Y-%m-%d")
             elif 'title' in movie_details:
                 movie_title = movie_details['title']
                 movie_release_date = movie_details['release_date']
@@ -81,11 +84,18 @@ def rename_vid_files(api_results, live_run, movie_template, episode_template):
             series_title = series_details['name']
             first_air_date = series_details['first_air_date']
             
+            if config_data["zero_padding"]:
+                season_str = f"{season:02}"
+                episode_str = f"{episode:02}"
+            else:
+                season_str = str(season)
+                episode_str = str(episode)
+
             new_filename = episode_template.format(
                 series_title=series_title,
                 episode_title=episode_title,
-                season=season,
-                episode=episode,
+                season=season_str,
+                episode=episode_str,
                 air_date=air_date,
                 resolution=resolution
             )
