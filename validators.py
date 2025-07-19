@@ -14,7 +14,7 @@ def not_empty_list(res, handled_files):
         print("No results to handle.")
         return handled_files
 
-def empty_vid_files(video_files):
+def vid_files(video_files):
     if not video_files:
         print("[WARNING] No valid video files, please select another folder.")
-        return True
+        return False

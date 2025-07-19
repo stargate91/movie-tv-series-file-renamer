@@ -6,9 +6,6 @@ def proc_file_msg(file_path, root_folder):
     rel_path = os.path.relpath(file_path, os.path.dirname(root_folder))
     print(f"Processing file: {rel_path}")
 
-def res_error_msg(file_path, e):
-    print(f"[ERROR] Error getting resolution for {file_path}: {e}")
-
 def rename_success_msg(file_path, new_filename):
     rel_path = os.path.relpath(file_path)
     print(f"Old name: {rel_path} → New name: {new_filename}")

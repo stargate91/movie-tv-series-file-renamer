@@ -1,8 +1,11 @@
-from outputs import proc_file_msg, res_error_msg, rename_success_msg, dry_rename_msg
+from meta_from_files import get_res, get_codec, get_video_bitrate, get_framerate
+from meta_from_files import get_audio_codec, get_audio_channels, get_first_audio_language_code, get_audio_channel_description
+from outputs import proc_file_msg, rename_success_msg, dry_rename_msg
 from validators import is_vid_file
-from datetime import datetime
-import ffmpeg
 import os
+import pycountry
+import ffmpeg
+
 
 def get_vid_files(directory, min_size_bytes, root_folder):
     video_files = []
@@ -30,21 +33,18 @@ def get_vid_files_all(root_folder, recursive):
 
     return video_files
 
-def get_res(file_path):
-    try:
-        probe = ffmpeg.probe(file_path, v='error', select_streams='v:0', show_entries='stream=width,height')
-        width = probe['streams'][0]['width']
-        height = probe['streams'][0]['height']
-        
-        if width >= 1920:
-            return '1080p'
-        elif width >= 1280:
-            return '720p'
-        else:
-            return '480p'
-    except ffmpeg._run.Error as e:
-        res_error_msg(file_path, e)
-        return "unknown"
+def get_video_metadata(file_path):
+    metadata = {}
+    metadata['resolution'] = get_res(file_path)
+    metadata['video_codec'] = get_codec(file_path)
+    metadata['video_bitrate'] = get_video_bitrate(file_path)
+    metadata['framerate'] = get_framerate(file_path)
+    metadata['audio_codec'] = get_audio_codec(file_path)
+    metadata['audio_channels'] = get_audio_channels(file_path)
+    metadata['first_audio_channel_language'] = get_first_audio_language_code(file_path)
+    metadata['audio_channels_description'] = get_audio_channel_description(file_path)
+    return metadata
+
 
 def rename_vid_files(api_results, live_run, zero_padding, movie_template, episode_template):
     renamed_files = []
@@ -54,25 +54,34 @@ def rename_vid_files(api_results, live_run, zero_padding, movie_template, episod
         file_type = file_data['file_type']
 
         resolution = get_res(file_path)
+        video_codec = get_codec(file_path)
+        video_bitrate = get_video_bitrate(file_path)
+        framerate = get_framerate(file_path)
+        audio_codec = get_audio_codec(file_path)
+        audio_channels = get_audio_channels(file_path)
+        first_audio_channel_language = get_first_audio_language_code(file_path)
+        audio_channels_description = get_audio_channel_description(file_path)
+
         file_extension = os.path.splitext(file_path)[1].lower()
 
         if file_type == "movie":
             movie_details = file_data['movie_details']
-            if 'Title' in movie_details:
-                movie_title = movie_details['Title']
-                movie_year = movie_details['Year']
-                released = movie_details['Released']
-                movie_release_date = datetime.strptime(released, "%d %b %Y").strftime("%Y-%m-%d")
-            elif 'title' in movie_details:
-                movie_title = movie_details['title']
-                movie_release_date = movie_details['release_date']
-                movie_year = movie_release_date.split('-')[0]
+            movie_title = movie_details['title']
+            movie_year = movie_details['year']
+            movie_release_date = movie_details['release_date']
 
             new_filename = movie_template.format(
                 movie_title=movie_title,
                 movie_release_date=movie_release_date,
                 movie_year=movie_year,
-                resolution=resolution
+                resolution=resolution,
+                video_codec=video_codec,
+                video_bitrate=video_bitrate,
+                framerate=framerate,
+                audio_codec=audio_codec,
+                audio_channels=audio_channels,
+                first_audio_channel_language=first_audio_channel_language,
+                audio_channels_description=audio_channels_description
                 )
         elif file_type == "episode":
             series_details = file_data['series_details']

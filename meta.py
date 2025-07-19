@@ -1,149 +1,165 @@
 import os
 from guessit import guessit
-from outputs import unknown_type_msg, sorted_success_msg, api_arg_error_msg, result_message
-from validators import empty_vid_files
 
-def extract_metadata(item):
+def call_api_with_fallback(api_func, title_file, year_file, title_folder, year_folder, file, api_source="tmdb", file_type="movie"):
+    try:
+        if api_source == "omdb" and file_type == "episode":
+            print(f"[WARNING] OMDb cannot handle TV episodes: {file}")
+            return None, "none"
 
-    result = guessit(item)
-    file_type = result.get('type', 'unknown')
+        if api_source == "omdb":
+            result_file = api_func(title_file, year_file)
+            print(f"[DEBUG] OMDb file result: {result_file}")
 
-    if file_type == "episode":
-        wanted_keys = ['title', 'season', 'episode', 'year']
-    elif file_type == "movie":
-        wanted_keys = ['title', 'year']
+            if result_file and result_file.get("Response") == "True":
+                return result_file, "file"
+
+            result_folder = api_func(title_folder, year_folder)
+            print(f"[DEBUG] OMDb folder result: {result_folder}")
+
+            if result_folder and result_folder.get("Response") == "True":
+                return result_folder, "folder"
+
+            return None, "none"
+
+        if api_source == "tmdb":
+            result_file = api_func(title_file, year_file)
+            print(f"[DEBUG] TMDb file result: {result_file}")
+
+            if result_file and result_file.get("total_results", 0) == 1:
+                return result_file, "file"
+
+            elif result_file and result_file.get("total_results", 0) > 1:
+                result_folder = api_func(title_folder, year_folder)
+                print(f"[DEBUG] TMDb folder result: {result_folder}")
+
+                if result_folder and result_folder.get("total_results", 0) == 1:
+                    return result_folder, "folder"
+
+                elif result_folder and result_folder.get("total_results", 0) > 1:
+                    print(f"[DEBUG] Merging multiple results from file and folder for {file}")
+
+                    merged_results = result_file.get("results", []) + result_folder.get("results", [])
+                    unique_results = {r["id"]: r for r in merged_results if "id" in r}
+
+                    merged_result_obj = {
+                        "page": 1,
+                        "total_results": len(unique_results),
+                        "results": list(unique_results.values())
+                    }
+
+                    return merged_result_obj, "mult"
+
+                return result_file, "file"
+
+            result_folder = api_func(title_folder, year_folder)
+            if result_folder and result_folder.get("total_results", 0) > 0:
+                return result_folder, "folder"
+
+            return None, "none"
+
+    except Exception as e:
+        print(f"[ERROR] API error for {file}: {e}")
+        return None, "none"
+
+
+
+def classify_result(api_data, file_info, lists, file_type, api_source):
+    if api_data is None:
+        lists['no'].append(file_info)
     else:
-        unknown_type_msg(item, file_type)
+        if api_source == "omdb":
+            if api_data.get("Response") == "True":
+                lists['one'].append({**file_info, 'details': api_data})
+            else:
+                lists['no'].append(file_info)
+        else: 
+            mult_results = (file_type == "movie" and api_data.get("total_results", 1) > 1) or \
+                           (file_type == "episode" and api_data.get("total_results", 1) > 1)
+            if mult_results:
+                lists['mult'].append({**file_info, 'details': api_data})
+            else:
+                lists['one'].append({**file_info, 'details': api_data})
 
-    wanted = {key: result.get(key, 'unknown') for key in wanted_keys}
-    extras = {key: value for key, value in result.items() if key not in wanted_keys}
 
-    return file_type, wanted, extras
-
-def process_vid_files(video_files, meta):
-
-    if empty_vid_files(video_files):
+def extract_metadata(video_files, api_client, api_source):
+    if not video_files:
+        print("[WARNING] No valid video files, please select another folder.")
         return
 
-    movie_files = []
-    episode_files = []
+    movie_lists = {'one': [], 'no': [], 'mult': []}
+    episode_lists = {'one': [], 'no': [], 'mult': []}
     unknown_files = []
 
     for file in video_files:
         file_name = os.path.basename(file)
         folder_name = os.path.basename(os.path.dirname(file))
 
-        if meta == "folder":
-            file_type, wanted, extras = extract_metadata(folder_name)
-        else:
-            file_type, wanted, extras = extract_metadata(file_name)
+        file_result = guessit(file_name)
+        folder_result = guessit(folder_name)
 
-        file_data = {
-            "file_path": file,
-            "file_type": file_type,
-            "wanted": wanted,
-            "extras": extras
-        }
+        file_type = file_result.get('type', 'unknown')
 
-        if file_type == "episode":
-            episode_files.append(file_data)
-            sorted_success_msg(file, file_type)
-        elif file_type == "movie":
-            movie_files.append(file_data)
-            sorted_success_msg(file, file_type)
-        elif file_type == "unknown":
-            unknown_files.append(file_data)
-            sorted_success_msg(file, file_type)
+        if file_type not in ["movie", "episode"]:
+            print(f"[ERROR] Unknown file type for {file}: {file_type}")
+            unknown_files.append(file)
+            continue
 
-    return movie_files, episode_files, unknown_files
+        extras_keys = ['title', 'year', 'season', 'episode', 'type', 'screen_size', 'video_codec', 'audio_codec', 'audio_channels' 'language']
+        file_extras = {k: v for k, v in file_result.items() if k not in extras_keys}
+        folder_extras = {k: v for k, v in folder_result.items() if k not in extras_keys}
+        merged_extras = folder_extras.copy()
+        merged_extras.update(file_extras)
 
-def transfer_meta_to_api(processed_files, api_client, api_source):
+        if file_type == "movie":
+            m_title_file = file_result.get('title', 'unknown')
+            m_year_file = file_result.get('year', 'unknown')
+            m_title_folder = folder_result.get('title', 'unknown')
+            m_year_folder = folder_result.get('year', 'unknown')
 
-    no_results = []
-    one_result = []
-    multiple_results = []
+            if api_source == "omdb":
+                api_func = api_client.get_from_omdb
+            else:
+                api_func = api_client.get_from_tmdb_movie
 
-    for file_data in processed_files:
+            api_data, _ = call_api_with_fallback(api_func, m_title_file, m_year_file, m_title_folder, m_year_folder, file, api_source, file_type)
+            file_info = {
+                'file_path': file,
+                'file_type': file_type,
+                'extras': merged_extras
+            }
+            classify_result(api_data, file_info, movie_lists, file_type, api_source)
 
-        file_path = file_data['file_path']
-        file_type = file_data['file_type']
-        wanted = file_data['wanted']
-        extras = file_data['extras']
-
-        title = wanted.get('title')
-        season = wanted.get('season')
-        episode = wanted.get('episode')
-        year = wanted.get('year')
-        
-        if api_source == "omdb" and file_type == "movie":
-            data = api_client.get_from_omdb(title, year)
-        elif api_source == "tmdb" and file_type == "movie":
-            data = api_client.get_from_tmdb_movie(title, year)
         elif file_type == "episode":
-            data = api_client.get_from_tmdb_tv(title, year)
+            e_title_file = file_result.get('title', 'unknown')
+            e_year_file = file_result.get('year', 'unknown')
+            season_file = file_result.get('season', 'unknown')
+            episode_file = file_result.get('episode', 'unknown')
 
-        episode_no_res = {
-                "file_path": file_path,
-                "file_type": file_type,
-                "season": season,
-                "episode": episode,
-                "extras": extras
-        }
+            e_title_folder = folder_result.get('title', 'unknown')
+            e_year_folder = folder_result.get('year', 'unknown')
+            season_folder = folder_result.get('season', 'unknown')
+            episode_folder = folder_result.get('episode', 'unknown')
 
-        episode_res = {
-                "file_path": file_path,
-                "file_type": file_type,
-                "season": season,
-                "episode": episode,
-                "series_details": data,
-                "extras": extras
-        }
+            api_func = api_client.get_from_tmdb_tv
+            api_data, _ = call_api_with_fallback(api_func, e_title_file, e_year_file, e_title_folder, e_year_folder, file, "tmdb")
+            file_info = {
+                'file_path': file,
+                'file_type': file_type,
+                'season_file': season_file,
+                'episode_file': episode_file,
+                'season_folder': season_folder,
+                'episode_folder': episode_folder,
+                'extras': merged_extras
+            }
+            classify_result(api_data, file_info, episode_lists, file_type, "tmdb")
 
-        movie_no_res = {
-                "file_path": file_path,
-                "file_type": file_type,
-                "extras": extras
-        }
-
-        movie_res = {
-                "file_path": file_path,
-                "file_type": file_type,
-                "movie_details": data,
-                "extras": extras
-        }
-
-        if data:
-            if file_type == "episode":
-                if data.get("total_results") == 0:
-                    no_results.append(episode_no_res)
-                    result_message(file_path, total_results=0)
-                elif data.get("total_results") == 1:
-                    one_result.append(episode_res)
-                    result_message(file_path, total_results=1, data=data)
-                elif data.get("total_results") > 1:
-                    multiple_results.append(episode_res)
-                    result_message(file_path, total_results=data.get("total_results"), data=data)
-                else:
-                    no_results.append(file_data)
-                    result_message(file_path)
-
-            if file_type == "movie":
-                if api_source == "omdb":
-                    if data.get("Response") == "False":
-                        no_results.append(movie_no_res)
-                        result_message(file_path, Response="False")
-                    elif data.get("Response") == "True":
-                        one_result.append(movie_res)
-                        result_message(file_path, Response="True", data=data)
-                elif api_source == "tmdb":
-                    if data.get("total_results") == 0:
-                        no_results.append(movie_no_res)
-                        result_message(file_path, total_results=0)
-                    elif data.get("total_results") == 1:
-                        one_result.append(movie_res)
-                        result_message(file_path, total_results=1, data=data)
-                    elif data.get("total_results") > 1:
-                        multiple_results.append(movie_res)
-                        result_message(file_path, total_results=data.get("total_results"), data=data)   
-
-    return no_results, one_result, multiple_results
+    return [
+    movie_lists['one'],
+    movie_lists['no'],
+    movie_lists['mult'],
+    episode_lists['one'],
+    episode_lists['no'],
+    episode_lists['mult'],
+    unknown_files
+    ]

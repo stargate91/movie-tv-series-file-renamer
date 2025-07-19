@@ -33,11 +33,6 @@ class Config:
             help="Include video files in subdirectories recursively."
         )
         parser.add_argument(
-            "--meta",
-            help="Which metadata source to prioritize ('file' or 'folder').",
-            choices=["file", "folder"]
-        )
-        parser.add_argument(
             "--source",
             help="Which database to use for searching ('omdb' or 'tmdb').",
             choices=["omdb", "tmdb"]
@@ -69,7 +64,6 @@ class Config:
             raise ValueError("No folder path provided. Use --folder or set it in config.ini.")
 
         recursive = self.config.getboolean('GENERAL', 'recursive', fallback=False)
-        meta = self.config.get('GENERAL', 'meta', fallback='file')
         source = self.config.get('GENERAL', 'source', fallback='omdb')
         live_run = self.config.getboolean('GENERAL', 'live_run', fallback=False)
 
@@ -84,7 +78,6 @@ class Config:
         return {
             "folder_path": folder_path,
             "recursive": recursive,
-            "meta": meta,
             "api_source": source,
             "movie_template": movie_template,
             "episode_template": episode_template,
