@@ -10,6 +10,7 @@ class APIClient:
         omdb_cache_file="omdb_cache.json",
         tmdb_movie_cache_file="tmdb_movie_cache.json",
         tmdb_tv_cache_file="tmdb_tv_cache.json",
+        tmdb_tv_detail_cache_file="tmdb_tv_detail_cache.json",
         tmdb_episode_cache_file="tmdb_episode_cache.json"
     ):
 
@@ -19,6 +20,7 @@ class APIClient:
         self.omdb_cache = CacheHandler(omdb_cache_file)
         self.tmdb_movie_cache = CacheHandler(tmdb_movie_cache_file)
         self.tmdb_tv_cache = CacheHandler(tmdb_tv_cache_file)
+        self.tmdb_tv_detail_cache = CacheHandler(tmdb_tv_detail_cache_file)
         self.tmdb_episode_cache = CacheHandler(tmdb_episode_cache_file)
 
     def _get_from_api(self, api_url, cache_key, cache_handler, headers=None):
@@ -74,9 +76,17 @@ class APIClient:
 
         return self._get_from_api(api_url, cache_key, self.tmdb_tv_cache)
 
+    def get_from_tmdb_tv_detail(self, id):
+        cache_key = f"{id}"
+        
+        api_url = f"https://api.themoviedb.org/3/tv/{id}?api_key={self.tmdb_key}"
+
+        return self._get_from_api(api_url, cache_key, self.tmdb_tv_detail_cache)
+
+
     def get_from_tmdb_episode(self, id, season, episode):
         cache_key = f"{id}-S{season}E{episode}"
         
-        api_url = f"https://api.themoviedb.org/3/tv/{id}/season/{season}/episode/{episode}?api_key={self.tmdb_key}"
+        api_url = f"https://api.themoviedb.org/3/tv/{series_id}/season/{season}/episode/{episode}?api_key={self.tmdb_key}"
 
         return self._get_from_api(api_url, cache_key, self.tmdb_episode_cache)

@@ -73,7 +73,7 @@ def handle_movie_no(movie_no, api_client, current_api='omdb'):
 
     if mode == '3':
         print("Cancelled.")
-        return []
+        return [], []
 
     handled_movies = []
     skipped_movies = []

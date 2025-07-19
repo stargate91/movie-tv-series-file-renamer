@@ -1,5 +1,6 @@
 from meta_from_files import get_res, get_codec, get_video_bitrate, get_framerate
-from meta_from_files import get_audio_codec, get_audio_channels, get_first_audio_language_code, get_audio_channel_description
+from meta_from_files import get_audio_codec, get_audio_channels
+from meta_from_files import get_first_audio_language_code, get_audio_channel_description
 from outputs import proc_file_msg, rename_success_msg, dry_rename_msg
 from validators import is_vid_file
 import os
@@ -106,7 +107,14 @@ def rename_vid_files(api_results, live_run, zero_padding, movie_template, episod
                 season=season_str,
                 episode=episode_str,
                 air_date=air_date,
-                resolution=resolution
+                resolution=resolution,
+                video_codec=video_codec,
+                video_bitrate=video_bitrate,
+                framerate=framerate,
+                audio_codec=audio_codec,
+                audio_channels=audio_channels,
+                first_audio_channel_language=first_audio_channel_language,
+                audio_channels_description=audio_channels_description
             )
         
         new_filename += file_extension

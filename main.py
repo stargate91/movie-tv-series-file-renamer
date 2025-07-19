@@ -3,6 +3,7 @@ from config import Config
 from file_ops import get_vid_files_all, rename_vid_files
 from meta import extract_metadata
 from movie_handler import normalize_movies, handle_movie_no, handle_movie_mult
+from series_handler_id import normalize_episodes, handle_episode_no, handle_episode_mult
 
 
 def main():
@@ -38,10 +39,15 @@ def main():
     movies = norm_movie_one + norm_movie_no + norm_movie_mult
     
     rename_vid_files(movies, live_run, zero_padding, movie_template, episode_template)
+    '''
+    handled_episode_no, skipped_episode_no = handle_episode_no(episode_no, api_client)
+    handled_episode_mult, skipped_episode_mult = handle_episode_mult(episode_mult, api_client)
 
+    norm_episode_one = normalize_episodes(episode_one, api_client)
+    norm_episode_no = normalize_episodes(episode_no, api_client)
+    norm_episode_mult = normalize_episodes(episode_mult, api_client)
 
-
-
-
+    episodes = norm_episode_one + norm_episode_no + norm_episode_mult    
+    '''
 if __name__ == "__main__":
     main()
