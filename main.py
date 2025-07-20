@@ -4,6 +4,7 @@ from file_ops import get_vid_files_all, rename_vid_files
 from meta import extract_metadata
 from movie_handler import normalize_movies, handle_movie_no, handle_movie_mult
 from series_handler_id import normalize_episodes, handle_episode_no, handle_episode_mult
+import sys
 
 
 def main():
@@ -27,9 +28,16 @@ def main():
 
     video_files = get_vid_files_all(folder_path, recursive)
 
-    movie_one, movie_no, movie_mult, episode_one, episode_no, episode_mult, unknown_files = extract_metadata(video_files, api_client, api_source)
+    result = extract_metadata(video_files, api_client, api_source)
+    movie_one, movie_no, movie_mult, episode_one, episode_no, episode_mult, unknown_files = result
 
-    handled_movie_no, skipped_movie_no = handle_movie_no(movie_no, api_client, api_source)
+    if not any([movie_one, movie_no, movie_mult, episode_one, episode_no, episode_mult, unknown_files]):
+        sys.exit(0)
+
+    
+    handled_movie_no, skipped_movie_no, remaining_episode_no = handle_movie_no(movie_no, api_client, api_source)
+
+    '''
     handled_movie_mult, skipped_movie_mult = handle_movie_mult(movie_mult, api_client, api_source)
 
     norm_movie_one = normalize_movies(movie_one)
@@ -39,7 +47,7 @@ def main():
     movies = norm_movie_one + norm_movie_no + norm_movie_mult
     
     rename_vid_files(movies, live_run, zero_padding, movie_template, episode_template)
-    '''
+    
     handled_episode_no, skipped_episode_no = handle_episode_no(episode_no, api_client)
     handled_episode_mult, skipped_episode_mult = handle_episode_mult(episode_mult, api_client)
 

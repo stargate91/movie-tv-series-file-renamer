@@ -1,12 +1,26 @@
-from meta_from_files import get_res, get_codec, get_video_bitrate, get_framerate
-from meta_from_files import get_audio_codec, get_audio_channels
-from meta_from_files import get_first_audio_language_code, get_audio_channel_description
+from meta_from_files import ( 
+    get_res,
+    get_codec,
+    get_video_bitrate,
+    get_framerate, 
+    get_audio_codec,
+    get_audio_channels,
+    get_first_audio_language_code,
+    get_audio_channel_description
+)
 from outputs import proc_file_msg, rename_success_msg, dry_rename_msg
-from validators import is_vid_file
 import os
 import pycountry
 import ffmpeg
 
+def is_vid_file(file_path, min_size_bytes):
+    file_extension = os.path.splitext(file_path)[1].lower()
+    valid_extensions = ['.mp4', '.mkv', '.avi', '.mov', '.wmv', '.mpeg', '.mpg']
+
+    if file_extension in valid_extensions:
+        file_size = os.path.getsize(file_path)
+        return file_size >= min_size_bytes
+    return False
 
 def get_vid_files(directory, min_size_bytes, root_folder):
     video_files = []

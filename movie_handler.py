@@ -1,6 +1,8 @@
 from datetime import datetime
 
 def normalize_movies(movies):
+    print("\n=== NORMALIZE MOVIES METADATA ===\n")
+
     handled_files = []
 
     for file_data in movies:
@@ -28,9 +30,9 @@ def normalize_movies(movies):
             'extras': file_data['extras'],
             'movie_details': movie_details
             })
+        print("Normalized successfully: {file_data['file_path']}")
 
     return handled_files
-
 
 def get_api_func(api_client, source):
     return {
@@ -55,39 +57,95 @@ def extract_results(result, source):
 def switch_api(current):
     available = ['omdb', 'tmdb']
     others = [a for a in available if a != current]
-    print(f"Available APIs: {', '.join(others)}")
-    new_api = input("Switch to: ").strip()
-    if new_api in available:
-        return new_api
-    print("Invalid API, staying on current.")
-    return current
+    
+    while True:
+        print(f"\nAvailable APIs: {', '.join(others)} (current: {current})")
+        new_api = input("Switch to: ").strip().lower()
+
+        if new_api == current:
+            print(f"You are already using '{current}'. Choose a different API.")
+            continue
+
+        if new_api in others:
+            print(f"[INFO] Switched to API: {new_api.upper()}")
+            return new_api
+
+        print("Invalid API. Please choose from the available options or press Enter to cancel.")
+        cancel = input("Try again? (y/n): ").strip().lower()
+        if cancel != 'y':
+            print("Staying on current API.")
+            return current
+
+def handle_cancellation(handled_movies, skipped_movies, movie_no, idx):
+    print("\n[INFO] Manual search cancelled by user.\n")
+
+    if handled_movies:
+        print("\nMetada stored for the following movies:\n")
+        for file in handled_movies:
+            print(f"[SAVED] {file['file_path']}")
+    else:
+        print("\nNo metadata was stored.")
+
+    if skipped_movies:
+        print("\nThe following movies were deferred for later:\n")
+        for skip in skipped_movies:
+            print(f"[SKIPPED] {skip['file_path']}")
+
+    remaining_movies = movie_no[idx:]
+
+    if remaining_files:
+        print("\nThe following movies were not processed:\n")
+        for leftover in remaining_movies:
+            print(f"[INFO] {leftover['file_path']}")
+    else:
+        print("\n[INFO] All movies have been processed.")
+
+    return handled_movies, skipped_movies, remaining_movies
+
 
 def handle_movie_no(movie_no, api_client, current_api='omdb'):
-    print("\n--- MOVIES WITH NO MATCH ---")
+    print("\n=== MOVIES WITH NO MATCH ===")
+
+    if not movie_no:
+        print("\n[INFO] There are no movies with no match. Continue with the next task.")
+        return
+
+    print(f"\n[INFO] Current API: {current_api.upper()}\n")
+
     for idx, movie in enumerate(movie_no, 1):
         print(f"{idx}. {movie['file_path']}")
+
     print("\nManual search required for these movies.\n")
     
     print("Options:\n1: Manual search for all\n2: Decide per movie (y/n/c)\n3: Cancel")
-    mode = input("Choose an option: ").strip()
+    mode = input("Choose an option (1/2/3): ").strip()
+    while mode not in {'1', '2', '3'}:
+        print("Invalid input. Please enter 1, 2, or 3.")
+        mode = input("Choose an option (1/2/3): ").strip()
 
     if mode == '3':
-        print("Cancelled.")
-        return [], []
+        print("\nCancelled.\n")
+        return [], [], []
 
     handled_movies = []
     skipped_movies = []
+    remaining_movies = []
 
-    for movie in movie_no:
+    for idx, movie in enumerate(movie_no):
         if mode == '2':
+            valid_choices = {'y', 'n', 'c'}
             choice = input(f"\nSearch for: {movie['file_path']}? (y/n/c): ").strip().lower()
+            while choice not in valid_choices:
+                print("Invalid input. Please enter y, n, or c.")
+                choice = input(f"\nSearch for: {movie['file_path']}? (y/n/c): ").strip().lower()
             if choice == 'c':
-                print("Cancelled.")
-                break
+                return handle_cancellation(handled_movies, skipped_movies, movie_no, idx)
             if choice != 'y':
+                skipped_movies.append(movie)
                 continue
 
         print(f"\n Search for: {movie['file_path']}")
+        print(f"[API: {current_api.upper()}]")
         title = input("Title: ").strip()
         year = input("Year (optional): ").strip() or 'unknown'
 
@@ -95,31 +153,19 @@ def handle_movie_no(movie_no, api_client, current_api='omdb'):
             api_func = get_api_func(api_client, current_api)
             result = api_func(title, year)
 
-            if not result or not has_results(result, current_api):
-                print("No results found.")
-            else:
-                options = extract_results(result, current_api)
-                for i, opt in enumerate(options, 1):
-                    print(f"{i}. {opt.get('title') or opt.get('Title')} ({opt.get('year') or opt.get('release_date') or 'unknown'})")
+            options = extract_results(result, current_api) if result else []
 
-                print("Select result by number, or:")
+            if not options:
+                print("No results found.")
+                print("Options:")
                 print("r: retry search")
                 print("a: try another API")
                 print("s: skip")
                 print("c: cancel")
                 sel = input("Choice: ").strip().lower()
-
-                if sel.isdigit() and 1 <= int(sel) <= len(options):
-                    selected = options[int(sel) - 1]
-                    handled_movies.append({
-                        'file_path': movie['file_path'],
-                        'file_type': movie['file_type'],
-                        'extras': movie['extras'],
-                        'details': selected
-                    })
-                    break
-
-                elif sel == 'r':
+                if sel == 'r':
+                    title = input("Retry title: ").strip()
+                    year = input("Year (optional): ").strip() or 'unknown'
                     continue
                 elif sel == 'a':
                     current_api = switch_api(current_api)
@@ -128,19 +174,62 @@ def handle_movie_no(movie_no, api_client, current_api='omdb'):
                     skipped_movies.append(movie)
                     break
                 elif sel == 'c':
-                    print("Cancelled.")
-                    return handled_movies
+                    return handle_cancellation(handled_movies, skipped_movies, movie_no, idx)
                 else:
-                    print("Invalid input.")
-            title = input("Retry title: ").strip()
-            year = input("Year (optional): ").strip() or 'unknown'
+                    print("Invalid input. Please enter r, a, s, or c.")
 
-    return handled_movies, skipped_movies
+            print("\nFound results:")
+            for i, opt in enumerate(options, 1):
+                print(f"{i}. {opt.get('title') or opt.get('Title')} ({opt.get('Year') or opt.get('release_date') or 'unknown'})")
+
+            print("Select result by number, or:")
+            print("r: retry search")
+            print("a: try another API")
+            print("s: skip")
+            print("c: cancel")
+            sel = input("Choice: ").strip().lower()
+            valid_cmds = {'r', 'a', 's', 'c'}
+            if sel.isdigit():
+                num = int(sel)
+                if 1 <= num <= len(options):
+                    selected = options[num - 1]
+                    handled_movies.append({
+                        'file_path': movie['file_path'],
+                        'file_type': movie['file_type'],
+                        'extras': movie['extras'],
+                        'details': selected
+                    })
+                    break
+                else:
+                    print("Invalid number.")
+            elif sel in valid_cmds:
+                if sel == 'r':
+                    title = input("Retry title: ").strip()
+                    year = input("Year (optional): ").strip() or 'unknown'
+                    continue
+                elif sel == 'a':
+                    current_api = switch_api(current_api)
+                    continue
+                elif sel == 's':
+                    skipped_movies.append(movie)
+                    break
+                elif sel == 'c':
+                    return handle_cancellation(handled_movies, skipped_movies, movie_no, idx)
+            else:
+                print(f"Invalid input. Please enter a number between 1-{len(options)} or r, a, s, c.")
+
+    return handled_movies, skipped_movies, remaining_movies
 
 def handle_movie_mult(movie_mult, api_client, current_api='omdb'):
-    print("\n--- MOVIES WITH MULTIPLE MATCHES ---")
+    print("\n=== MOVIES WITH MULTIPLE MATCHES ===")
+
+    if not movie_mult:
+        print("[INFO] There are no movies with multiple matches.")
+        return
+
     for idx, movie in enumerate(movie_mult, 1):
         print(f"{idx}. {movie['file_path']}")
+
     print("\nMultiple matches found for these movies. Manual selection is required.\n")
 
     print("Options:\n1: Manually choose for each\n2: Cancel")

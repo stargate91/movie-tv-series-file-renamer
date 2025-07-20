@@ -1,5 +1,3 @@
-from outputs import no_episode_msg
-
 def transfer_meta_to_episde_api(id_handled, api_client):
 	episodes = []
 	unknown = []
@@ -26,6 +24,6 @@ def transfer_meta_to_episde_api(id_handled, api_client):
 
 		else:
 			unknown.append(file_data)
-			no_episode_msg(file_path)
+			print(f"No episode found for {file_path}")
 
 	return episodes, unknown

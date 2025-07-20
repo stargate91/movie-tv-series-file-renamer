@@ -1,68 +1,64 @@
 import os
 from guessit import guessit
 
-def call_api_with_fallback(api_func, title_file, year_file, title_folder, year_folder, file, api_source="tmdb", file_type="movie"):
-    try:
-        if api_source == "omdb" and file_type == "episode":
-            print(f"[WARNING] OMDb cannot handle TV episodes: {file}")
-            return None, "none"
+def call_api_with_fallback(
+    api_func, 
+    title_file,
+    year_file,
+    title_folder,
+    year_folder,
+    file,
+    api_source="tmdb",
+    file_type="movie"
+):
+    if api_source == "omdb" and file_type == "episode":
+        print(f"[WARNING] OMDb cannot handle TV episodes: {file}")
+        return None, "none"
+    if api_source == "omdb":
+        result_file = api_func(title_file, year_file)
 
-        if api_source == "omdb":
-            result_file = api_func(title_file, year_file)
-            print(f"[DEBUG] OMDb file result: {result_file}")
+        if result_file and result_file.get("Response") == "True":
+            return result_file, "file"
 
-            if result_file and result_file.get("Response") == "True":
-                return result_file, "file"
+        result_folder = api_func(title_folder, year_folder)
 
-            result_folder = api_func(title_folder, year_folder)
-            print(f"[DEBUG] OMDb folder result: {result_folder}")
+        if result_folder and result_folder.get("Response") == "True":
+            return result_folder, "folder"
 
-            if result_folder and result_folder.get("Response") == "True":
-                return result_folder, "folder"
-
-            return None, "none"
-
-        if api_source == "tmdb":
-            result_file = api_func(title_file, year_file)
-            print(f"[DEBUG] TMDb file result: {result_file}")
-
-            if result_file and result_file.get("total_results", 0) == 1:
-                return result_file, "file"
-
-            elif result_file and result_file.get("total_results", 0) > 1:
-                result_folder = api_func(title_folder, year_folder)
-                print(f"[DEBUG] TMDb folder result: {result_folder}")
-
-                if result_folder and result_folder.get("total_results", 0) == 1:
-                    return result_folder, "folder"
-
-                elif result_folder and result_folder.get("total_results", 0) > 1:
-                    print(f"[DEBUG] Merging multiple results from file and folder for {file}")
-
-                    merged_results = result_file.get("results", []) + result_folder.get("results", [])
-                    unique_results = {r["id"]: r for r in merged_results if "id" in r}
-
-                    merged_result_obj = {
-                        "page": 1,
-                        "total_results": len(unique_results),
-                        "results": list(unique_results.values())
-                    }
-
-                    return merged_result_obj, "mult"
-
-                return result_file, "file"
-
-            result_folder = api_func(title_folder, year_folder)
-            if result_folder and result_folder.get("total_results", 0) > 0:
-                return result_folder, "folder"
-
-            return None, "none"
-
-    except Exception as e:
-        print(f"[ERROR] API error for {file}: {e}")
         return None, "none"
 
+    if api_source == "tmdb":
+        result_file = api_func(title_file, year_file)
 
+        if result_file and result_file.get("total_results", 0) == 1:
+            return result_file, "file"
+
+        elif result_file and result_file.get("total_results", 0) > 1:
+            result_folder = api_func(title_folder, year_folder)
+
+            if result_folder and result_folder.get("total_results", 0) == 1:
+                return result_folder, "folder"
+
+            elif result_folder and result_folder.get("total_results", 0) > 1:
+
+                merged_results = result_file.get("results", []) + result_folder.get("results", [])
+                unique_results = {r["id"]: r for r in merged_results if "id" in r}
+
+                merged_result_obj = {
+                    "page": 1,
+                    "total_results": len(unique_results),
+                    "results": list(unique_results.values())
+                }
+
+                return merged_result_obj, "mult"
+
+            return result_file, "file"
+
+        result_folder = api_func(title_folder, year_folder)
+        if result_folder and result_folder.get("total_results", 0) > 0:
+            return result_folder, "folder"
+
+        return None, "none"
 
 def classify_result(api_data, file_info, lists, file_type, api_source):
     if api_data is None:
@@ -81,11 +77,10 @@ def classify_result(api_data, file_info, lists, file_type, api_source):
             else:
                 lists['one'].append({**file_info, 'details': api_data})
 
-
 def extract_metadata(video_files, api_client, api_source):
     if not video_files:
-        print("[WARNING] No valid video files, please select another folder.")
-        return
+        print("[INFO] No valid video files, please select another folder. Exiting now.")
+        return [], [], [], [], [], [], []
 
     movie_lists = {'one': [], 'no': [], 'mult': []}
     episode_lists = {'one': [], 'no': [], 'mult': []}
