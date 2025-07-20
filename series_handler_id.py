@@ -15,38 +15,51 @@ def normalize_episodes(episodes, api_client, source=None):
 
     if not episodes:
         print(f"\n[INFO] There are no episodes to normalize in this pack: {source}.\n")
-        return
+        return [], []
 
     handled_files = []
     unexpected_files = []
 
     for file_data in episodes:
-        data = file_data['details']
-        season_details = data['results'][0]
-        series_id = season_details['id']
-        season_details.update({'first_air_year': season_details['first_air_date'].split('-')[0]})
-        season_details['title'] = season_details.pop('name')
+
+        details = file_data.get("details", {})
+
+        if "results" in details:
+            if details["results"]:
+                series_details = details["results"][0]
+            else:
+                print(f"[ERROR] Empty results in details for: {file_data['file_path']}")
+                unexpected_files.append(file_data)
+                continue
+        else:
+            series_details = details
+
+        series_id = series_details['id']
+        series_details.update({'first_air_year': series_details['first_air_date'].split('-')[0]})
+
+        if 'name' in series_details:
+            series_details['title'] = series_details.pop('name')
 
         season, episode = normalize_season_episode(file_data)
 
-        season_data = api_client.get_from_tmdb_tv_detail(series_id)
-        if season_data.get('status') == "Ended":
-            last_air_date = season_data.get('last_air_date')
+        series_data = api_client.get_from_tmdb_tv_detail(series_id)
+        if series_data.get('status') == "Ended":
+            last_air_date = series_data.get('last_air_date')
             if last_air_date:
-                season_details.update({
-                    'status': season_data.get('status', 'unknown'),
+                series_details.update({
+                    'status': series_data.get('status', 'unknown'),
                     'last_air_date': last_air_date,
                     'last_air_year': last_air_date.split('-')[0]
                 })
             else:
-                season_details.update({
-                    'status': season_data.get('status', 'unknown'),
+                series_details.update({
+                    'status': series_data.get('status', 'unknown'),
                     'last_air_date': 'unknown',
                     'last_air_year': 'unknown'
                 })
         else:
-            season_details.update({
-                'status': season_data.get('status', 'unknown'),
+            series_details.update({
+                'status': series_data.get('status', 'unknown'),
                 'last_air_date': 'unknown',
                 'last_air_year': 'unknown'                
             })
@@ -61,7 +74,7 @@ def normalize_episodes(episodes, api_client, source=None):
                 'extras': file_data['extras'],
                 'season': season,
                 'episode': episode,
-                'season_details': season_details
+                'series_details': series_details
             })
 
     return handled_files, unexpected_files

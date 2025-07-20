@@ -4,7 +4,7 @@ def normalize_movies(movies, source=None):
 
     if not movies:
         print(f"\n[INFO] There are no movies to normalize in this pack: {source}.\n")
-        return
+        return []
     
     handled_movies = []
 

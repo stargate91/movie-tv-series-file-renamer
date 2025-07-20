@@ -87,6 +87,6 @@ class APIClient:
     def get_from_tmdb_episode(self, id, season, episode):
         cache_key = f"{id}-S{season}E{episode}"
         
-        api_url = f"https://api.themoviedb.org/3/tv/{series_id}/season/{season}/episode/{episode}?api_key={self.tmdb_key}"
+        api_url = f"https://api.themoviedb.org/3/tv/{id}/season/{season}/episode/{episode}?api_key={self.tmdb_key}"
 
         return self._get_from_api(api_url, cache_key, self.tmdb_episode_cache)

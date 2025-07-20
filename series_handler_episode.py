@@ -1,29 +1,26 @@
-def transfer_meta_to_episde_api(id_handled, api_client):
-	episodes = []
+def extract_episode_metadata(episodes, api_client):
+	known = []
 	unknown = []
 
-	for file_data in id_handled:
-		file_path = file_data['file_path']
-		file_type = file_data['file_type']
+	for file_data in episodes:
 		series_details = file_data['series_details']
-		series_id = file_data['series_details']['id']
+		series_id = series_details['id']
 		season = file_data['season']
 		episode = file_data['episode']
-		extras = file_data['extras']
 
 		e_detail = api_client.get_from_tmdb_episode(series_id, season, episode)
 
-		if series_details and e_detail:
-			episodes.append({
+		if e_detail:
+			known.append({
 				"file_path": file_data['file_path'],
 				"file_type": file_data['file_type'],
 				"series_details": series_details,
 				"episode_details": e_detail, 
-				"extras": extras
+				"extras": file_data['extras']
 			})
 
 		else:
 			unknown.append(file_data)
-			print(f"No episode found for {file_path}")
+			print(f"No episode found for {file_data['file_path']}")
 
-	return episodes, unknown
+	return known, unknown

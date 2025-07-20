@@ -100,13 +100,20 @@ def rename_vid_files(api_results, live_run, zero_padding, movie_template, episod
                 )
         elif file_type == "episode":
             series_details = file_data['series_details']
+            series_title = series_details['title']
+            first_air_date = series_details['first_air_date']
+            first_air_year = series_details['first_air_year']
+            last_air_date = series_details['last_air_date']
+            last_air_year = series_details['last_air_year']
+            status = series_details['status']
+
             episode_details = file_data['episode_details']
             episode_title = episode_details['name']
             season = episode_details['season_number']
             episode = episode_details['episode_number']
             air_date = episode_details['air_date']
-            series_title = series_details['name']
-            first_air_date = series_details['first_air_date']
+            air_year = air_date.split('-')[0]
+
             
             if "zero_padding":
                 season_str = f"{season:02}"
@@ -117,10 +124,16 @@ def rename_vid_files(api_results, live_run, zero_padding, movie_template, episod
 
             new_filename = episode_template.format(
                 series_title=series_title,
+                first_air_date=first_air_date,
+                first_air_year=first_air_year,
+                last_air_date=last_air_date,
+                last_air_year=last_air_year,
+                status=status,
                 episode_title=episode_title,
                 season=season_str,
                 episode=episode_str,
                 air_date=air_date,
+                air_year=air_year,
                 resolution=resolution,
                 video_codec=video_codec,
                 video_bitrate=video_bitrate,
