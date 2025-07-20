@@ -33,21 +33,21 @@ def main():
 
     if not any([movie_one, movie_no, movie_mult, episode_one, episode_no, episode_mult, unknown_files]):
         sys.exit(0)
-
     
     handled_movie_no, skipped_movie_no, remaining_episode_no = handle_movie_no(movie_no, api_client, api_source)
+    handled_movie_mult, skipped_movie_mult, remaining_episode_mult = handle_movie_mult(movie_mult, api_client, api_source)
 
-    '''
-    handled_movie_mult, skipped_movie_mult = handle_movie_mult(movie_mult, api_client, api_source)
+    norm_movie_one = normalize_movies(movie_one, source='movies with one result')
+    norm_movie_no = normalize_movies(handled_movie_no, source='movies that required manual search')
+    norm_movie_mult = normalize_movies(handled_movie_mult, source='movies that required manual selection')
 
-    norm_movie_one = normalize_movies(movie_one)
-    norm_movie_no = normalize_movies(handled_movie_no)
-    norm_movie_mult = normalize_movies(handled_movie_mult)
-
-    movies = norm_movie_one + norm_movie_no + norm_movie_mult
+    norm_movie_one += norm_movie_no or []
+    norm_movie_one += norm_movie_mult or []
+    movies = norm_movie_one
     
     rename_vid_files(movies, live_run, zero_padding, movie_template, episode_template)
-    
+
+    '''
     handled_episode_no, skipped_episode_no = handle_episode_no(episode_no, api_client)
     handled_episode_mult, skipped_episode_mult = handle_episode_mult(episode_mult, api_client)
 

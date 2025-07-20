@@ -100,11 +100,15 @@ def extract_metadata(video_files, api_client, api_source):
             unknown_files.append(file)
             continue
 
-        extras_keys = ['title', 'year', 'season', 'episode', 'type', 'screen_size', 'video_codec', 'audio_codec', 'audio_channels' 'language']
+        extras_keys = ['title', 'year', 'season', 'episode', 'type', 'screen_size', 'video_codec', 'audio_codec', 'audio_channels', 'language']
         file_extras = {k: v for k, v in file_result.items() if k not in extras_keys}
         folder_extras = {k: v for k, v in folder_result.items() if k not in extras_keys}
         merged_extras = folder_extras.copy()
         merged_extras.update(file_extras)
+
+        print(f"\nThe following extra metadatas obtained from file and folder name and will be added for: {file}")
+        for k, v in merged_extras.items():
+            print(f"[INFO] {k}: {v}")
 
         if file_type == "movie":
             m_title_file = file_result.get('title', 'unknown')

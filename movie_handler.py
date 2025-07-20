@@ -1,9 +1,12 @@
 from datetime import datetime
 
-def normalize_movies(movies):
-    print("\n=== NORMALIZE MOVIES METADATA ===\n")
+def normalize_movies(movies, source=None):
 
-    handled_files = []
+    if not movies:
+        print(f"\n[INFO] There are no movies to normalize in this pack: {source}.\n")
+        return
+    
+    handled_movies = []
 
     for file_data in movies:
         movie_details = file_data['details']
@@ -24,15 +27,14 @@ def normalize_movies(movies):
         if 'Year' in movie_details:
             movie_details['year'] = movie_details.pop('Year')
 
-        handled_files.append({
+        handled_movies.append({
             'file_path': file_data['file_path'],
             'file_type': file_data['file_type'],
             'extras': file_data['extras'],
             'movie_details': movie_details
             })
-        print("Normalized successfully: {file_data['file_path']}")
 
-    return handled_files
+    return handled_movies
 
 def get_api_func(api_client, source):
     return {
@@ -93,7 +95,7 @@ def handle_cancellation(handled_movies, skipped_movies, movie_no, idx):
 
     remaining_movies = movie_no[idx:]
 
-    if remaining_files:
+    if remaining_movies:
         print("\nThe following movies were not processed:\n")
         for leftover in remaining_movies:
             print(f"[INFO] {leftover['file_path']}")
@@ -124,7 +126,7 @@ def handle_movie_no(movie_no, api_client, current_api='omdb'):
         mode = input("Choose an option (1/2/3): ").strip()
 
     if mode == '3':
-        print("\nCancelled.\n")
+        print("\n[INFO] Manual search cancelled by user.")
         return [], [], []
 
     handled_movies = []
@@ -224,31 +226,34 @@ def handle_movie_mult(movie_mult, api_client, current_api='omdb'):
     print("\n=== MOVIES WITH MULTIPLE MATCHES ===")
 
     if not movie_mult:
-        print("[INFO] There are no movies with multiple matches.")
+        print("\n[INFO] There are no movies with multiple matches.")
         return
+
+    print(f"\n[INFO] Current API: {current_api.upper()}\n")
 
     for idx, movie in enumerate(movie_mult, 1):
         print(f"{idx}. {movie['file_path']}")
 
-    print("\nMultiple matches found for these movies. Manual selection is required.\n")
+    print("\nnMultiple matches found for these movies. Manual selection is required.\n")
 
     print("Options:\n1: Manually choose for each\n2: Cancel")
     mode = input("Choose an option: ").strip()
 
     if mode == '2':
-        print("Cancelled.")
-        return [], []
+        print("\n[INFO] Manual selection cancelled by user.")
+        return [], [], []
 
     handled_movies = []
     skipped_movies = []
+    remaining_movies = []
 
-    for movie in movie_mult:
-        print(f"\n--- {movie['file_path']} ---")
+    for idx, movie in enumerate(movie_mult):
+        print(f"\n Choose a result or an action for this movie: {movie['file_path']}")
         details = movie['details']
         results = extract_results(details, current_api)
 
         for i, res in enumerate(results, 1):
-            print(f"{i}. {res.get('title') or res.get('Title')} ({res.get('year') or res.get('release_date') or 'unknown'})")
+            print(f"{i}. {res.get('title') or res.get('Title')} ({res.get('Year') or res.get('release_date') or 'unknown'})")
 
         print("Select result by number, or:")
         print("r: retry search")
@@ -275,19 +280,18 @@ def handle_movie_mult(movie_mult, api_client, current_api='omdb'):
                 if has_results(result, current_api):
                     results = extract_results(result, current_api)
                     for i, res in enumerate(results, 1):
-                        print(f"{i}. {res.get('title') or res.get('Title')} ({res.get('year') or res.get('release_date') or 'unknown'})")
+                        print(f"{i}. {res.get('title') or res.get('Title')} ({res.get('Year') or res.get('release_date') or 'unknown'})")
                 else:
                     print("No results.")
             elif sel == 'a':
                 current_api = switch_api(current_api)
+                continue
             elif sel == 's':
                 skipped_movies.append(movie)
                 break
             elif sel == 'c':
-                print("Cancelled.")
-                return handled_movies, skipped_movies
+                return handle_cancellation(handled_movies, skipped_movies, movie_mult, idx)
             else:
-                print("Invalid input.")
+                print(f"Invalid input. Please enter a number between 1-{len(results)} or r, a, s, c.")
 
-    return handled_movies, skipped_movies
-
+    return handled_movies, skipped_movies, remaining_movies
