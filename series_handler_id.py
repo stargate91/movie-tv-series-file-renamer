@@ -11,7 +11,11 @@ def normalize_season_episode(file_data):
 
     return season, episode
 
-def normalize_episodes(episodes, api_client):
+def normalize_episodes(episodes, api_client, source=None):
+
+    if not episodes:
+        print(f"\n[INFO] There are no episodes to normalize in this pack: {source}.\n")
+        return
 
     handled_files = []
     unexpected_files = []

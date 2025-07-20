@@ -50,9 +50,9 @@ def main():
     h_episode_no, s_episode_no, r_episode_no = handle_episode_no(episode_no, api_client)
     h_episode_mult, s_episode_mult, r_episode_mult = handle_episode_mult(episode_mult, api_client)
 
-    n_episode_one, u_episodes_one = normalize_episodes(episode_one, api_client)
-    n_episode_mult, u_episodes_mult = normalize_episodes(episode_mult, api_client)
-    n_episode_no, u_episodes_no = normalize_episodes(episode_no, api_client)
+    n_episode_one, u_episodes_one = normalize_episodes(episode_one, api_client, source='episodes with one result')
+    n_episode_mult, u_episodes_mult = normalize_episodes(episode_mult, api_client, source='episodes that required manual search')
+    n_episode_no, u_episodes_no = normalize_episodes(episode_no, api_client, source='episodes that required manual selection')
 
     n_episode_one += n_episode_no or []
     n_episode_one += n_episode_mult or []
