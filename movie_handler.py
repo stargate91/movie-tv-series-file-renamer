@@ -279,6 +279,7 @@ def handle_movie_mult(movie_mult, api_client, current_api='omdb'):
                 result = get_api_func(api_client, current_api)(title, year)
                 if has_results(result, current_api):
                     results = extract_results(result, current_api)
+                    print("Found results:")
                     for i, res in enumerate(results, 1):
                         print(f"{i}. {res.get('title') or res.get('Title')} ({res.get('Year') or res.get('release_date') or 'unknown'})")
                 else:

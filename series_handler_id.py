@@ -12,7 +12,6 @@ def normalize_season_episode(file_data):
     return season, episode
 
 def normalize_episodes(episodes, api_client):
-    print("\n=== NORMALIZE EPISODES METADATA ===\n")
 
     handled_files = []
     unexpected_files = []
@@ -31,17 +30,21 @@ def normalize_episodes(episodes, api_client):
             last_air_date = season_data.get('last_air_date')
             if last_air_date:
                 season_details.update({
+                    'status': season_data.get('status', 'unknown'),
                     'last_air_date': last_air_date,
                     'last_air_year': last_air_date.split('-')[0]
                 })
             else:
                 season_details.update({
+                    'status': season_data.get('status', 'unknown'),
                     'last_air_date': 'unknown',
                     'last_air_year': 'unknown'
                 })
         else:
             season_details.update({
-                'status': season_data.get('status', 'unknown')
+                'status': season_data.get('status', 'unknown'),
+                'last_air_date': 'unknown',
+                'last_air_year': 'unknown'                
             })
 
         if 'unknown' in [season, episode]:
@@ -56,7 +59,6 @@ def normalize_episodes(episodes, api_client):
                 'episode': episode,
                 'season_details': season_details
             })
-            print("Normalized successfully: {file_data['file_path']}")
 
     return handled_files, unexpected_files
 
@@ -112,16 +114,38 @@ def user_menu(files, folders, main_folders):
             print("\nOperation cancelled. Exiting menu.")
             return None
 
-def ask_choice(max_choice):
-    try:
-        choice = int(input(f"Please select a series by number (1-{max_choice}): "))
-        if 1 <= choice <= max_choice:
-            return choice
-        else:
-            return None
-    except ValueError:
-        print("Invalid input. Please enter a number.")
-        return None
+def handle_cancellation(handled_episodes, skipped_episodes, remaining_source, mode, idx_or_processed=None):
+    print("\n[INFO] Manual search cancelled by user.\n")
+
+    if handled_episodes:
+        print("\nMetadata stored for the following episodes:\n")
+        for file in handled_episodes:
+            print(f"[SAVED] {file['file_path']}")
+    else:
+        print("\nNo metadata was stored.")
+
+    if skipped_episodes:
+        print("\nThe following episodes were deferred for later:\n")
+        for skip in skipped_episodes:
+            print(f"[SKIPPED] {skip['file_path']}")
+
+    remaining_episodes = []
+
+    if mode == 1:
+        remaining_episodes = remaining_source[idx_or_processed:]
+    elif mode == 2:
+        for dir_key, eps in remaining_source.items():
+            if dir_key not in idx_or_processed:
+                remaining_episodes.extend(eps)
+
+    if remaining_episodes:
+        print("\nThe following episodes were not processed:\n")
+        for leftover in remaining_episodes:
+            print(f"[INFO] {leftover['file_path']}")
+    else:
+        print("\n[INFO] All episodes have been processed.")
+
+    return handled_episodes, skipped_episodes, remaining_episodes
 
 # ======================================================================
 
@@ -130,7 +154,7 @@ def handle_episode_no(episode_no, api_client):
 
     if not episode_no:
         print("\n[INFO] There are no episodes with no match. Continue with the next task.")
-        return [], []
+        return [], [], []
 
     for idx, episode in enumerate(episode_no, 1):
         print(f"{idx}. {episode['file_path']}")
@@ -144,197 +168,487 @@ def handle_episode_no(episode_no, api_client):
 
     action_choice = user_menu(episode_no, first_folder_key, first_main_folder_key)
 
-    skipped_files = []
-    handled_files = [] 
+    skipped_episodes = []
+    handled_episodes = []
+    remaining_episodes = [] 
 
     if action_choice == 1:
-        for file_data in episode_no:
-            file_type = file_data['file_type']
-            print(f"Manual series search required for {file_data['file_path']}")
-            if input("\nWould you like to search manually? (y/n): ").strip().lower() == 'y':
-                search_title = input(f"Enter series title: ").strip()
-                search_year = input(f"Enter series release year (or leave empty to skip): ").strip()
-                if not search_year:
-                    search_year = 'unknown'
-                data = api_client.get_from_tmdb_tv(search_title, search_year)
-                results = file_data['data']['results']
+        for idx, episode in enumerate(episode_no):
+            print(f"\n Search for: {episode['file_path']}")
+            title = input("Series title: ").strip()
+            year = input("Series first air year (optional): ").strip() or 'unknown'
+
+            while True:
+                result = api_client.get_from_tmdb_tv(title, year)
+                options = result.get('results') if result else []
+
+                if not options:
+                    print("No results found.")
+                    print("Options:")
+                    print("r: retry search")
+                    print("s: skip")
+                    print("c: cancel")
+                    sel = input("Choice: ").strip().lower()
+                    if sel == 'r':
+                        title = input("Retry title: ").strip()
+                        year = input("First air year (optional): ").strip() or 'unknown'
+                        continue
+                    elif sel == 's':
+                        skipped_episodes.append(episode)
+                        break
+                    elif sel == 'c':
+                        return handle_cancellation(
+                            handled_episodes,
+                            skipped_episodes,
+                            episode_no,
+                            mode=1,
+                            idx_or_processed=idx
+                        )
+                    else:
+                        print("Invalid input. Please enter r, s, or c.")
+
                 print("Found results:")
-                for idx, result in enumerate(results, start=1):
-                    print(f"{idx}. {result['name']} ({result['first_air_date']})")
-
-                choice = None
-                while choice is None:
-                    choice = ask_choice(len(results))
-
-                selected_result = results[choice - 1]
-                print(f"User selected: {selected_result['name']} ({selected_result['first_air_date']})")
-                handled_files.append({
-                    "file_path": file_data['file_path'],
-                    "file_type": file_data['file_type'],
-                    "season": file_data['season'],
-                    "episode": file_data['episode'],
-                    "details": selected_result,
-                    "extras": file_data['extras']
-                })
-            else:
-                return None
+                for i, opt in enumerate(options, 1):
+                    print(f"{i}. {opt.get('name')} ({opt.get('first_air_date') or 'unknown'})")
+                
+                print("Select result by number, or:")
+                print("r: retry search")
+                print("s: skip")
+                print("c: cancel")
+                sel = input("Choice: ").strip().lower()
+                valid_cmds = {'r', 's', 'c'}
+                if sel.isdigit():
+                    num = int(sel)
+                    if 1 <= num <= len(options):
+                        selected = options[num - 1]
+                        handled_episodes.append({
+                            'file_path': episode['file_path'],
+                            'file_type': episode['file_type'],
+                            'season_file': episode['season_file'],
+                            'episode_file': episode['episode_file'],
+                            'season_folder': episode['season_folder'],
+                            'episode_folder': episode['episode_folder'],                                                        
+                            'extras': episode['extras'],
+                            'details': selected
+                        })
+                        break
+                    else:
+                        print("Invalid number.")
+                elif sel in valid_cmds:
+                    if sel == 'r':
+                        title = input("Retry title: ").strip()
+                        year = input("First air year (optional): ").strip() or 'unknown'
+                        continue
+                    elif sel == 's':
+                        skipped_episodes.append(episode)
+                        break
+                    elif sel == 'c':
+                        return handle_cancellation(
+                            handled_episodes,
+                            skipped_episodes,
+                            episode_no,
+                            mode=1,
+                            idx_or_processed=idx
+                        )
+                else:
+                    print(f"Invalid input. Please enter a number between 1-{len(options)} or r, s, c.")
 
     elif action_choice == 2:
-        for season_dir, files in folders.items():
-            print(f"\nAttempting manual search for: {season_dir}")
-            if input("\nWould you like to search manually? (y/n): ").strip().lower() == 'y':
-                search_title = input(f"Enter series title: ").strip()
-                search_year = input(f"Enter series release year (or leave empty to skip): ").strip()
-                if not search_year:
-                    search_year = 'unknown'                
-                data = api_client.get_from_tmdb_tv(search_title, search_year)
-                results = data['results']
+        processed_folders = []
+
+        for season_dir, episodes in folders.items():
+
+            print(f"\n Search for: {season_dir}")
+            title = input("Series title: ").strip()
+            year = input("Series first air year (optional): ").strip() or 'unknown'
+
+            while True:
+                result = api_client.get_from_tmdb_tv(title, year)
+                options = result.get('results') if result else []
+
+                if not options:
+                    print("No results found.")
+                    print("Options:")
+                    print("r: retry search")
+                    print("s: skip")
+                    print("c: cancel")
+                    sel = input("Choice: ").strip().lower()
+                    if sel == 'r':
+                        title = input("Retry title: ").strip()
+                        year = input("First air year (optional): ").strip() or 'unknown'
+                        continue
+                    elif sel == 's':
+                        skipped_episodes.extend(episodes)
+                        break
+                    elif sel == 'c':
+                        return handle_cancellation(
+                            handled_episodes,
+                            skipped_episodes,
+                            folders,
+                            mode=2,
+                            idx_or_processed=processed_folders
+                        )
+                    else:
+                        print("Invalid input. Please enter r, s, or c.")
+
                 print("Found results:")
-                for idx, result in enumerate(results, start=1):
-                    print(f"{idx}. {result['name']} ({result['first_air_date']})")
+                for i, opt in enumerate(options, 1):
+                    print(f"{i}. {opt.get('name')} ({opt.get('first_air_date') or 'unknown'})")
+                
+                print("Select result by number, or:")
+                print("r: retry search")
+                print("s: skip")
+                print("c: cancel")
+                sel = input("Choice: ").strip().lower()
+                valid_cmds = {'r', 's', 'c'}
+                if sel.isdigit():
+                    num = int(sel)
+                    if 1 <= num <= len(options):
+                        selected = options[num - 1]
+                        for episode in episodes:
+                            handled_episodes.append({
+                            'file_path': episode['file_path'],
+                            'file_type': episode['file_type'],
+                            'season_file': episode['season_file'],
+                            'episode_file': episode['episode_file'],
+                            'season_folder': episode['season_folder'],
+                            'episode_folder': episode['episode_folder'],                                                        
+                            'extras': episode['extras'],
+                            'details': selected
+                            })
+                        processed_folders.append(season_dir)
+                        break
+                    else:
+                        print("Invalid number.")
+                elif sel in valid_cmds:
+                    if sel == 'r':
+                        title = input("Retry title: ").strip()
+                        year = input("First air year (optional): ").strip() or 'unknown'
+                        continue
+                    elif sel == 's':
+                        skipped_episodes.extend(episodes)
+                        break
+                    elif sel == 'c':
+                        return handle_cancellation(
+                            handled_episodes,
+                            skipped_episodes,
+                            folders,
+                            mode=2,
+                            idx_or_processed=processed_folders
+                        )
+                else:
+                    print(f"Invalid input. Please enter a number between 1-{len(options)} or r, s, c.")
 
-                choice = None
-                while choice is None:
-                    choice = ask_choice(len(results))
-
-                selected_result = results[choice - 1]
-                print(f"User selected: {selected_result['name']} ({selected_result['first_air_date']})")
-
-                for file_data in files:
-                    handled_files.append({
-                        "file_path": file_data['file_path'],
-                        "file_type": file_data['file_type'],
-                        "season": file_data['season'],
-                        "episode": file_data['episode'],
-                        "details": selected_result,
-                        "extras": file_data['extras']
-                    })
-            else:
-                return None
     elif action_choice == 3:
-        for series_dir, files in main_folders.items():
-            print(f"\nAttempting manual search for: {season_dir}")
-            if input("\nWould you like to search manually? (y/n): ").strip().lower() == 'y':
-                search_title = input(f"Enter series title: ").strip()
-                search_year = input(f"Enter series release year (or leave empty to skip): ").strip()
-                if not search_year:
-                    search_year = 'unknown'
-                data = api_client.get_from_tmdb_tv(search_title, search_year)
-                results = data['results']
+        processed_folders = []
+
+        for series_dir, episodes in main_folders.items():
+
+            print(f"\n Search for: {series_dir}")
+            title = input("Series title: ").strip()
+            year = input("Series first air year (optional): ").strip() or 'unknown'
+
+            while True:
+                result = api_client.get_from_tmdb_tv(title, year)
+                options = result.get('results') if result else []
+
+                if not options:
+                    print("No results found.")
+                    print("Options:")
+                    print("r: retry search")
+                    print("s: skip")
+                    print("c: cancel")
+                    sel = input("Choice: ").strip().lower()
+                    if sel == 'r':
+                        title = input("Retry title: ").strip()
+                        year = input("First air year (optional): ").strip() or 'unknown'
+                        continue
+                    elif sel == 's':
+                        skipped_episodes.extend(episodes)
+                        break
+                    elif sel == 'c':
+                        return handle_cancellation(
+                            handled_episodes,
+                            skipped_episodes,
+                            main_folders,
+                            mode=2,
+                            idx_or_processed=processed_folders
+                        )
+                    else:
+                        print("Invalid input. Please enter r, s, or c.")
+
                 print("Found results:")
-                for idx, result in enumerate(results, start=1):
-                    print(f"{idx}. {result['name']} ({result['first_air_date']})")
+                for i, opt in enumerate(options, 1):
+                    print(f"{i}. {opt.get('name')} ({opt.get('first_air_date') or 'unknown'})")
+                
+                print("Select result by number, or:")
+                print("r: retry search")
+                print("s: skip")
+                print("c: cancel")
+                sel = input("Choice: ").strip().lower()
+                valid_cmds = {'r', 's', 'c'}
+                if sel.isdigit():
+                    num = int(sel)
+                    if 1 <= num <= len(options):
+                        selected = options[num - 1]
+                        for episode in episodes:
+                            handled_episodes.append({
+                            'file_path': episode['file_path'],
+                            'file_type': episode['file_type'],
+                            'season_file': episode['season_file'],
+                            'episode_file': episode['episode_file'],
+                            'season_folder': episode['season_folder'],
+                            'episode_folder': episode['episode_folder'],                                                        
+                            'extras': episode['extras'],
+                            'details': selected
+                            })
+                        processed_folders.append(series_dir)
+                        break
+                    else:
+                        print("Invalid number.")
+                elif sel in valid_cmds:
+                    if sel == 'r':
+                        title = input("Retry title: ").strip()
+                        year = input("First air year (optional): ").strip() or 'unknown'
+                        continue
+                    elif sel == 's':
+                        skipped_episodes.extend(episodes)
+                        break
+                    elif sel == 'c':
+                        return handle_cancellation(
+                            handled_episodes,
+                            skipped_episodes,
+                            main_folders,
+                            mode=2,
+                            idx_or_processed=processed_folders
+                        )
+                else:
+                    print(f"Invalid input. Please enter a number between 1-{len(options)} or r, s, c.")
 
-                choice = None
-                while choice is None:
-                    choice = ask_choice(len(results))
-
-                selected_result = results[choice - 1]
-                print(f"User selected: {selected_result['name']} ({selected_result['first_air_date']})")
-
-                for file_data in files:
-                    handled_files.append({
-                        "file_path": file_data['file_path'],
-                        "file_type": file_data['file_type'],
-                        "season": file_data['season'],
-                        "episode": file_data['episode'],
-                        "details": selected_result,
-                        "extras": file_data['extras']
-                        })
-            else:
-                return None
     else:
-        return [], []
+        print("\n[INFO] Manual search cancelled by user.")
+        return [], [], []
 
-    return handled_files, skipped_files
+    return handled_episodes, skipped_episodes, remaining_episodes
 
 # ======================================================================
 # ======================================================================
 # ======================================================================
 
-def pick_res(results, choice):
-    selected_result = results[choice - 1]
-    print(f"User selected: {selected_result['name']} ({selected_result['first_air_date']})")
-    return selected_result
+def handle_episode_mult(episode_mult, api_client):
+    print("\n=== EPISODES WITH MULTIPLE SERIES MATCHES ===\n")
 
-def select_for_group(files, file_type):
-    prototype = files[0]
-    results = prototype["series_details"]["results"]
+    if not episode_mult:
+        print("\n[INFO] There are no episodes with multiple matches. Continue with the next task.")
+        return [], [], []
 
-    for idx, result in enumerate(results, start=1):
-        print(f"{idx}. {result['name']} ({result['first_air_date']})")
+    for idx, episode in enumerate(episode_mult, 1):
+        print(f"{idx}. {episode['file_path']}")
 
-    choice = None
-    while choice is None:
-        choice = ask_choice(len(results))
+    print("\nManual selection required for these episodes.\n")
 
-    return pick_res(results, choice)
-
-
-def handle_episode_mult(episode_mult):
-    handled_files = []
-
-    folders, main_folders = group_by_folders(mult_res)
-
-    for file_data in mult_res:
-        file_type = file_data['file_type']
-        print(f"Multiple {file_type} results found for: {file_data['file_path']}")
+    folders, main_folders = group_by_folders(episode_mult) 
 
     first_folder_key = next(iter(folders))
     first_main_folder_key = next(iter(main_folders))
 
-    action_choice = user_menu(mult_res, first_folder_key, first_main_folder_key)
+    action_choice = user_menu(episode_mult, first_folder_key, first_main_folder_key)
+
+    skipped_episodes = []
+    handled_episodes = []
+    remaining_episodes = [] 
 
     if action_choice == 1:
-        for file_data in mult_res:
-            file_type = file_data['file_type']
-            results = file_data['data']['results']
-            print(f"Multiple {file_type} results found for: {file_data['file_path']}")
-            for idx, result in enumerate(results, start=1):
-                print(f"{idx}. {result['name']} ({result['first_air_date']})")
-            
 
-            choice = None
-            while choice is None:
-                choice = ask_choice(len(results))
+        for idx, episode in enumerate(episode_mult):
+            results = episode['details']['results']
+            print(f"\n Choose a result or an action for this episode: {episode['file_path']}")
 
-            selected_series = pick_res(results, choice)
-            handled_files.append({
-                "file_path": file_data['file_path'],
-                "file_type": file_data['file_type'],
-                "season": file_data['season'],
-                "episode": file_data['episode'],
-                "details": selected_series,
-                "extras": file_data['extras']
-            })
+            for idx, res in enumerate(results, start=1):
+                print(f"{idx}. {res['name']} ({res['first_air_date'] or 'unknown'})")
+
+            print("Select result by number, or:")
+            print("r: retry search")
+            print("s: skip")
+            print("c: cancel")
+
+            while True:
+                sel = input("Choice: ").strip().lower()
+                valid_cmds = {'r', 's', 'c'}
+                if sel.isdigit():
+                    num = int(sel)
+                    if 1 <= num <= len(results):
+                        selected = results[num - 1]
+                        handled_episodes.append({
+                            'file_path': episode['file_path'],
+                            'file_type': episode['file_type'],
+                            'season_file': episode['season_file'],
+                            'episode_file': episode['episode_file'],
+                            'season_folder': episode['season_folder'],
+                            'episode_folder': episode['episode_folder'],                                                        
+                            'extras': episode['extras'],
+                            'details': selected
+                        })
+                        break
+                    else:
+                        print("Invalid number.")
+                elif sel in valid_cmds:
+                    if sel == 'r':
+                        title = input("Retry title: ").strip()
+                        year = input("First air year (optional): ").strip() or 'unknown'
+                        result = api_client.get_from_tmdb_tv(title, year)
+                        results = result.get('results') if result else []
+                        if results:
+                            print("Found results:")
+                            for i, res in enumerate(results, 1):
+                                print(f"{i}. {res.get('name')} ({res.get('first_air_date') or 'unknown'})")
+                            else:
+                                print("No results.")
+                    elif sel == 's':
+                        skipped_episodes.append(episode)
+                        break
+                    elif sel == 'c':
+                        return handle_cancellation(
+                            handled_episodes,
+                            skipped_episodes,
+                            episode_no,
+                            mode=1,
+                            idx_or_processed=idx
+                        )
+                else:
+                    print(f"Invalid input. Please enter a number between 1-{len(results)} or r, s, c.")              
 
     elif action_choice == 2:
-        for season_dir, files in folders.items():
-            print(f"\nAttempting manual search for: {season_dir}")
-            selected_series = select_for_group(files, file_type="episode")
-            for file_data in files:
-                handled_files.append({
-                    "file_path": file_data['file_path'],
-                    "file_type": file_data['file_type'],
-                    "season": file_data['season'],
-                    "episode": file_data['episode'],
-                    "details": selected_series,
-                    "extras": file_data['extras']
-                })
-    elif action_choice == 3:
-        for series_dir, files in main_folders.items():
-            print(f"\nAttempting manual search for: {series_dir}")
-            selected_series = select_for_group(files, file_type="episode")
-            for file_data in files:
-                handled_files.append({
-                    "file_path": file_data['file_path'],
-                    "file_type": file_data['file_type'],
-                    "season": file_data['season'],
-                    "episode": file_data['episode'],
-                    "details": selected_series,
-                    "extras": file_data['extras']
-                })
-    elif action_choice == 4:
-        return None
+        processed_folders = []
 
-    return handled_files
+        for season_dir, episodes in folders.items():
+            prototype = episodes[0]
+            results = prototype['details']['results']
+
+            print(f"\n Choose a result or an action for this folder: {season_dir}")
+
+            for idx, res in enumerate(results, start=1):
+                print(f"{idx}. {res['name']} ({res['first_air_date'] or 'unknown'})")
+
+            print("Select result by number, or:")
+            print("r: retry search")
+            print("s: skip")
+            print("c: cancel")
+
+            while True:
+                sel = input("Choice: ").strip().lower()
+                valid_cmds = {'r', 's', 'c'}
+                if sel.isdigit():
+                    num = int(sel)
+                    if 1 <= num <= len(results):
+                        selected = results[num - 1]
+                        for episode in episodes:
+                            handled_episodes.append({
+                            'file_path': episode['file_path'],
+                            'file_type': episode['file_type'],
+                            'season_file': episode['season_file'],
+                            'episode_file': episode['episode_file'],
+                            'season_folder': episode['season_folder'],
+                            'episode_folder': episode['episode_folder'],                                                        
+                            'extras': episode['extras'],
+                            'details': selected
+                            })
+                        processed_folders.append(season_dir)
+                        break
+                    else:
+                        print("Invalid number.")
+                elif sel in valid_cmds:
+                    if sel == 'r':
+                        title = input("Retry title: ").strip()
+                        year = input("First air year (optional): ").strip() or 'unknown'
+                        result = api_client.get_from_tmdb_tv(title, year)
+                        results = result.get('results') if result else []
+                        if results:
+                            print("Found results:")
+                            for i, res in enumerate(results, 1):
+                                print(f"{i}. {res.get('name')} ({res.get('first_air_date') or 'unknown'})")
+                            else:
+                                print("No results.")
+                    elif sel == 's':
+                        skipped_episodes.append(episodes)
+                        break
+                    elif sel == 'c':
+                        return handle_cancellation(
+                            handled_episodes,
+                            skipped_episodes,
+                            episode_mult,
+                            mode=2,
+                            idx_or_processed=processed_folders
+                        )
+                else:
+                    print(f"Invalid input. Please enter a number between 1-{len(results)} or r, s, c.")
+
+    elif action_choice == 3:
+        processed_folders = []
+
+        for series_dir, episodes in main_folders.items():
+            prototype = episodes[0]
+            results = prototype['details']['results']
+
+            print(f"\n Choose a result or an action for this folder: {series_dir}")
+
+            for idx, res in enumerate(results, start=1):
+                print(f"{idx}. {res['name']} ({res['first_air_date'] or 'unknown'})")
+
+            print("Select result by number, or:")
+            print("r: retry search")
+            print("s: skip")
+            print("c: cancel")
+
+            while True:
+                sel = input("Choice: ").strip().lower()
+                valid_cmds = {'r', 's', 'c'}
+                if sel.isdigit():
+                    num = int(sel)
+                    if 1 <= num <= len(results):
+                        selected = results[num - 1]
+                        for episode in episodes:
+                            handled_episodes.append({
+                            'file_path': episode['file_path'],
+                            'file_type': episode['file_type'],
+                            'season_file': episode['season_file'],
+                            'episode_file': episode['episode_file'],
+                            'season_folder': episode['season_folder'],
+                            'episode_folder': episode['episode_folder'],                                                        
+                            'extras': episode['extras'],
+                            'details': selected
+                            })
+                        processed_folders.append(series_dir)
+                        break
+                    else:
+                        print("Invalid number.")
+                elif sel in valid_cmds:
+                    if sel == 'r':
+                        title = input("Retry title: ").strip()
+                        year = input("First air year (optional): ").strip() or 'unknown'
+                        result = api_client.get_from_tmdb_tv(title, year)
+                        results = result.get('results') if result else []
+                        if results:
+                            print("Found results:")
+                            for i, res in enumerate(results, 1):
+                                print(f"{i}. {res.get('name')} ({res.get('first_air_date') or 'unknown'})")
+                            else:
+                                print("No results.")
+                    elif sel == 's':
+                        skipped_episodes.append(episodes)
+                        break
+                    elif sel == 'c':
+                        return handle_cancellation(
+                            handled_episodes,
+                            skipped_episodes,
+                            episode_mult,
+                            mode=2,
+                            idx_or_processed=processed_folders
+                        )
+                else:
+                    print(f"Invalid input. Please enter a number between 1-{len(results)} or r, s, c.")
+    else:
+        print("\n[INFO] Manual selection cancelled by user.")
+        return [], [], []
+
+    return handled_episodes, skipped_episodes, remaining_episodes

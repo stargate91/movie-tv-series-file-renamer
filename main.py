@@ -33,29 +33,31 @@ def main():
 
     if not any([movie_one, movie_no, movie_mult, episode_one, episode_no, episode_mult, unknown_files]):
         sys.exit(0)
-    
-    handled_movie_no, skipped_movie_no, remaining_episode_no = handle_movie_no(movie_no, api_client, api_source)
-    handled_movie_mult, skipped_movie_mult, remaining_episode_mult = handle_movie_mult(movie_mult, api_client, api_source)
 
-    norm_movie_one = normalize_movies(movie_one, source='movies with one result')
-    norm_movie_no = normalize_movies(handled_movie_no, source='movies that required manual search')
-    norm_movie_mult = normalize_movies(handled_movie_mult, source='movies that required manual selection')
+    h_movie_no, s_movie_no, r_movie_no = handle_movie_no(movie_no, api_client, api_source)
+    h_movie_mult, s_movie_mult, r_movie_mult = handle_movie_mult(movie_mult, api_client, api_source)
 
-    norm_movie_one += norm_movie_no or []
-    norm_movie_one += norm_movie_mult or []
-    movies = norm_movie_one
+    n_movie_one = normalize_movies(movie_one, source='movies with one result')
+    n_movie_no = normalize_movies(h_movie_no, source='movies that required manual search')
+    n_movie_mult = normalize_movies(h_movie_mult, source='movies that required manual selection')
+
+    n_movie_one += n_movie_no or []
+    n_movie_one += n_movie_mult or []
+    movies = n_movie_one
     
     rename_vid_files(movies, live_run, zero_padding, movie_template, episode_template)
 
-    '''
-    handled_episode_no, skipped_episode_no = handle_episode_no(episode_no, api_client)
-    handled_episode_mult, skipped_episode_mult = handle_episode_mult(episode_mult, api_client)
+    h_episode_no, s_episode_no, r_episode_no = handle_episode_no(episode_no, api_client)
+    h_episode_mult, s_episode_mult, r_episode_mult = handle_episode_mult(episode_mult, api_client)
 
-    norm_episode_one = normalize_episodes(episode_one, api_client)
-    norm_episode_no = normalize_episodes(episode_no, api_client)
-    norm_episode_mult = normalize_episodes(episode_mult, api_client)
+    n_episode_one, u_episodes_one = normalize_episodes(episode_one, api_client)
+    n_episode_mult, u_episodes_mult = normalize_episodes(episode_mult, api_client)
+    n_episode_no, u_episodes_no = normalize_episodes(episode_no, api_client)
 
-    episodes = norm_episode_one + norm_episode_no + norm_episode_mult    
-    '''
+    n_episode_one += n_episode_no or []
+    n_episode_one += n_episode_mult or []
+    episodes = n_episode_one
+
+
 if __name__ == "__main__":
     main()
