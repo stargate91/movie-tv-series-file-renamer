@@ -2,9 +2,10 @@ from api_client import APIClient
 from config import Config
 from file_ops import get_vid_files_all, rename_vid_files
 from meta import extract_metadata
-from movie_handler import normalize_movies, handle_movie_no, handle_movie_mult
-from series_handler_id import normalize_episodes, handle_episode_no, handle_episode_mult
+from movie_handler import handle_movie_no, handle_movie_mult
+from series_handler_id import handle_episode_no, handle_episode_mult
 from series_handler_episode import extract_episode_metadata
+from normalizers import normalize_movies, normalize_episodes
 import sys
 
 

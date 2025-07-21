@@ -8,7 +8,7 @@ from meta_from_files import (
     get_first_audio_language_code,
     get_audio_channel_description
 )
-from outputs import proc_file_msg, rename_success_msg, dry_rename_msg
+from ui_ux import proc_file_msg, rename_success_msg, dry_rename_msg
 import os
 import pycountry
 import ffmpeg

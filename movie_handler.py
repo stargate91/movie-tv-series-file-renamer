@@ -1,40 +1,4 @@
-from datetime import datetime
-
-def normalize_movies(movies, source=None):
-
-    if not movies:
-        print(f"\n[INFO] There are no movies to normalize in this pack: {source}.\n")
-        return []
-    
-    handled_movies = []
-
-    for file_data in movies:
-        movie_details = file_data['details']
-
-        if movie_details.get('results'):
-            movie_details = movie_details['results'][0]
-
-        if 'release_date' in movie_details:
-            movie_details.update({'year': movie_details['release_date'].split('-')[0]})
-
-        if 'Title' in movie_details:
-            movie_details['title'] = movie_details.pop('Title')
-
-        if 'Released' in movie_details:
-            movie_details['release_date'] = movie_details.pop('Released')
-            movie_details['release_date'] = datetime.strptime(movie_details['release_date'], "%d %b %Y").strftime("%Y-%m-%d")
-
-        if 'Year' in movie_details:
-            movie_details['year'] = movie_details.pop('Year')
-
-        handled_movies.append({
-            'file_path': file_data['file_path'],
-            'file_type': file_data['file_type'],
-            'extras': file_data['extras'],
-            'movie_details': movie_details
-            })
-
-    return handled_movies
+from ui_ux import print_cancellation_summary
 
 def get_api_func(api_client, source):
     return {
@@ -78,32 +42,7 @@ def switch_api(current):
             print("Staying on current API.")
             return current
 
-def handle_cancellation(handled_movies, skipped_movies, movie_no, idx):
-    print("\n[INFO] Manual search cancelled by user.\n")
-
-    if handled_movies:
-        print("\nMetada stored for the following movies:\n")
-        for file in handled_movies:
-            print(f"[SAVED] {file['file_path']}")
-    else:
-        print("\nNo metadata was stored.")
-
-    if skipped_movies:
-        print("\nThe following movies were deferred for later:\n")
-        for skip in skipped_movies:
-            print(f"[SKIPPED] {skip['file_path']}")
-
-    remaining_movies = movie_no[idx:]
-
-    if remaining_movies:
-        print("\nThe following movies were not processed:\n")
-        for leftover in remaining_movies:
-            print(f"[INFO] {leftover['file_path']}")
-    else:
-        print("\n[INFO] All movies have been processed.")
-
-    return handled_movies, skipped_movies, remaining_movies
-
+# ======================================================================
 
 def handle_movie_no(movie_no, api_client, current_api='omdb'):
     print("\n=== MOVIES WITH NO MATCH ===")
@@ -126,8 +65,7 @@ def handle_movie_no(movie_no, api_client, current_api='omdb'):
         mode = input("Choose an option (1/2/3): ").strip()
 
     if mode == '3':
-        print("\n[INFO] Manual search cancelled by user.")
-        return [], [], []
+        return print_cancellation_summary(action="search")
 
     handled_movies = []
     skipped_movies = []
@@ -141,7 +79,15 @@ def handle_movie_no(movie_no, api_client, current_api='omdb'):
                 print("Invalid input. Please enter y, n, or c.")
                 choice = input(f"\nSearch for: {movie['file_path']}? (y/n/c): ").strip().lower()
             if choice == 'c':
-                return handle_cancellation(handled_movies, skipped_movies, movie_no, idx)
+                return print_cancellation_summary(
+                    handled=handled_movies,
+                    skipped=skipped_movies,
+                    source=movie_no,
+                    mode=1,
+                    idx_or_processed=idx,
+                    content="movies",
+                    action="search"
+                )
             if choice != 'y':
                 skipped_movies.append(movie)
                 continue
@@ -176,7 +122,15 @@ def handle_movie_no(movie_no, api_client, current_api='omdb'):
                     skipped_movies.append(movie)
                     break
                 elif sel == 'c':
-                    return handle_cancellation(handled_movies, skipped_movies, movie_no, idx)
+                    return print_cancellation_summary(
+                        handled=handled_movies,
+                        skipped=skipped_movies,
+                        source=movie_no,
+                        mode=1,
+                        idx_or_processed=idx,
+                        content="movies",
+                        action="search"
+                    )
                 else:
                     print("Invalid input. Please enter r, a, s, or c.")
 
@@ -216,11 +170,23 @@ def handle_movie_no(movie_no, api_client, current_api='omdb'):
                     skipped_movies.append(movie)
                     break
                 elif sel == 'c':
-                    return handle_cancellation(handled_movies, skipped_movies, movie_no, idx)
+                    return print_cancellation_summary(
+                        handled=handled_movies,
+                        skipped=skipped_movies,
+                        source=movie_no,
+                        mode=1,
+                        idx_or_processed=idx,
+                        content="movies",
+                        action="search"
+                    )
             else:
                 print(f"Invalid input. Please enter a number between 1-{len(options)} or r, a, s, c.")
 
     return handled_movies, skipped_movies, remaining_movies
+
+# ======================================================================
+# ======================================================================
+# ======================================================================
 
 def handle_movie_mult(movie_mult, api_client, current_api='omdb'):
     print("\n=== MOVIES WITH MULTIPLE MATCHES ===")
@@ -240,8 +206,7 @@ def handle_movie_mult(movie_mult, api_client, current_api='omdb'):
     mode = input("Choose an option: ").strip()
 
     if mode == '2':
-        print("\n[INFO] Manual selection cancelled by user.")
-        return [], [], []
+        return print_cancellation_summary(action="selection")
 
     handled_movies = []
     skipped_movies = []
@@ -291,7 +256,15 @@ def handle_movie_mult(movie_mult, api_client, current_api='omdb'):
                 skipped_movies.append(movie)
                 break
             elif sel == 'c':
-                return handle_cancellation(handled_movies, skipped_movies, movie_mult, idx)
+                return print_cancellation_summary(
+                    handled=handled_movies,
+                    skipped=skipped_movies,
+                    source=movie_mult,
+                    mode=1,
+                    idx_or_processed=idx,
+                    content="movies",
+                    action="selection"
+                )
             else:
                 print(f"Invalid input. Please enter a number between 1-{len(results)} or r, a, s, c.")
 
