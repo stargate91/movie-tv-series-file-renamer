@@ -1,3 +1,4 @@
+from helper import group_by_folders
 import os
 
 # ----- File operations outputs -----
@@ -57,6 +58,23 @@ def print_cancellation_summary(
 
     return handled, skipped, remaining
 
+def display_res(
+    options,
+    file=None,
+    folder=None,
+    content=None
+):
+
+    if file:
+        print(f"\n Choose a result or an action for this {content}: {file['file_path']}") # {content}: [movie, episode]
+    elif folder:
+        print(f"\n Choose a result or an action for this folder: {folder}")
+    else:
+        print("\nFound results:")
+
+    for i, opt in enumerate(options, 1):
+        print(f"{i}. {opt.get('title') or opt.get('Title') or opt.get('name')} ({opt.get('Year') or opt.get('release_date') or opt.get('first_air_date')})")
+
 # ----- Handling inputs -----
 
 def user_menu(files, folders, main_folders):
@@ -85,6 +103,116 @@ def user_menu(files, folders, main_folders):
         except (KeyboardInterrupt, EOFError):
             print("\nOperation cancelled. Exiting menu.")
             return None
+
+def show_list_and_get_user_choice(
+    vid_files,
+    current_api=None,
+    content=None,
+    action=None,
+    res_quantity=None
+):
+
+    if not vid_files:
+        print(f"\n[INFO] There are no {content} with {res_quantity}. Continue with the next task.") # {res_quantity}: [no match, multiple matches]
+        return [], [], []
+
+    print(f"\n=== {content.upper()} WITH {res_quantity.upper()} ===\n") # {content}: [movies, episodes]
+
+    if current_api:
+        print(f"\n[INFO] Current API: {current_api.upper()}\n")
+
+    for idx, vid in enumerate(vid_files, 1):
+        print(f"{idx}. {vid['file_path']}")
+
+    print(f"\nManual {action} required for these {content}.\n") # {action}: [search, selection]
+    
+    if content == "movies":
+        print(f"Options:\n1: Manual {action} for all\n2: Cancel")
+        mode = input("Choose an option (1/2): ").strip()
+        while mode not in {'1', '2'}:
+            print("Invalid input. Please enter 1 or 2")
+            mode = input("Choose an option (1/2): ").strip()
+
+        if mode == '2':
+            print_cancellation_summary(action=action)
+            return "cancelled"
+        else:
+            return None
+
+    if content == "episodes":
+        folders, main_folders = group_by_folders(vid_files) 
+        
+        first_folder_key = next(iter(folders))
+        first_main_folder_key = next(iter(main_folders))
+
+        action_choice = user_menu(vid_files, first_folder_key, first_main_folder_key)
+        return folders, main_folders, action_choice
+
+def get_title_and_year_input(re=None, mo=None, ep=None, file=None, folder=None, current_api=None):
+    if file:
+        print(f"\n Search for: {file['file_path']}")
+
+    if folder:
+        print(f"\n Search for: {folder}")
+
+    if current_api:
+        print(f"[API: {current_api.upper()}]")
+
+    if mo:
+        prompt_title = "Retry title" if re else "Title"
+        title = input(f"{prompt_title}: ").strip()
+        year = input("Year (optional): ").strip() or 'unknown'
+
+    elif ep:
+        prompt_title = "Retry title" if re else "Series title"
+        title = input(f"{prompt_title}: ").strip()
+        year = input("Series first air year (optional): ").strip() or 'unknown'
+
+    return title, year
+
+def switch_api(current):
+    available = ['omdb', 'tmdb']
+    others = [a for a in available if a != current]
+    
+    while True:
+        print(f"\nAvailable APIs: {', '.join(others)} (current: {current})")
+        new_api = input("Switch to: ").strip().lower()
+
+        if new_api == current:
+            print(f"You are already using '{current}'. Choose a different API.")
+            continue
+
+        if new_api in others:
+            print(f"[INFO] Switched to API: {new_api.upper()}")
+            return new_api
+
+        print("Invalid API. Please choose from the available options or press Enter to cancel.")
+        cancel = input("Try again? (y/n): ").strip().lower()
+        if cancel != 'y':
+            print("Staying on current API.")
+            return current
+
+def action_menu(no=None, mult_api=None):
+    if no:
+        print("No results found.")
+        print("Options:")
+    print("Select result by number, or:")
+    print("r: retry search")
+    if mult_api:
+        print("a: try another API")
+    print("s: skip")
+    print("c: cancel")
+
+def process_number_choice(sel, options, file, handled):
+    if sel.isdigit():
+        num = int(sel)
+        if 1 <= num <= len(options):
+            selected = options[num - 1]
+            handled.append(build_entry(file, selected))
+            return True
+        else:
+            print("Invalid number.")
+    return False
 
 # ----- Main messages -----
 
