@@ -1,14 +1,23 @@
+from dotenv import load_dotenv
+from build import DEFAULT_CONFIG, KEYS_ERROR_MESSAGE
 import os
 import argparse
 import configparser
-from dotenv import load_dotenv
+import sys
 
 class Config:
     def __init__(self):
+        self.DEFAULT_CONFIG = DEFAULT_CONFIG
+
         self.config = configparser.ConfigParser()
 
-        config_path = os.path.join(os.path.dirname(__file__), 'config.ini')
-        self.config.read(config_path)
+        self.run_dir = self.get_run_dir()
+        self.config_path = os.path.join(self.run_dir, "config.ini")
+
+        if not os.path.exists(self.config_path):
+            self.create_default_config()
+
+        self.config.read(self.config_path)
 
         dotenv_path = os.path.join("data", ".env")
         load_dotenv(dotenv_path)
@@ -19,12 +28,41 @@ class Config:
 
         self.args = self.parse_args()
 
+    def get_run_dir(self):
+        if getattr(sys, 'frozen', False):
+            return os.path.dirname(sys.executable)
+        else:
+            return os.path.dirname(os.path.abspath(__file__))
+
+    def create_default_config(self):
+        with open(self.config_path, "w", encoding="utf-8") as f:
+            f.write(self.DEFAULT_CONFIG)
+        print(f"[INFO] Default config.ini created at {self.config_path}")
+
+    def validate_api_keys(self):
+        placeholders = {"your_omdb_key_here", "your_tmdb_key_here", "your_tmdb_token_here"}
+
+        if not all([self.omdb_key, self.tmdb_key, self.tmdb_bearer_token]):
+            print("\n[ERROR] Missing API key(s) or token.")
+            self._print_key_error_and_exit()
+
+        if (self.omdb_key in placeholders or
+            self.tmdb_key in placeholders or
+            self.tmdb_bearer_token in placeholders):
+            print("\n[ERROR] You are still using placeholder API keys. Please replace them with real keys!")
+            self._print_key_error_and_exit()
+
+    def _print_key_error_and_exit(self):
+        print(KEYS_ERROR_MESSAGE)
+        input("[INFO] Press Enter to exit...")
+        sys.exit(1)
+
     def parse_args(self):
         parser = argparse.ArgumentParser(
             description="Automatically renames video files based on metadata."
         )
         parser.add_argument("--folder", help="Path to the folder containing the movie files to rename.")
-        parser.add_argument("--vid_size", help="Set the minimum size of video files for processing.")
+        parser.add_argument("--vid_size", type=int, help="Set the minimum size of video files for processing.")
         parser.add_argument("--recursive", action="store_true", help="Include video files in subdirectories recursively.")
         parser.add_argument("--source", help="Which database to use for searching ('omdb' or 'tmdb').", choices=["omdb", "tmdb"])
         parser.add_argument("--movie_template", help="The template used for renaming movie files")
@@ -38,7 +76,7 @@ class Config:
         if folder_path is None:
             raise ValueError("No folder path provided. Use --folder or set it in config.ini.")
 
-        vid_size = self.args.vid_size if self.args.vid_size else self.config.get('GENERAL', 'vid_size', fallback=None)
+        vid_size = self.args.vid_size if self.args.vid_size else self.config.getint('GENERAL', 'vid_size', fallback=None)
         if vid_size is None:
             raise ValueError("No video size provided. Use --vid_size or set it in config.ini.")
 
@@ -59,7 +97,7 @@ class Config:
 
         return {
             "folder_path": folder_path,
-            "vid_size": int(vid_size),
+            "vid_size": vid_size,
             "recursive": recursive,
             "api_source": source,
             "movie_template": movie_template,

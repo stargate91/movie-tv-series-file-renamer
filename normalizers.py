@@ -53,7 +53,7 @@ def normalize_episodes(episodes, api_client, source=None):
         print(f"\n[INFO] There are no episodes to normalize in this pack: {source}.\n")
         return [], []
 
-    handled_episodes = []
+    normalized_episodes = []
     unexpected_files = []
 
     for file_data in episodes:
@@ -104,7 +104,7 @@ def normalize_episodes(episodes, api_client, source=None):
             print(f"[WARNING] Unexpected files for {file_data['file_path']}. Manual renaming needed.")
             unexpected_files.append(file_data)
         else:
-            handled_episodes.append({
+            normalized_episodes.append({
                 'file_path': file_data['file_path'],
                 'file_type': file_data['file_type'],
                 'extras': file_data['extras'],
@@ -113,4 +113,4 @@ def normalize_episodes(episodes, api_client, source=None):
                 'series_details': series_details
             })
 
-    return handled_episodes, unexpected_files
+    return normalized_episodes, unexpected_files

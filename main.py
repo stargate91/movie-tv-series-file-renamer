@@ -12,6 +12,7 @@ import sys
 def main():
 
     config = Config()
+    config.validate_api_keys()
     config_data = config.get_config()
 
     folder_path = config_data["folder_path"]
@@ -68,4 +69,9 @@ def main():
     rename_vid_files(episodes, live_run, zero_padding, movie_template, episode_template)
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        print(f"[ERROR] {e}")
+    if getattr(sys, 'frozen', False):
+        input("\n[INFO] Press Enter to exit...")
