@@ -1,100 +1,210 @@
+# 🎬 Movie / TV Series Renamer
 
-# Movie/TV Series Renamer
+This is a Python-based tool that automatically renames your movie and TV series video files using metadata from OMDb or TMDb APIs.\
+It's built to help organize downloaded video content by giving meaningful and standardized file names.
 
-A simple Python script that automatically renames your movie and TV series video files based on metadata (like title, year, resolution, etc.) pulled from APIs such as OMDb and TMDb. It also allows you to manually choose the correct result when there are multiple matches or search for a result when no match is found.
+## ✅ Features
+
+- Automatically renames **movie** and **episode** files using API metadata
+- Supports both **OMDb** (movies only) and **TMDb** (movies and series)
+- If multiple results are found, you can manually choose the correct one
+- If no match is found, you can perform a manual API search
+- Falls back from file name to folder name when needed
+- Fully customizable file name templates
+- Supports **dry-run** mode (preview renaming without changing anything)
+- Command-line arguments to override config settings
+- Environment variable or `.ini` based configuration
+- Automatically ignores small video samples (default < 500 MB)
+- Future plans include subtitle handling, logging, batch mode, and more!
 
 ---
 
-## Features
+## 📁 Folder Structure
 
-- **Auto-Rename**: The script will automatically rename your video files using metadata from OMDb or TMDb.
-- **Manual Selection**: If there are multiple results found, you can manually select the correct one or search for a result.
-- **Metadata Sources**: Choose between OMDb (default) or TMDb for metadata search.
-- **Folder and File Metadata**: The script can extract metadata from the filename or the folder name, depending on your preference.
-- **Recursive Search**: Option to recursively process files in subdirectories.
+```
+Movie-TV-Renamer/
+│
+├── api_client.py               # Handles API communication
+├── cache.py                    # Handles result caching
+├── config.ini                  # Main config file (user-editable)
+├── config.py                   # Loads CLI args, .env and config.ini
+├── file_ops.py                 # File/folder renaming logic
+├── main.py                     # Entry point
+├── meta.py                     # Metadata parsing and extraction
+├── meta_from_files.py          # Guessing titles/seasons/etc. from file names
+├── movie_handler.py            # Handles movie-specific logic
+├── series_handler_id.py        # TMDb ID-based series handling
+├── series_handler_episode.py   # Episode-level TMDb handling
+├── outputs.py                  # Printing and formatting outputs
+├── requirements.txt            # Python dependencies
+├── README.md                   # This file
+├── .gitignore
+└── data/
+    └── .env                    # (Optional) API keys can be stored here
+```
 
 ---
 
-## Installation
+## ⚙️ Setup
 
-### Prerequisites
-
-1. Python 3.6+
-2. You will need **OMDb** and **TMDb** API keys. You can sign up for these APIs:
-   - OMDb: [https://www.omdbapi.com/apikey.aspx](https://www.omdbapi.com/apikey.aspx)
-   - TMDb: [https://www.themoviedb.org/settings/api](https://www.themoviedb.org/settings/api)
-
-### Step 1: Clone this repo
+### 1. Clone the repository
 
 ```bash
-git clone https://github.com/your-username/movie-tv-series-renamer.git
-cd movie-tv-series-renamer
+git clone https://github.com/yourname/movie-tv-renamer.git
+cd movie-tv-renamer
 ```
 
-### Step 2: Install dependencies
+### 2. Install requirements
 
-Create a virtual environment (optional but recommended):
-
-```bash
-python3 -m venv venv
-source venv/bin/activate   # On Windows, use `venv\Scriptsctivate`
-```
-
-Install the required dependencies:
+It's recommended to use a virtual environment:
 
 ```bash
+python -m venv venv
+source venv/bin/activate  # or venv\Scripts\activate on Windows
 pip install -r requirements.txt
 ```
 
-### Step 3: Set up environment variables
+---
 
-Create a `.env` file in the project root and add your API keys:
+## 🔐 API Keys
 
-```plaintext
-OMDB_KEY=your_omdb_api_key
-TMDB_KEY=your_tmdb_api_key
-TMDB_BEARER_TOKEN=your_tmdb_bearer_token
+You need at least one API key to use this tool.
+
+1. **OMDb API Key** (Movies only): [https://www.omdbapi.com/apikey.aspx](https://www.omdbapi.com/apikey.aspx)
+2. **TMDb API Key + Bearer Token** (Movies & TV): [https://developer.themoviedb.org/](https://developer.themoviedb.org/)
+
+You can set them in two ways:
+
+### Option 1: `.env` file (recommended)
+
+Create a file called `.env` inside the `data/` folder:
+
 ```
+OMDB_KEY=your_omdb_key_here
+TMDB_KEY=your_tmdb_key_here
+TMDB_BEARER_TOKEN=your_tmdb_bearer_token_here
+```
+
+### Option 2: Edit `config.ini` under `[API]` section
 
 ---
 
-## Usage
+## 🧪 Configurations
 
-Run the script with your folder of video files:
+All default settings are stored in `config.ini`. Here's what you can configure:
+
+### `[GENERAL]`
+
+- `folder_path` – The base directory to scan for files
+- `recursive` – Search subdirectories too (`True` / `False`)
+- `source` – `"tmdb"` or `"omdb"`
+- `live_run` – If `True`, it renames files. If `False`, it's a dry-run
+
+### `[TEMPLATES]`
+
+Customize the naming format using these variables.
+
+#### Movie Example:
+
+```ini
+movie_template = {movie_title} {movie_year}-{resolution}
+```
+
+#### Episode Example:
+
+```ini
+episode_template = {series_title} - S{season}E{episode} - {episode_title}-{air_date}-{resolution}
+```
+
+**Variables supported include:**
+
+- `movie_title`, `movie_year`, `resolution`, `video_codec`, `audio_channels`, etc.
+- `series_title`, `season`, `episode`, `episode_title`, `air_date`, and more
+
+### `[API]`
+
+Put your keys here if you're not using `.env`.
+
+---
+
+## 🚀 How to Run
+
+### Basic usage (from `config.ini`):
 
 ```bash
-python main.py /path/to/your/videos --recursive --meta "file" --source "omdb" --type "movie"
+python main.py
 ```
 
-### Available Options
+### With command-line arguments:
 
-- `folder`: Path to the folder containing video files to rename.
-- `--recursive`: Whether to include video files in subdirectories. By default, it only processes the files in the specified folder.
-- `--meta`: The metadata source to prioritize. Can be either `file` or `folder`. Default is `file`.
-- `--source`: Which API to use for metadata search. Options are `omdb` or `tmdb`. Default is `omdb`.
-- `--type`: Type of content. Choose either `movie` or `series`. Default is `movie`.
-- `--second`: Use a second metadata search source (opposite of the one set in `--meta`).
+```bash
+python main.py --folder "E:\Movies" --live-run --source tmdb
+```
 
----
+### Useful CLI options:
 
-## Future Plans
-
-- **Resolution and Quality Update**: Automatically update the file names with the correct resolution and quality information pulled from metadata (e.g., `1080p`, `BluRay`).
-- **Multiple File Format Support**: Expand the supported file formats for video files and handle potential edge cases.
-- **Batch Renaming**: Implement a feature for bulk renaming files from multiple folders at once.
-- **Enhanced Metadata**: Include additional metadata like actors, directors, genres, and IMDb ratings in the renamed files.
-- **Cloud Integration**: Add an option to automatically upload renamed files to cloud storage services like Google Drive or Dropbox.
-- **AI-powered Matching**: Add AI-based improvements to detect and correct file name inconsistencies, such as misspellings or format errors.
-- **Error Logging and Reporting**: Implement a better logging system to track all renaming actions, errors, and warnings, to help debug any issues in the renaming process.
+- `--folder`: Specify a folder directly
+- `--recursive`: Search inside subfolders
+- `--live-run`: Actually rename files (without it, just shows changes)
+- `--movie_template` / `--episode_template`: Override templates
+- `--zero-padding`: Use zero-padding like `S01E01`
 
 ---
 
-## Contributing
+## 🧠 How It Works
 
-If you'd like to contribute, feel free to fork the repository, create a branch, and submit a pull request! Please make sure to write tests for any new functionality you add.
+1. Tries to extract the movie/episode title from the **file name**
+2. Searches API for matches
+   - If **one match**, it uses that
+   - If **multiple or none**, tries using the **folder name**
+3. If still not resolved, lets the user search manually
+4. Renames the file based on the chosen template
+5. If `live_run` is `False`, it just prints what would happen
 
 ---
 
-## License
+## 🧰 Requirements
 
-This project is open-source and available under the [MIT License](LICENSE).
+- Python 3.7+
+- Dependencies (in `requirements.txt`)
+  - `requests`
+  - `python-dotenv`
+  - `ffmpeg-python`
+  - `guessit`
+  - `pycountry`
+
+---
+
+## 🚣️ Planned Features
+
+- Rename folders too (not just files)
+- Rename/move subtitle and audio track files
+- Skip or delete sample files automatically
+- Logging (to console and file)
+- "Undo last rename" functionality
+- Handle skipped files later
+- Batch mode (no interaction)
+- Custom user-defined template variables
+- API localization (e.g. support for Hungarian titles)
+- GUI (possibly in the future)
+
+---
+
+## ⚠️ Notes
+
+- Minimum video size is currently **500 MB** (hardcoded)
+- Only TMDb is used for **TV series**
+- OMDb only works for **movies**
+- If no renaming template variables are found (like last_air_date because the series isn't ended yet), the value becomes `"unknown"`
+- Files are **not renamed** unless `--live-run` or `live_run=True` is set!
+
+---
+
+## 📬 Contact
+
+For questions or ideas, feel free to open an issue or fork and contribute!
+
+---
+
+**Enjoy your clean and organized video library! 🎉**
+
