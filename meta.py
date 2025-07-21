@@ -96,7 +96,7 @@ def extract_metadata(video_files, api_client, api_source):
         file_type = file_result.get('type', 'unknown')
 
         if file_type not in ["movie", "episode"]:
-            print(f"[ERROR] Unknown file type for {file}: {file_type}")
+            print(f"[WARNING] Unknown file type for {file}: {file_type}")
             unknown_files.append(file)
             continue
 

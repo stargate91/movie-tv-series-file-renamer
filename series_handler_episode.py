@@ -21,6 +21,6 @@ def extract_episode_metadata(episodes, api_client):
 
 		else:
 			unknown.append(file_data)
-			print(f"No episode found for {file_data['file_path']}")
+			print(f"[WARNING] No episode found for {file_data['file_path']}")
 
 	return known, unknown

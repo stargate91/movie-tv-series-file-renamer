@@ -1,4 +1,10 @@
-DEFAULT_CONFIG = """
+CONFIG_PATH = "config.ini"
+
+try:
+    with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+        DEFAULT_CONFIG = f.read()
+except FileNotFoundError:
+    DEFAULT_CONFIG = """
 [GENERAL]
 folder_path = E:\\dl_torrent
 # Path to the folder containing the video files to rename.

@@ -1,4 +1,4 @@
-from helper import group_by_folders
+from helper import group_by_folders, build_entry
 import os
 
 # ----- File operations outputs -----
@@ -216,11 +216,43 @@ def process_number_choice(sel, options, file, handled):
 
 # ----- Main messages -----
 
-def done_msg(unknown):
-    print("\n Done.")
-    print("\n Unexpected files:")
-    for file_data in unknown:
-        print(f"\n [INFO] {file_data['file_path']}")
+def done_msg(skipped, remaining, no_episode_detail, u_episodes):
+    print("\n" + "="*30)
+    print("CLEANUP SUMMARY")
+    print("="*30)
 
+    # Skipped files
+    if skipped:
+        print("\nSkipped Files:")
+        for file_data in skipped:
+            print(f"   • {file_data['file_path']}")
+    else:
+        print("\nNo files were skipped.")
+
+    if remaining:
+        print("\nUnprocessed Files:")
+        for file_data in remaining:
+            print(f"   • {file_data['file_path']}")
+    else:
+        print("\nAll files were processed.")
+
+    if no_episode_detail:
+        print("\n Episodes Missing Season/Episode Info:")
+        for file_data in no_episode_detail:
+            print(f"   • {file_data['file_path']}")
+    else:
+        print("\nAll episodes have season and episode numbers.")
+
+    if u_episodes:
+        print("\nEpisodes With Unexpected Format (e.g. S01E0102, S01E01-02, 1x0102):")
+        for file_data in u_episodes:
+            print(f"   • {file_data['file_path']}")
+    else:
+        print("\nNo unexpected episode formats detected.")
+
+    print("\nDone!")
+    print("Your video library is now cleaner and better organized.")
+    print("If you spot any issues or have feature ideas, feel free to open an issue on GitHub!")
+    print("="*30 + "\n")
 
 

@@ -1,6 +1,6 @@
 from ui_ux import show_list_and_get_user_choice, print_cancellation_summary, switch_api, get_title_and_year_input
 from ui_ux import display_res, action_menu, process_number_choice
-from helper import build_entry, extract_results, search_api
+from helper import extract_results, search_api
 
 def handle_movie_no(movie_no, api_client, current_api='omdb'):
     
