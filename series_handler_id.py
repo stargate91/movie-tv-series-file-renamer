@@ -587,7 +587,7 @@ def handle_episode_mult(episode_mult, api_client):
                             else:
                                 print("No results.")
                     elif sel == 's':
-                        skipped_episodes.append(episodes)
+                        skipped_episodes.extend(episodes)
                         break
                     elif sel == 'c':
                         return handle_cancellation(
@@ -652,7 +652,7 @@ def handle_episode_mult(episode_mult, api_client):
                             else:
                                 print("No results.")
                     elif sel == 's':
-                        skipped_episodes.append(episodes)
+                        skipped_episodes.extend(episodes)
                         break
                     elif sel == 'c':
                         return handle_cancellation(
