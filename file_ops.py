@@ -115,7 +115,7 @@ def rename_vid_files(api_results, live_run, zero_padding, movie_template, episod
             air_year = air_date.split('-')[0]
 
             
-            if "zero_padding":
+            if zero_padding:
                 season_str = f"{season:02}"
                 episode_str = f"{episode:02}"
             else:
