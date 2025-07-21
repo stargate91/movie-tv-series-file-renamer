@@ -31,7 +31,7 @@ Movie-TV-Renamer/
 ├── file_ops.py                 # File/folder renaming logic
 ├── main.py                     # Entry point
 ├── meta.py                     # Metadata parsing and extraction
-├── meta_from_files.py          # Guessing titles/seasons/etc. from file names
+├── meta_from_files.py          # Getting tech metadata from the video files (e.g resolution, video codec)
 ├── movie_handler.py            # Handles movie-specific logic
 ├── series_handler_id.py        # TMDb ID-based series handling
 ├── series_handler_episode.py   # Episode-level TMDb handling
