@@ -192,7 +192,7 @@ python main.py --folder "E:\Movies" --live-run --source tmdb
 
 ## ⚠️ Notes
 
-- Minimum video size is currently **500 MB** (hardcoded)
+- Minimum video size is currently **500 MB** (but you can change it in config.ini or CLI `--vid_size`)
 - Only TMDb is used for **TV series**
 - OMDb only works for **movies**
 - If no renaming template variables are found (like last_air_date because the series isn't ended yet), the value becomes `"unknown"`

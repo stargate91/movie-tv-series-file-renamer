@@ -34,8 +34,8 @@ def get_vid_files(directory, min_size_bytes, root_folder):
     
     return video_files
 
-def get_vid_files_all(root_folder, recursive):
-    min_size_mb = 500
+def get_vid_files_all(root_folder, vid_size, recursive):
+    min_size_mb = vid_size
     min_size_bytes = min_size_mb * 1024 * 1024
 
     video_files = []

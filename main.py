@@ -14,6 +14,7 @@ def main():
     config_data = config.get_config()
 
     folder_path = config_data["folder_path"]
+    vid_size = config_data["vid_size"]
     recursive = config_data["recursive"]
     api_source = config_data["api_source"]
     movie_template = config_data["movie_template"]
@@ -27,7 +28,7 @@ def main():
 
     api_client = APIClient(omdb_key, tmdb_key, tmdb_bearer_token)
 
-    video_files = get_vid_files_all(folder_path, recursive)
+    video_files = get_vid_files_all(folder_path, vid_size, recursive)
 
     result = extract_metadata(video_files, api_client, api_source)
     movie_one, movie_no, movie_mult, episode_one, episode_no, episode_mult, unknown_files = result
