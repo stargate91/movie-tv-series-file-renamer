@@ -96,6 +96,7 @@ All default settings are stored in `config.ini`. Here's what you can configure:
 ### `[GENERAL]`
 
 - `folder_path` – The base directory to scan for files
+- `vid_size` – Minimum video file size (MB) to include in processing
 - `recursive` – Search subdirectories too (`True` / `False`)
 - `source` – `"tmdb"` or `"omdb"`
 - `live_run` – If `True`, it renames files. If `False`, it's a dry-run
@@ -144,6 +145,7 @@ python main.py --folder "E:\Movies" --live-run --source tmdb
 ### Useful CLI options:
 
 - `--folder`: Specify a folder directly
+- `--vid_size`: Minimum video file size (MB) (overrides config.ini)
 - `--recursive`: Search inside subfolders
 - `--live-run`: Actually rename files (without it, just shows changes)
 - `--movie_template` / `--episode_template`: Override templates
