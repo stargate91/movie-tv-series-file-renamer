@@ -57,33 +57,36 @@ class Config:
         )
         return parser.parse_args()
 
-    def get_config(self):
-        folder_path = self.args.folder if self.args.folder else self.config.get('GENERAL', 'folder_path', fallback=None)
+def get_config(self):
+    folder_path = self.args.folder if self.args.folder else self.config.get('GENERAL', 'folder_path', fallback=None)
 
-        if folder_path is None:
-            raise ValueError("No folder path provided. Use --folder or set it in config.ini.")
+    if folder_path is None:
+        raise ValueError("No folder path provided. Use --folder or set it in config.ini.")
 
-        recursive = self.config.getboolean('GENERAL', 'recursive', fallback=False)
-        source = self.config.get('GENERAL', 'source', fallback='omdb')
-        live_run = self.config.getboolean('GENERAL', 'live_run', fallback=False)
+    recursive = self.config.getboolean('GENERAL', 'recursive', fallback=False)
+    source = self.config.get('GENERAL', 'source', fallback='tmdb')
+    live_run = self.config.getboolean('GENERAL', 'live_run', fallback=False)
+    zero_padding = self.config.getboolean('GENERAL', 'zero_padding', fallback=False)
 
-        movie_template = self.config.get('TEMPLATES', 'movie_template', fallback="{movie_title} {movie_year}-{resolution})")
-        episode_template = self.config.get('TEMPLATES', 'episode_template', fallback="{series_title} - S{season}E{episode} - {episode_title}-{air_date}-{resolution}")
+    if self.args.recursive:
+        recursive = True
+    if self.args.live_run:
+        live_run = True
+    if self.args.zero_padding:
+        zero_padding = True
 
-        zero_padding = self.config.getboolean('GENERAL', 'zero_padding', fallback=False)
+    movie_template = self.config.get('TEMPLATES', 'movie_template', fallback="{movie_title} {movie_year}-{resolution})")
+    episode_template = self.config.get('TEMPLATES', 'episode_template', fallback="{series_title} - S{season}E{episode} - {episode_title}-{air_date}-{resolution}")
 
-        if self.args.zero_padding:
-            zero_padding = True
-
-        return {
-            "folder_path": folder_path,
-            "recursive": recursive,
-            "api_source": source,
-            "movie_template": movie_template,
-            "episode_template": episode_template,
-            "zero_padding": zero_padding,
-            "live_run": live_run,
-            "omdb_key": self.omdb_key,
-            "tmdb_key": self.tmdb_key,
-            "tmdb_bearer_token": self.tmdb_bearer_token
-        }
+    return {
+        "folder_path": folder_path,
+        "recursive": recursive,
+        "api_source": source,
+        "movie_template": movie_template,
+        "episode_template": episode_template,
+        "zero_padding": zero_padding,
+        "live_run": live_run,
+        "omdb_key": self.omdb_key,
+        "tmdb_key": self.tmdb_key,
+        "tmdb_bearer_token": self.tmdb_bearer_token
+    }
