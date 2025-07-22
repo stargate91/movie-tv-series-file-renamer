@@ -1,8 +1,10 @@
+from pathlib import Path
 import pycountry
 import ffmpeg
 
 def get_res(file_path):
     try:
+        file_path = str(Path(file_path).resolve())
         probe = ffmpeg.probe(file_path, v='error', select_streams='v:0', show_entries='stream=width,height')
         stream = probe['streams'][0]
         width = stream['width']
@@ -25,6 +27,7 @@ def get_res(file_path):
         return "unknown"
 
 def get_codec(file_path):
+    file_path = str(Path(file_path).resolve())
     try:
         probe = ffmpeg.probe(file_path, v='error', select_streams='v:0', show_entries='stream=codec_name')
         codec = probe['streams'][0]['codec_name']
@@ -44,6 +47,7 @@ def get_codec(file_path):
 
 
 def get_audio_codec(file_path):
+    file_path = str(Path(file_path).resolve())
     try:
         probe = ffmpeg.probe(
             file_path,
@@ -72,6 +76,7 @@ def get_audio_codec(file_path):
 
 
 def get_video_bitrate(file_path):
+    file_path = str(Path(file_path).resolve())
     try:
         probe = ffmpeg.probe(
             file_path,
@@ -92,6 +97,7 @@ def get_video_bitrate(file_path):
         return "unknown"
 
 def get_framerate(file_path):
+    file_path = str(Path(file_path).resolve())
     try:
         probe = ffmpeg.probe(
             file_path, 
@@ -114,6 +120,7 @@ def get_audio_channels(file_path):
         6: "5.1",
         8: "7.1"
     }
+    file_path = str(Path(file_path).resolve())
     try:
         probe = ffmpeg.probe(
             file_path,
@@ -158,6 +165,7 @@ def get_language_code_2(lang_name_or_code):
     return "unknown"
 
 def get_first_audio_language_code(file_path):
+    file_path = str(Path(file_path).resolve())
     try:
         probe = ffmpeg.probe(
             file_path,
@@ -177,6 +185,7 @@ def get_first_audio_language_code(file_path):
         return "unknown"
 
 def get_audio_channel_description(file_path):
+    file_path = str(Path(file_path).resolve())
     try:
         probe = ffmpeg.probe(
             file_path,

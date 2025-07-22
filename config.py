@@ -1,5 +1,6 @@
 from dotenv import load_dotenv
 from build import DEFAULT_CONFIG, KEYS_ERROR_MESSAGE
+from pathlib import Path
 import os
 import argparse
 import configparser
@@ -81,6 +82,8 @@ class Config:
         if folder_path is None:
             raise ValueError("No folder path provided. Use --folder or set it in config.ini.")
 
+        folder_path = Path(folder_path).expanduser().resolve()
+
         vid_size = self.args.vid_size if self.args.vid_size else self.config.getint('GENERAL', 'vid_size', fallback=None)
         if vid_size is None:
             raise ValueError("No video size provided. Use --vid_size or set it in config.ini.")
@@ -117,4 +120,3 @@ class Config:
             "tmdb_key": self.tmdb_key,
             "tmdb_bearer_token": self.tmdb_bearer_token
         }
-

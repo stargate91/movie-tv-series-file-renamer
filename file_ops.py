@@ -146,12 +146,11 @@ def rename_vid_files(api_results, live_run, zero_padding, movie_template, episod
             )
         
         new_filename += file_extension
-
+        file_path = str(file_path)
         directory = os.path.dirname(file_path)
         new_file_path = os.path.join(directory, new_filename)
 
         if live_run:
-            
             os.rename(file_path, new_file_path)
             renamed_files.append(new_file_path)
             rename_success_msg(file_path, new_filename)

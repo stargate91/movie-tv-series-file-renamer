@@ -1,3 +1,6 @@
+from logger_setup import setup_logging
+setup_logging()
+
 from api_client import APIClient
 from config import Config
 from file_ops import get_vid_files_all, rename_vid_files
