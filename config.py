@@ -67,7 +67,8 @@ class Config:
             description="Automatically renames video files based on metadata."
         )
         parser.add_argument("--folder", help="Path to the folder containing the movie files to rename.")
-        parser.add_argument("--vid_size", type=int, help="Set the minimum size of video files for processing.")
+        parser.add_argument("--interactive", action="store_true", help="Enable interactive mode with manual search and selection for ambiguous or missing matches.")
+        parser.add_argument("--vid_size", type=int, help="Set the minimum size of video files for processing.") 
         parser.add_argument("--recursive", action="store_true", help="Include video files in subdirectories recursively.")
         parser.add_argument("--source", help="Which database to use for searching ('omdb' or 'tmdb').", choices=["omdb", "tmdb"])
         parser.add_argument("--movie_template", help="The template used for renaming movie files")
@@ -83,6 +84,8 @@ class Config:
             raise ValueError("No folder path provided. Use --folder or set it in config.ini.")
 
         folder_path = Path(folder_path).expanduser().resolve()
+
+        interactive = self.config.getboolean('GENERAL', 'interactive', fallback=False)
 
         vid_size = self.args.vid_size if self.args.vid_size else self.config.getint('GENERAL', 'vid_size', fallback=None)
         if vid_size is None:
@@ -108,6 +111,7 @@ class Config:
 
         return {
             "folder_path": folder_path,
+            "interactive": interactive,
             "vid_size": vid_size,
             "recursive": recursive,
             "api_source": source,

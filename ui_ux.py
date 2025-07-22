@@ -235,17 +235,26 @@ def start_msg(source, folder_path, use_emojis):
 
     print(f"{get_label('up', use_emojis)}Starting up...\n")
 
-def done_msg(skipped, remaining, no_episode_detail, u_episodes, renamed_files, use_emojis):
+def done_msg(unknown_files, skipped, remaining, no_episode_detail, u_episodes, renamed_files, use_emojis, interactive):
     print("\n" + "="*30)
     print(f"{get_label('summary', use_emojis)}CLEANUP SUMMARY")
     print("="*30)
 
-    if skipped:
-        print(f"\n{get_label('skipped', use_emojis)}Skipped Files:")
-        for file_data in skipped:
+    if interactive:
+        if skipped:
+            print(f"\n{get_label('skipped', use_emojis)}Skipped Files:")
+            for file_data in skipped:
+                print(f"   • {file_data['file_path']}")
+        else:
+            print(f"\n{get_label('skipped', use_emojis)}No files were skipped.")
+
+
+    if unknown_files:
+        print(f"\n{get_label('unexpected_ep', use_emojis)}Unexpected Files:")
+        for file_data in unknown_files:
             print(f"   • {file_data['file_path']}")
     else:
-        print(f"\n{get_label('skipped', use_emojis)}No files were skipped.")
+        print(f"\n{get_label('unexpected_ep', use_emojis)}No unexpected files were detected.")
 
     if remaining:
         print(f"\n{get_label('unprocessed', use_emojis)}Unprocessed Files:")

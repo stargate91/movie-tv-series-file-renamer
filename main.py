@@ -20,6 +20,7 @@ def main():
     config_data = config.get_config()
 
     folder_path = config_data["folder_path"]
+    interactive = config_data["interactive"]
     vid_size = config_data["vid_size"]
     recursive = config_data["recursive"]
     api_source = config_data["api_source"]
@@ -44,13 +45,47 @@ def main():
 
     if not any([movie_one, movie_no, movie_mult, episode_one, episode_no, episode_mult, unknown_files]):
         sys.exit(0)
-    
-    h_movie_no, s_movie_no, r_movie_no = handle_movie_no(movie_no, api_client, api_source)
-    h_movie_mult, s_movie_mult, r_movie_mult = handle_movie_mult(movie_mult, api_client, api_source)
+
+    if interactive:
+        h_movie_no, s_movie_no, r_movie_no = handle_movie_no(movie_no, api_client, api_source)
+        h_movie_mult, s_movie_mult, r_movie_mult = handle_movie_mult(movie_mult, api_client, api_source)
+
+        n_movie_no = normalize_movies(h_movie_no, source="There wasn't any movie required manual search.")
+        n_movie_mult = normalize_movies(h_movie_mult, source="There wasn't any movie required manual selection.")
+
+        h_episode_no, s_episode_no, r_episode_no = handle_episode_no(episode_no, api_client)
+        h_episode_mult, s_episode_mult, r_episode_mult = handle_episode_mult(episode_mult, api_client)
+
+        n_episode_mult, x_episodes_mult = normalize_episodes(h_episode_mult, api_client, source="There wasn't any episode required manual search.")
+        n_episode_no, x_episodes_no = normalize_episodes(h_episode_no, api_client, source="There wasn't any episode required manual selection.")
+
+        s_movie_no = s_movie_no or []
+        s_movie_no += s_movie_mult or []
+        s_movie_no += s_episode_no or []
+        s_movie_no += s_episode_mult or []
+        skipped = s_movie_no
+
+        r_movie_no = r_movie_no or []
+        r_movie_no += r_movie_mult or []
+        r_movie_no += r_episode_no or []
+        r_movie_no += r_episode_mult
+        remaining = r_movie_no
+
+    if not interactive:
+        n_movie_no = []
+        n_movie_mult = []
+        n_episode_no = []
+        n_episode_mult = []
+        x_episodes_no = []
+        x_episodes_mult = []
+        skipped = []
+        movie_no = movie_no or []
+        movie_no += movie_mult or []
+        movie_no += episode_no or []
+        movie_no += episode_mult or []
+        remaining = movie_no
 
     n_movie_one = normalize_movies(movie_one, source="There wasn't any movie with exact match.")
-    n_movie_no = normalize_movies(h_movie_no, source="There wasn't any movie required manual search.")
-    n_movie_mult = normalize_movies(h_movie_mult, source="There wasn't any movie required manual selection.")
 
     n_movie_one = n_movie_one or []
     n_movie_one += n_movie_no or []
@@ -58,15 +93,8 @@ def main():
     movies = n_movie_one
     
     renamed_movie_files = rename_vid_files(movies, live_run, zero_padding, movie_template, episode_template, use_emojis)
-    
-    h_episode_no, s_episode_no, r_episode_no = handle_episode_no(episode_no, api_client)
-    h_episode_mult, s_episode_mult, r_episode_mult = handle_episode_mult(episode_mult, api_client)
 
     n_episode_one, x_episodes_one = normalize_episodes(episode_one, api_client, source="There wasn't any episode with exact series match.")
-
-    n_episode_mult, x_episodes_mult = normalize_episodes(h_episode_mult, api_client, source="There wasn't any episode required manual search.")
-
-    n_episode_no, x_episodes_no = normalize_episodes(h_episode_no, api_client, source="There wasn't any episode required manual selection.")
     
     n_episode_one = n_episode_one or []
     n_episode_one += n_episode_no or []
@@ -77,18 +105,6 @@ def main():
 
     renamed_episode_files = rename_vid_files(episodes, live_run, zero_padding, movie_template, episode_template, use_emojis)
 
-    s_movie_no = s_movie_no or []
-    s_movie_no += s_movie_mult or []
-    s_movie_no += s_episode_no or []
-    s_movie_no += s_episode_mult or []
-    skipped = s_movie_no
-
-    r_movie_no = r_movie_no or []
-    r_movie_no += r_movie_mult or []
-    r_movie_no += r_episode_no or []
-    r_movie_no += r_episode_mult
-    remaining = r_movie_no
-
     x_episodes_one = x_episodes_one or []
     x_episodes_one += x_episodes_mult or []
     x_episodes_one += x_episodes_no or []
@@ -98,7 +114,7 @@ def main():
     renamed_movie_files += renamed_episode_files or []
     renamed_files = renamed_movie_files
 
-    done_msg(skipped, remaining, no_episode_detail, u_episodes, renamed_files, use_emojis)
+    done_msg(unknown_files, skipped, remaining, no_episode_detail, u_episodes, renamed_files, use_emojis, interactive)
 
 if __name__ == "__main__":
     try:
