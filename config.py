@@ -66,16 +66,58 @@ class Config:
         parser = argparse.ArgumentParser(
             description="Automatically renames video files based on metadata."
         )
-        parser.add_argument("--folder", help="Path to the folder containing the movie files to rename.")
-        parser.add_argument("--interactive", action="store_true", help="Enable interactive mode with manual search and selection for ambiguous or missing matches.")
-        parser.add_argument("--vid_size", type=int, help="Set the minimum size of video files for processing.") 
-        parser.add_argument("--recursive", action="store_true", help="Include video files in subdirectories recursively.")
-        parser.add_argument("--source", help="Which database to use for searching ('omdb' or 'tmdb').", choices=["omdb", "tmdb"])
-        parser.add_argument("--movie_template", help="The template used for renaming movie files")
-        parser.add_argument("--episode_template", help="The template used for renaming episode files")
-        parser.add_argument("--zero-padding", action="store_true", help="Use zero-padding for season and episode numbers (S01E01).")
-        parser.add_argument("--live-run", action="store_true", help="Perform the actual renaming, modifying files.")
-        parser.add_argument("--use-emojis", action="store_true", help="Enable emoji icons in terminal output for better readability.")
+        parser.add_argument(
+            "--folder",
+            help="Path to the folder containing the movie files to rename."
+        )
+        parser.add_argument(
+            "--interactive",
+            action="store_true",
+            help="Enable interactive mode with manual search and selection for ambiguous or missing matches."
+        )
+        parser.add_argument(
+            "--vid_size",
+            type=int,
+            help="Set the minimum size of video files for processing."
+        ) 
+        parser.add_argument(
+            "--recursive",
+            action="store_true",
+            help="Include video files in subdirectories recursively."
+        )
+        parser.add_argument(
+            "--source",
+            help="Which database to use for searching ('omdb' or 'tmdb').",
+            choices=["omdb", "tmdb"]
+        )
+        parser.add_argument(
+            "--source_mode",
+            help="Source of metadata (title and optionally year) for API lookup: 'file' uses the filename, 'folder' uses the folder name, 'fallback' tries the filename first, then the folder if needed.",
+            choices=["file", "folder", "fallback"]
+        )
+        parser.add_argument(
+            "--movie_template",
+            help="The template used for renaming movie files"
+        )
+        parser.add_argument(
+            "--episode_template",
+            help="The template used for renaming episode files"
+        )
+        parser.add_argument(
+            "--zero-padding",
+            action="store_true",
+            help="Use zero-padding for season and episode numbers (S01E01)."
+        )
+        parser.add_argument(
+            "--live-run",
+            action="store_true",
+            help="Perform the actual renaming, modifying files."
+        )
+        parser.add_argument(
+            "--use-emojis",
+            action="store_true",
+            help="Enable emoji icons in terminal output for better readability."
+        )
         return parser.parse_args()
 
     def get_config(self):
@@ -93,6 +135,7 @@ class Config:
 
         recursive = self.config.getboolean('GENERAL', 'recursive', fallback=False)
         source = self.config.get('GENERAL', 'source', fallback='tmdb')
+        source_mode = self.config.get('GENERAL', 'source_mode', fallback='fallback')
         live_run = self.config.getboolean('GENERAL', 'live_run', fallback=False)
         zero_padding = self.config.getboolean('TEMPLATES', 'zero_padding', fallback=False)
         use_emojis = self.config.getboolean('GENERAL', 'use_emojis', fallback=False)
@@ -115,6 +158,7 @@ class Config:
             "vid_size": vid_size,
             "recursive": recursive,
             "api_source": source,
+            "source_mode": source_mode,
             "movie_template": movie_template,
             "episode_template": episode_template,
             "zero_padding": zero_padding,

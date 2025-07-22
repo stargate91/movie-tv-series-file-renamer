@@ -5,6 +5,10 @@ folder_path = E:\\dl_torrent
 # Example: "E:\\dl_torrent" or "/home/user/videos"
 # Use double backslashes \\ on Windows or forward slashes /
 
+interactive = True
+# Enable interactive mode for manual search and selection when multiple or no matches are found.
+# Set to True to allow user input during processing; False for fully automated batch mode.
+
 vid_size = 500
 # Minimum video file size (in megabytes) to include in processing.
 # Helps exclude sample clips or other small, irrelevant video files.
@@ -18,6 +22,13 @@ source = tmdb
 # Options: "omdb", "tmdb"
 # OMDb only gives one result if there is one and only useable for movies.
 # TMDb handles both movies and series, in case you choose "omdb" here, for episode files still the API source is TMDb.
+
+source_mode = fallback
+# Source of metadata (title and optionally year) used for API lookup.
+# Options: "file", "folder", "fallback"
+# "file": uses the filename to extract title/year.
+# "folder": uses the parent folder name instead.
+# "fallback": tries filename first; if no valid API result, falls back to folder name (recommended).
 
 live_run = False
 # If True, the program will actually rename files.

@@ -24,6 +24,7 @@ def main():
     vid_size = config_data["vid_size"]
     recursive = config_data["recursive"]
     api_source = config_data["api_source"]
+    source_mode = config_data["source_mode"]
     movie_template = config_data["movie_template"]
     episode_template = config_data["episode_template"]
     zero_padding = config_data["zero_padding"]
@@ -40,7 +41,7 @@ def main():
 
     video_files = get_vid_files_all(folder_path, vid_size, recursive)
 
-    result = extract_metadata(video_files, api_client, api_source)
+    result = extract_metadata(video_files, api_client, api_source, source_mode)
     movie_one, movie_no, movie_mult, episode_one, episode_no, episode_mult, unknown_files = result
 
     if not any([movie_one, movie_no, movie_mult, episode_one, episode_no, episode_mult, unknown_files]):
