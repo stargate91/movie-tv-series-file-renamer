@@ -1,5 +1,27 @@
 import os
 
+LABELS = {
+    "start":           ("🚀 ", ""),
+    "live_mode":       ("⚠️ ", ""),
+    "dry_run":         ("📝 ", ""),
+    "name":            ("🎥 ", ""),
+    "version":         ("📦 ", ""),
+    "config":          ("⚙️ ", ""),
+    "dir":             ("📁 ", ""),
+    "up":              ("⚡ ", ""),
+    "summary":         ("📋 ", ""),
+    "skipped":         ("⏭️ ", ""),
+    "unprocessed":     ("⏳ ", ""),
+    "no_se_ep":        ("⚠️ ", ""),
+    "unexpected_ep":   ("❓ ", ""),
+    "renamed":         ("✅ ", ""),
+    "done":            ("🎉 ", "")
+}
+
+def get_label(name, use_emojis):
+    pair = LABELS.get(name, ("", ""))
+    return pair[0] if use_emojis else pair[1]
+
 def group_by_folders(episodes):
     folders = {}
     main_folders = {}

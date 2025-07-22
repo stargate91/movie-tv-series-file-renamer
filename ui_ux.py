@@ -1,7 +1,15 @@
-from helper import group_by_folders, build_entry
+from helper import group_by_folders, build_entry, get_label
 import os
 
 # ----- File operations outputs -----
+
+def rename_starts_msg(live_run, use_emojis):
+    print(f"\n{get_label('start', use_emojis)}Starting file renaming process...")
+    if live_run:
+        print(f"{get_label('live_mode', use_emojis)}Live mode enabled - files **will be renamed**.\n")
+    else:
+        print(f"{get_label('dry_run', use_emojis)}Dry run mode - no changes will be made, just simulating.\n")
+    print("=" * 35 + "\n")
 
 def proc_file_msg(file_path, root_folder):
     rel_path = os.path.relpath(file_path, os.path.dirname(root_folder))
@@ -29,14 +37,14 @@ def print_cancellation_summary(
     print(f"\n[INFO] Manual {action} cancelled by user.") # {action}: [search, selection]
 
     if handled:
-        print(f"\nMetadata stored for the following {content}:\n") # {content}: [movies, episodes]
+        print(f"\n[INFO] Metadata stored for the following {content}:\n") # {content}: [movies, episodes]
         for file in handled:
             print(f"[SAVED] {file['file_path']}")
     else:
         print("\n[INFO] No metadata was stored.")
 
     if skipped:
-        print(f"\nThe following {content} were deferred for later:\n")
+        print(f"\n[INFO] The following {content} were deferred for later:\n")
         for skip in skipped:
             print(f"[SKIPPED] {skip['file_path']}")
     else:
@@ -52,7 +60,7 @@ def print_cancellation_summary(
                 remaining.extend(eps)
 
     if remaining:
-        print(f"\nThe following {content} were not processed:\n")
+        print(f"\n[INFO] The following {content} were not processed:\n")
         for leftover in remaining:
             print(f"[PENDING] {leftover['file_path']}")
 
@@ -79,7 +87,7 @@ def display_res(
 
 def user_menu(files, folders, main_folders):
     menu_text = (
-        "\nChoose how you want to apply the selected metadata for the files above:\n"
+        "Choose how you want to apply the selected metadata for the files above:\n"
         f"  1. Apply to a single file only (e.g: {files[0]['file_path']})\n"
         f"  2. Apply to the entire folder (e.g: {folders})\n"
         f"  3. Apply to the main (parent) folder and all sub‑folders (e.g: {main_folders})\n"
@@ -114,12 +122,12 @@ def show_list_and_get_user_choice(
 
     if not vid_files:
         print(f"\n[INFO] There are no {content} with {res_quantity}. Continue with the next task.") # {res_quantity}: [no match, multiple matches]
-        return [], [], []
+        return [], [], [], []
 
-    print(f"\n=== {content.upper()} WITH {res_quantity.upper()} ===\n") # {content}: [movies, episodes]
+    print(f"\n===== {content.upper()} WITH {res_quantity.upper()} =====\n") # {content}: [movies, episodes]
 
     if current_api:
-        print(f"\n[INFO] Current API: {current_api.upper()}\n")
+        print(f"[INFO] Current API: {current_api.upper()}\n")
 
     for idx, vid in enumerate(vid_files, 1):
         print(f"{idx}. {vid['file_path']}")
@@ -128,16 +136,16 @@ def show_list_and_get_user_choice(
     
     if content == "movies":
         print(f"Options:\n1: Manual {action} for all\n2: Cancel")
-        mode = input("Choose an option (1/2): ").strip()
-        while mode not in {'1', '2'}:
+        choice = int(input("Choose an option (1/2): "))
+        while choice not in {1, 2}:
             print("Invalid input. Please enter 1 or 2")
-            mode = input("Choose an option (1/2): ").strip()
+            choice = int(input("Choose an option (1/2): "))
 
-        if mode == '2':
-            print_cancellation_summary(action=action)
-            return "cancelled"
+        if choice == 2:
+            handled, skipped, remaining = print_cancellation_summary(source=vid_files, mode=1, idx_or_processed=0, content="movies", action=action)
+            return handled, skipped, remaining, choice
         else:
-            return None
+            return [], [], [], []
 
     if content == "episodes":
         folders, main_folders = group_by_folders(vid_files) 
@@ -146,7 +154,7 @@ def show_list_and_get_user_choice(
         first_main_folder_key = next(iter(main_folders))
 
         action_choice = user_menu(vid_files, first_folder_key, first_main_folder_key)
-        return folders, main_folders, action_choice
+        return folders, main_folders, action_choice, []
 
 def get_title_and_year_input(re=None, mo=None, ep=None, file=None, folder=None, current_api=None):
     if file:
@@ -215,44 +223,60 @@ def process_number_choice(sel, options, file, handled):
     return False
 
 # ----- Main messages -----
+def start_msg(source, folder_path, use_emojis):
+    print("===================================")
+    print(f"{get_label('name', use_emojis)}MovieRenamer")
+    print(f"{get_label('version', use_emojis)}Version: 1.1.0")
+    print(f"{get_label('config', use_emojis)}Using configuration: {source}")
+    print(f"{get_label('dir', use_emojis)}Working directory: {folder_path}")
+    print("===================================\n")
+    print("This tool helps you rename your video files using metadata from TMDb or OMDb.")
+    print("Make sure your files are organized properly!\n")
 
-def done_msg(skipped, remaining, no_episode_detail, u_episodes):
+    print(f"{get_label('up', use_emojis)}Starting up...\n")
+
+def done_msg(skipped, remaining, no_episode_detail, u_episodes, renamed_files, use_emojis):
     print("\n" + "="*30)
-    print("CLEANUP SUMMARY")
+    print(f"{get_label('summary', use_emojis)}CLEANUP SUMMARY")
     print("="*30)
 
-    # Skipped files
     if skipped:
-        print("\nSkipped Files:")
+        print(f"\n{get_label('skipped', use_emojis)}Skipped Files:")
         for file_data in skipped:
             print(f"   • {file_data['file_path']}")
     else:
-        print("\nNo files were skipped.")
+        print(f"\n{get_label('skipped', use_emojis)}No files were skipped.")
 
     if remaining:
-        print("\nUnprocessed Files:")
+        print(f"\n{get_label('unprocessed', use_emojis)}Unprocessed Files:")
         for file_data in remaining:
             print(f"   • {file_data['file_path']}")
     else:
-        print("\nAll files were processed.")
+        print(f"\n{get_label('unprocessed', use_emojis)}All files were processed.")
 
     if no_episode_detail:
-        print("\n Episodes Missing Season/Episode Info:")
+        print(f"\n{get_label('no_se_ep', use_emojis)}Episodes Missing Season/Episode Info:")
         for file_data in no_episode_detail:
             print(f"   • {file_data['file_path']}")
     else:
-        print("\nAll episodes have season and episode numbers.")
+        print(f"\n{get_label('no_se_ep', use_emojis)}All episodes have season and episode numbers.")
 
     if u_episodes:
-        print("\nEpisodes With Unexpected Format (e.g. S01E0102, S01E01-02, 1x0102):")
+        print(f"\n{get_label('unexpected_ep', use_emojis)}Episodes With Unexpected Format (e.g. S01E0102, S01E01-02, 1x0102):")
         for file_data in u_episodes:
             print(f"   • {file_data['file_path']}")
     else:
-        print("\nNo unexpected episode formats detected.")
+        print(f"\n{get_label('unexpected_ep', use_emojis)}No unexpected episode formats detected.")
 
-    print("\nDone!")
+    if renamed_files:
+        print(f"\n{get_label('renamed', use_emojis)}Files renamed:")
+        for file_data in renamed_files:
+            print(f"   • {file_data['file_path']}")
+        print(f"\n {len(renamed_files)} file(s) renamed successfully.")
+    else:
+        print(f"\n{get_label('renamed', use_emojis)}No files were renamed - either a dry run or nothing matched.")
+
+    print(f"\n{get_label('done', use_emojis)}Done!")
     print("Your video library is now cleaner and better organized.")
     print("If you spot any issues or have feature ideas, feel free to open an issue on GitHub!")
     print("="*30 + "\n")
-
-

@@ -106,9 +106,10 @@ def extract_metadata(video_files, api_client, api_source):
         merged_extras = folder_extras.copy()
         merged_extras.update(file_extras)
 
-        print(f"\nThe following extra metadatas obtained from file and folder name and will be added for: {file}")
+        print(f"\nExtra metadata extracted from file and folder names for:\n   {file}")
+        print("These will be included in the final metadata:")
         for k, v in merged_extras.items():
-            print(f"[INFO] {k}: {v}")
+                print(f"   • {k.ljust(16)}: {v}")
 
         if file_type == "movie":
             m_title_file = file_result.get('title', 'unknown')

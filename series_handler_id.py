@@ -5,7 +5,7 @@ import os
 
 def handle_episode_no(episode_no, api_client):
 
-    folders, main_folders, action_choice = show_list_and_get_user_choice(
+    folders, main_folders, action_choice, placeholder = show_list_and_get_user_choice(
         episode_no,
         current_api=None,
         content="episodes",
@@ -195,7 +195,8 @@ def handle_episode_no(episode_no, api_client):
                     print(f"Invalid input. Please enter a number between 1-{len(options)} or r, s, c.")
 
     else:
-        return print_cancellation_summary(action="search")
+        handle, skipped, remaining = print_cancellation_summary(handled=None, skipped=None, source=episode_no, mode=1, idx_or_processed=0, content="episodes", action="search")
+        return handle, skipped, remaining
 
     return handled_episodes, skipped_episodes, remaining_episodes
 
@@ -205,7 +206,7 @@ def handle_episode_no(episode_no, api_client):
 
 def handle_episode_mult(episode_mult, api_client):
 
-    folders, main_folders, action_choice = show_list_and_get_user_choice(
+    folders, main_folders, action_choice, placeholder = show_list_and_get_user_choice(
         episode_mult,
         current_api=None,
         content="episodes",
@@ -337,6 +338,7 @@ def handle_episode_mult(episode_mult, api_client):
                 else:
                     print(f"Invalid input. Please enter a number between 1-{len(options)} or r, s, c.")
     else:
-        return print_cancellation_summary(action="selection")
+        handle, skipped, remaining = print_cancellation_summary(handled=None, skipped=None, source=episode_mult, mode=1, idx_or_processed=0, content="episodes", action="selection")
+        return handle, skipped, remaining
 
     return handled_episodes, skipped_episodes, remaining_episodes

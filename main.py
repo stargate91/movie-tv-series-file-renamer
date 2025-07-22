@@ -6,7 +6,7 @@ from movie_handler import handle_movie_no, handle_movie_mult
 from series_handler_id import handle_episode_no, handle_episode_mult
 from series_handler_episode import extract_episode_metadata
 from normalizers import normalize_movies, normalize_episodes
-from ui_ux import done_msg
+from ui_ux import start_msg, done_msg
 import sys
 
 
@@ -24,10 +24,13 @@ def main():
     episode_template = config_data["episode_template"]
     zero_padding = config_data["zero_padding"]
     live_run = config_data["live_run"]
+    use_emojis = config_data["use_emojis"]
     
     omdb_key = config_data["omdb_key"]
     tmdb_key = config_data["tmdb_key"]
     tmdb_bearer_token = config_data["tmdb_bearer_token"]
+
+    start_msg(config.source, folder_path, use_emojis)
 
     api_client = APIClient(omdb_key, tmdb_key, tmdb_bearer_token)
 
@@ -51,7 +54,7 @@ def main():
     n_movie_one += n_movie_mult or []
     movies = n_movie_one
     
-    rename_vid_files(movies, live_run, zero_padding, movie_template, episode_template)
+    renamed_movie_files = rename_vid_files(movies, live_run, zero_padding, movie_template, episode_template, use_emojis)
     
     h_episode_no, s_episode_no, r_episode_no = handle_episode_no(episode_no, api_client)
     h_episode_mult, s_episode_mult, r_episode_mult = handle_episode_mult(episode_mult, api_client)
@@ -69,7 +72,7 @@ def main():
 
     episodes, u_episodes = extract_episode_metadata(n_episodes, api_client)
 
-    rename_vid_files(episodes, live_run, zero_padding, movie_template, episode_template)
+    renamed_episode_files = rename_vid_files(episodes, live_run, zero_padding, movie_template, episode_template, use_emojis)
 
     s_movie_no = s_movie_no or []
     s_movie_no += s_movie_mult or []
@@ -88,7 +91,11 @@ def main():
     x_episodes_one += x_episodes_no or []
     no_episode_detail = x_episodes_one
 
-    done_msg(skipped, remaining, no_episode_detail, u_episodes)
+    renamed_movie_files = renamed_movie_files or []
+    renamed_movie_files += renamed_episode_files or []
+    renamed_files = renamed_movie_files
+
+    done_msg(skipped, remaining, no_episode_detail, u_episodes, renamed_files, use_emojis)
 
 if __name__ == "__main__":
     try:

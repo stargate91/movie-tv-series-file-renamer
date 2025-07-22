@@ -8,7 +8,7 @@ from meta_from_files import (
     get_first_audio_language_code,
     get_audio_channel_description
 )
-from ui_ux import proc_file_msg, rename_success_msg, dry_rename_msg
+from ui_ux import proc_file_msg, rename_starts_msg, rename_success_msg, dry_rename_msg
 import os
 import pycountry
 import ffmpeg
@@ -61,7 +61,8 @@ def get_video_metadata(file_path):
     return metadata
 
 
-def rename_vid_files(api_results, live_run, zero_padding, movie_template, episode_template):
+def rename_vid_files(api_results, live_run, zero_padding, movie_template, episode_template, use_emojis):
+    rename_starts_msg(live_run, use_emojis)
     renamed_files = []
 
     for file_data in api_results:
@@ -150,6 +151,7 @@ def rename_vid_files(api_results, live_run, zero_padding, movie_template, episod
         new_file_path = os.path.join(directory, new_filename)
 
         if live_run:
+            
             os.rename(file_path, new_file_path)
             renamed_files.append(new_file_path)
             rename_success_msg(file_path, new_filename)

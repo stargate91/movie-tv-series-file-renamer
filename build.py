@@ -29,6 +29,10 @@ live_run = False
 # If True, the program will actually rename files.
 # If False, it's a dry run that only prints changes.
 
+use_emojis = False
+# Whether to display emojis in terminal messages for better readability.
+# Set to True to enable emojis, or False to keep output plain and compatible with all terminals.
+
 [TEMPLATES]
 
 # Note:

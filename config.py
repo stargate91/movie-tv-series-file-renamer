@@ -28,6 +28,10 @@ class Config:
 
         self.args = self.parse_args()
 
+        self.source = "config.ini"
+        if any(vars(self.args).values()):
+            self.source = "argparse"
+
     def get_run_dir(self):
         if getattr(sys, 'frozen', False):
             return os.path.dirname(sys.executable)
@@ -69,6 +73,7 @@ class Config:
         parser.add_argument("--episode_template", help="The template used for renaming episode files")
         parser.add_argument("--zero-padding", action="store_true", help="Use zero-padding for season and episode numbers (S01E01).")
         parser.add_argument("--live-run", action="store_true", help="Perform the actual renaming, modifying files.")
+        parser.add_argument("--use-emojis", action="store_true", help="Enable emoji icons in terminal output for better readability.")
         return parser.parse_args()
 
     def get_config(self):
@@ -84,6 +89,7 @@ class Config:
         source = self.config.get('GENERAL', 'source', fallback='tmdb')
         live_run = self.config.getboolean('GENERAL', 'live_run', fallback=False)
         zero_padding = self.config.getboolean('TEMPLATES', 'zero_padding', fallback=False)
+        use_emojis = self.config.getboolean('GENERAL', 'use_emojis', fallback=False)
 
         if self.args.recursive:
             recursive = True
@@ -91,6 +97,8 @@ class Config:
             live_run = True
         if self.args.zero_padding:
             zero_padding = True
+        if self.args.use_emojis:
+            use_emojis = True
 
         movie_template = self.config.get('TEMPLATES', 'movie_template', fallback="{movie_title} {movie_year}-{resolution}")
         episode_template = self.config.get('TEMPLATES', 'episode_template', fallback="{series_title} - S{season}E{episode} - {episode_title}-{air_date}-{resolution}")
@@ -104,6 +112,7 @@ class Config:
             "episode_template": episode_template,
             "zero_padding": zero_padding,
             "live_run": live_run,
+            "use_emojis": use_emojis,
             "omdb_key": self.omdb_key,
             "tmdb_key": self.tmdb_key,
             "tmdb_bearer_token": self.tmdb_bearer_token

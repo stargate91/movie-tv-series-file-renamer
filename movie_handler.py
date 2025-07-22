@@ -4,7 +4,7 @@ from helper import extract_results, search_api
 
 def handle_movie_no(movie_no, api_client, current_api='omdb'):
     
-    result = show_list_and_get_user_choice(
+    handled, skipped, remaining, choice = show_list_and_get_user_choice(
         movie_no,
         current_api=current_api,
         content="movies",
@@ -12,8 +12,8 @@ def handle_movie_no(movie_no, api_client, current_api='omdb'):
         res_quantity="no match"
     )
 
-    if result == "cancelled":
-        return [], [], []
+    if choice == 2:
+        return handled, skipped, remaining
 
     handled_movies = []
     skipped_movies = []
@@ -86,7 +86,7 @@ def handle_movie_no(movie_no, api_client, current_api='omdb'):
 
 def handle_movie_mult(movie_mult, api_client, current_api='omdb'):
     
-    result = show_list_and_get_user_choice(
+    handled, skipped, remaining, choice = show_list_and_get_user_choice(
         movie_mult,
         current_api=current_api,
         content="movies",
@@ -94,8 +94,8 @@ def handle_movie_mult(movie_mult, api_client, current_api='omdb'):
         res_quantity="multiple matches"
     )
 
-    if result == "cancelled":
-        return [], [], []
+    if choice == 2:
+        return handled, skipped, remaining
 
     handled_movies = []
     skipped_movies = []

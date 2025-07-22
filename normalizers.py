@@ -3,7 +3,7 @@ from datetime import datetime
 def normalize_movies(movies, source=None):
 
     if not movies:
-        print(f"\n[INFO] {source}\n")
+        print(f"\n[INFO] {source}")
         return []
     
     normalized_movies = []
@@ -50,7 +50,7 @@ def normalize_season_episode_numbers(file_data):
 def normalize_episodes(episodes, api_client, source=None):
 
     if not episodes:
-        print(f"\n[INFO] {source}\n")
+        print(f"\n[INFO] {source}")
         return [], []
 
     normalized_episodes = []
