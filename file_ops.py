@@ -68,6 +68,13 @@ def rename_vid_files(api_results, live_run, zero_padding, movie_template, episod
     for file_data in api_results:
         file_path = file_data['file_path']
         file_type = file_data['file_type']
+        extras = file_data.get('extras')
+        release_group = extras.get('release_group', 'unknown')
+        source = extras.get('source', 'unknown')
+        other = extras.get('other', 'unknown')
+        edition = extras.get('edition', 'unknown')
+        streaming_service = extras.get('streaming_service', 'unknown')
+
 
         resolution = get_res(file_path)
         video_codec = get_codec(file_path)
@@ -97,7 +104,13 @@ def rename_vid_files(api_results, live_run, zero_padding, movie_template, episod
                 audio_codec=audio_codec,
                 audio_channels=audio_channels,
                 first_audio_channel_language=first_audio_channel_language,
-                audio_channels_description=audio_channels_description
+                audio_channels_description=audio_channels_description,
+
+                release_group=release_group,
+                source=source,
+                other=other,
+                edition=edition,
+                streaming_service=streaming_service
                 )
         elif file_type == "episode":
             series_details = file_data['series_details']
@@ -142,7 +155,13 @@ def rename_vid_files(api_results, live_run, zero_padding, movie_template, episod
                 audio_codec=audio_codec,
                 audio_channels=audio_channels,
                 first_audio_channel_language=first_audio_channel_language,
-                audio_channels_description=audio_channels_description
+                audio_channels_description=audio_channels_description,
+
+                release_group=release_group,
+                source=source,
+                other=other,
+                edition=edition,
+                streaming_service=streaming_service
             )
         
         new_filename += file_extension

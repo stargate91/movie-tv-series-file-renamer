@@ -1,60 +1,93 @@
 DEFAULT_CONFIG = """
 [GENERAL]
-folder_path = E:\\dl_torrent
+[GENERAL]
 # Path to the folder containing the video files to rename.
 # Example: "E:\\dl_torrent" or "/home/user/videos"
 # Use double backslashes \\ on Windows or forward slashes /
 
-interactive = True
+folder_path = E:\\dl_torrent
+
 # Enable interactive mode for manual search and selection when multiple or no matches are found.
 # Set to True to allow user input during processing; False for fully automated batch mode.
 
-vid_size = 500
+interactive = True
+
 # Minimum video file size (in megabytes) to include in processing.
 # Helps exclude sample clips or other small, irrelevant video files.
 
-recursive = True
+vid_size = 500
+
 # Whether to search subdirectories recursively for video files.
 # Possible values: True or False
 
-source = tmdb
+recursive = True
+
 # API source for metadata lookup.
 # Options: "omdb", "tmdb"
 # OMDb only gives one result if there is one and only useable for movies.
 # TMDb handles both movies and series, in case you choose "omdb" here, for episode files still the API source is TMDb.
 
-source_mode = fallback
+source = tmdb
+
 # Source of metadata (title and optionally year) used for API lookup.
 # Options: "file", "folder", "fallback"
 # "file": uses the filename to extract title/year.
 # "folder": uses the parent folder name instead.
 # "fallback": tries filename first; if no valid API result, falls back to folder name (recommended).
 
-live_run = False
+source_mode = fallback
+
 # If True, the program will actually rename files.
 # If False, it's a dry run that only prints changes.
 
-use_emojis = False
+live_run = False
+
 # Whether to display emojis in terminal messages for better readability.
 # Set to True to enable emojis, or False to keep output plain and compatible with all terminals.
-# 
+
 # Emojis usually work well in:
 #   - Modern terminals (Windows Terminal, macOS Terminal, Linux with UTF-8 support)
 #   - IDE-integrated terminals (e.g. VSCode, PyCharm)
-#
+
 # Emojis may not display correctly in:
 #   - Legacy Windows CMD or PowerShell without Unicode font support
 #   - Non-UTF-8 terminals or basic remote shells (e.g. some SSH clients)
-#
+
 # For maximum compatibility (e.g. when running scripts on remote servers), keep this set to False.
+
+use_emojis = False
+
 
 [TEMPLATES]
 
-# Note:
+# Note #1:
 # If a variable cannot be extracted from the source (API, filename, or folder name),
 # or the data does not exist, the value will be replaced with "unknown".
 
-movie_template = {movie_title} {movie_year}-{resolution}
+# Note #2:
+# The variables below are extracted from your file or folder names.
+# They are available for both movie and episode templates.
+# If a variable isn't found for a movie or episode, it will default to "unknown".
+
+# Available variables:
+#   release_group       - Release group (e.g. SCammerGRoup)
+#   source              - Source of the file (e.g. Blu-ray, Web)
+#   other               - Additional tags (e.g. Retail, Remux, HDR10, Hybrid, Read NFO)
+#   edition             - Edition type (e.g. Extended, Director's Cut)
+#   streaming_service   - Streaming platform (e.g. AppleTV)
+
+# Note #3:
+# Some variables above like source or other may appear twice:
+# once extracted from the file or folder name, and once from the file's technical metadata
+# (such as video/audio codecs, resolution, HDR type, etc.).
+# Important: these values do NOT overwrite each other.
+# If your setup uses both sources, they can show up separately in the output.
+# For example, a file might be marked as "Dual Audio" in the filename and also detected as "Dual Audio"
+# via media analysis, in that case, both may be included depending on your configuration.
+
+# Always check the log during a dry run to verify which values are being picked up
+# and ensure they match your expectations.
+
 # Template for renaming movie files.
 # Available variables:
 #   movie_title                  - Movie title
@@ -69,10 +102,11 @@ movie_template = {movie_title} {movie_year}-{resolution}
 #   first_audio_channel_language - Language of the first audio track (e.g. en, hu)
 #   audio_channels_description   - Human-readable audio description (e.g. Single Audio, Dual Audio, Multi Audio)
 
+movie_template = {movie_title} {movie_year}-{resolution}
+
 # Example:
 #   "Inception 2010-1080p H.264 AAC Stereo"
 
-episode_template = {series_title} - S{season}E{episode} - {episode_title}-{air_date}-{resolution}
 # Template for renaming episode files.
 # Available variables:
 #   series_title                  - Name of the TV series
@@ -95,27 +129,34 @@ episode_template = {series_title} - S{season}E{episode} - {episode_title}-{air_d
 #   first_audio_channel_language  - Language of the first audio track (e.g. en, hu)
 #   audio_channels_description    - Human-readable audio description (e.g. Single Audio, Dual Audio, Multi Audio)
 
+episode_template = {series_title} - S{season}E{episode} - {episode_title}-{air_date}-{resolution}
+
 # Example:
 #   "Friends - S01E03 - The One with the Thumb-1994-09-22-720p"
 
-zero_padding = True
 # Whether to use zero-padding for season and episode numbers.
 # True -> S01E01
 # False -> S1E1
 
+zero_padding = True
+
+
 [API]
-omdb_key = your_omdb_key_here
 # Your API key for OMDb.
 # Required if you use "omdb" as the source
 # Only for movies and you can get only 1 result / movie
 
-tmdb_key = your_tmdb_key_here
+omdb_key = your_omdb_key_here
+
 # Your API key for TMDb.
 # Required if you use "tmdb" as the source.
 
-tmdb_bearer_token = your_tmdb_token_here
+tmdb_key = your_tmdb_key_here
+
 # Bearer token for TMDb API authorization.
 # Required if you use "tmdb" as the source.
+
+tmdb_bearer_token = your_tmdb_token_here
 """
 
 KEYS_ERROR_MESSAGE = """
