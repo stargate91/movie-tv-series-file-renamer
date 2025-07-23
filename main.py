@@ -72,7 +72,7 @@ def main():
             r_movie_no = r_movie_no or []
             r_movie_no += r_movie_mult or []
             r_movie_no += r_episode_no or []
-            r_movie_no += r_episode_mult
+            r_movie_no += r_episode_mult or []
             remaining = r_movie_no
 
             n_movie_no = n_movie_no or []
@@ -133,7 +133,7 @@ def main():
         r_movie_no = r_movie_no or []
         r_movie_no += r_movie_mult or []
         r_movie_no += r_episode_no or []
-        r_movie_no += r_episode_mult
+        r_movie_no += r_episode_mult or []
         remaining = r_movie_no
 
 # -------------------- Batch mode  --------------------
