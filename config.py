@@ -76,6 +76,11 @@ class Config:
             help="Enable interactive mode with manual search and selection for ambiguous or missing matches."
         )
         parser.add_argument(
+            "--skipped",
+            action="store_true",
+            help="Saves skipped files during interactive mode and allows reloading them in a future run. Only applicable in interactive mode."
+        )
+        parser.add_argument(
             "--vid_size",
             type=int,
             help="Set the minimum size of video files for processing."
@@ -91,9 +96,13 @@ class Config:
             choices=["omdb", "tmdb"]
         )
         parser.add_argument(
-            "--source_mode",
+            "--source-mode",
             help="Source of metadata (title and optionally year) for API lookup: 'file' uses the filename, 'folder' uses the folder name, 'fallback' tries the filename first, then the folder if needed.",
             choices=["file", "folder", "fallback"]
+        )
+        parser.add_argument(
+            "--custom_variable",
+            help="Defining a custom variable to use in templates"
         )
         parser.add_argument(
             "--movie_template",
@@ -129,6 +138,8 @@ class Config:
 
         interactive = self.config.getboolean('GENERAL', 'interactive', fallback=False)
 
+        skipped = self.config.getboolean('GENERAL', 'skipped', fallback=False)
+
         vid_size = self.args.vid_size if self.args.vid_size else self.config.getint('GENERAL', 'vid_size', fallback=None)
         if vid_size is None:
             raise ValueError("No video size provided. Use --vid_size or set it in config.ini.")
@@ -140,6 +151,8 @@ class Config:
         zero_padding = self.config.getboolean('TEMPLATES', 'zero_padding', fallback=False)
         use_emojis = self.config.getboolean('GENERAL', 'use_emojis', fallback=False)
 
+        if self.args.skipped:
+            skipped = True
         if self.args.recursive:
             recursive = True
         if self.args.live_run:
@@ -149,16 +162,19 @@ class Config:
         if self.args.use_emojis:
             use_emojis = True
 
+        custom_variable = self.args.custom_variable or self.config.get('TEMPLATES', 'custom_variable', fallback="Default")
         movie_template = self.config.get('TEMPLATES', 'movie_template', fallback="{movie_title} {movie_year}-{resolution}")
         episode_template = self.config.get('TEMPLATES', 'episode_template', fallback="{series_title} - S{season}E{episode} - {episode_title}-{air_date}-{resolution}")
 
         return {
             "folder_path": folder_path,
             "interactive": interactive,
+            "skipped": skipped,
             "vid_size": vid_size,
             "recursive": recursive,
             "api_source": source,
             "source_mode": source_mode,
+            "custom_variable": custom_variable,
             "movie_template": movie_template,
             "episode_template": episode_template,
             "zero_padding": zero_padding,

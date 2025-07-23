@@ -10,7 +10,7 @@ def rename_starts_msg(live_run, use_emojis):
     else:
         print(f"{get_label('dry_run', use_emojis)}Dry run mode - no changes will be made, just simulating.\n")
     print("=" * 35 + "\n")
-
+ 
 def proc_file_msg(file_path, root_folder):
     rel_path = os.path.relpath(file_path, os.path.dirname(root_folder))
     print(f"[INFO] Processing file: {rel_path}")
@@ -88,10 +88,10 @@ def display_res(
 def user_menu(files, folders, main_folders):
     menu_text = (
         "Choose how you want to apply the selected metadata for the files above:\n"
-        f"  1. Apply to a single file only (e.g: {files[0]['file_path']})\n"
-        f"  2. Apply to the entire folder (e.g: {folders})\n"
-        f"  3. Apply to the main (parent) folder and all sub‑folders (e.g: {main_folders})\n"
-        "  4. Cancel\n"
+        f"  [1] Apply to a single file only (e.g: {files[0]['file_path']})\n"
+        f"  [2] Apply to the entire folder (e.g: {folders})\n"
+        f"  [3] Apply to the main (parent) folder and all sub‑folders (e.g: {main_folders})\n"
+        "  [4] Cancel\n"
         "Enter your choice (1–4): "
     )
     while True:
@@ -156,6 +156,28 @@ def show_list_and_get_user_choice(
         action_choice = user_menu(vid_files, first_folder_key, first_main_folder_key)
         return folders, main_folders, action_choice, []
 
+def prompt_search_decision(file, idx, handled, skipped, source, content, action):
+    valid_choices = {'y', 'n', 's', 'c'}
+    while True:
+        print(f"\n{file['file_path']}")
+        choice = input(f"Do you want to search manually? (y/n/c): ").strip().lower()
+        if choice in valid_choices:
+            if choice == 'c':
+                handled, skipped, remaining = print_cancellation_summary(
+                    handled=handled,
+                    skipped=skipped,
+                    source=source,
+                    mode=1,
+                    idx_or_processed=idx,
+                    content=content,
+                    action=action
+                )
+                return 'c', handled, skipped, remaining
+            elif choice == 'n' or choice == 's':
+                skipped.append(file)
+            return choice, handled, skipped, []
+        print("Invalid input. Please enter y, n, or c.")
+
 def get_title_and_year_input(re=None, mo=None, ep=None, file=None, folder=None, current_api=None):
     if file:
         print(f"\n Search for: {file['file_path']}")
@@ -205,11 +227,11 @@ def action_menu(no=None, mult_api=None):
         print("No results found.")
         print("Options:")
     print("Select result by number, or:")
-    print("r: retry search")
+    print("[r] Retry search")
     if mult_api:
-        print("a: try another API")
-    print("s: skip")
-    print("c: cancel")
+        print("[a] Try another API")
+    print("[s] Skip")
+    print("[c] Cancel")
 
 def process_number_choice(sel, options, file, handled):
     if sel.isdigit():
@@ -247,7 +269,6 @@ def done_msg(unknown_files, skipped, remaining, no_episode_detail, u_episodes, r
                 print(f"   • {file_data['file_path']}")
         else:
             print(f"\n{get_label('skipped', use_emojis)}No files were skipped.")
-
 
     if unknown_files:
         print(f"\n{get_label('unexpected_ep', use_emojis)}Unexpected Files:")
@@ -288,4 +309,57 @@ def done_msg(unknown_files, skipped, remaining, no_episode_detail, u_episodes, r
     print(f"\n{get_label('done', use_emojis)}Done!")
     print("Your video library is now cleaner and better organized.")
     print("If you spot any issues or have feature ideas, feel free to open an issue on GitHub!")
+    print("="*30 + "\n")
+
+def skipped_msg(skipped, remaining, no_episode_detail, u_episodes, renamed_files, use_emojis):
+    print("\n" + "="*30)
+    print(f"{get_label('summary', use_emojis)}SKIPPED FILES SUMMARY")
+    print("="*30)
+
+    if skipped:
+        print(f"\n{get_label('skipped', use_emojis)}Skipped Files:")
+        for file_data in skipped:
+            print(f"   • {file_data['file_path']}")
+    else:
+        print(f"\n{get_label('skipped', use_emojis)}No files were skipped.")
+
+    if unknown_files:
+        print(f"\n{get_label('unexpected_ep', use_emojis)}Unexpected Files:")
+        for file_data in unknown_files:
+            print(f"   • {file_data['file_path']}")
+    else:
+        print(f"\n{get_label('unexpected_ep', use_emojis)}No unexpected files were detected.")
+
+    if remaining:
+        print(f"\n{get_label('unprocessed', use_emojis)}Unprocessed Files:")
+        for file_data in remaining:
+            print(f"   • {file_data['file_path']}")
+    else:
+        print(f"\n{get_label('unprocessed', use_emojis)}All files were processed.")
+
+    if no_episode_detail:
+        print(f"\n{get_label('no_se_ep', use_emojis)}Episodes Missing Season/Episode Info:")
+        for file_data in no_episode_detail:
+            print(f"   • {file_data['file_path']}")
+    else:
+        print(f"\n{get_label('no_se_ep', use_emojis)}All episodes have season and episode numbers.")
+
+    if u_episodes:
+        print(f"\n{get_label('unexpected_ep', use_emojis)}Episodes With Unexpected Format (e.g. S01E0102, S01E01-02, 1x0102):")
+        for file_data in u_episodes:
+            print(f"   • {file_data['file_path']}")
+    else:
+        print(f"\n{get_label('unexpected_ep', use_emojis)}No unexpected episode formats detected.")
+
+    if renamed_files:
+        print(f"\n{get_label('renamed', use_emojis)}Files renamed:")
+        for file_data in renamed_files:
+            print(f"   • {file_data['file_path']}")
+        print(f"\n {len(renamed_files)} file(s) renamed successfully.")
+    else:
+        print(f"\n{get_label('renamed', use_emojis)}No files were renamed (dry run or no matches).")
+
+    print("\n" + "="*30)
+    print(f"{get_label('done', use_emojis)} Done!")
+    print("Skipped files processing completed.")
     print("="*30 + "\n")

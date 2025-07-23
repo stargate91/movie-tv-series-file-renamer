@@ -61,7 +61,7 @@ def get_video_metadata(file_path):
     return metadata
 
 
-def rename_vid_files(api_results, live_run, zero_padding, movie_template, episode_template, use_emojis):
+def rename_vid_files(api_results, live_run, zero_padding, custom_variable, movie_template, episode_template, use_emojis):
     rename_starts_msg(live_run, use_emojis)
     renamed_files = []
 
@@ -110,7 +110,9 @@ def rename_vid_files(api_results, live_run, zero_padding, movie_template, episod
                 source=source,
                 other=other,
                 edition=edition,
-                streaming_service=streaming_service
+                streaming_service=streaming_service,
+
+                custom_variable=custom_variable
                 )
         elif file_type == "episode":
             series_details = file_data['series_details']
@@ -161,7 +163,9 @@ def rename_vid_files(api_results, live_run, zero_padding, movie_template, episod
                 source=source,
                 other=other,
                 edition=edition,
-                streaming_service=streaming_service
+                streaming_service=streaming_service,
+
+                custom_variable=custom_variable
             )
         
         new_filename += file_extension

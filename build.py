@@ -1,6 +1,5 @@
 DEFAULT_CONFIG = """
 [GENERAL]
-[GENERAL]
 # Path to the folder containing the video files to rename.
 # Example: "E:\\dl_torrent" or "/home/user/videos"
 # Use double backslashes \\ on Windows or forward slashes /
@@ -11,6 +10,13 @@ folder_path = E:\\dl_torrent
 # Set to True to allow user input during processing; False for fully automated batch mode.
 
 interactive = True
+
+# Enable or disable skipped file saving and reloading.
+# When set to true, skipped files (e.g. unmatched or multi-match entries)
+# will be saved during interactive mode and can be reloaded in a future run.
+# Only has an effect when interactive mode is enabled.
+
+skipped = True
 
 # Minimum video file size (in megabytes) to include in processing.
 # Helps exclude sample clips or other small, irrelevant video files.
@@ -57,7 +63,6 @@ live_run = False
 
 use_emojis = False
 
-
 [TEMPLATES]
 
 # Note #1:
@@ -88,6 +93,15 @@ use_emojis = False
 # Always check the log during a dry run to verify which values are being picked up
 # and ensure they match your expectations.
 
+
+# Custom variable for use in renaming templates.
+# You can define any custom string value here to be included in your
+# movie or episode filename templates, allowing personalized or
+# project-specific tags, markers, or metadata.
+# Example usage in a template: "{series_title} - S{season}E{episode} - {custom_variable}"
+
+custom_variable = default
+
 # Template for renaming movie files.
 # Available variables:
 #   movie_title                  - Movie title
@@ -101,8 +115,9 @@ use_emojis = False
 #   audio_channels               - Number of audio channels of the first audio track (e.g. Stereo, 5.1)
 #   first_audio_channel_language - Language of the first audio track (e.g. en, hu)
 #   audio_channels_description   - Human-readable audio description (e.g. Single Audio, Dual Audio, Multi Audio)
+#   custom_variable              - A user-defined custom string that can be included in renaming templates for additional personalization or metadata.
 
-movie_template = {movie_title} {movie_year}-{resolution}
+movie_template = {custom_variable} + {movie_title} {movie_year}-{resolution}
 
 # Example:
 #   "Inception 2010-1080p H.264 AAC Stereo"
@@ -128,8 +143,9 @@ movie_template = {movie_title} {movie_year}-{resolution}
 #   audio_channels                - Number of audio channels of the first audio track (e.g. Stereo, 5.1)
 #   first_audio_channel_language  - Language of the first audio track (e.g. en, hu)
 #   audio_channels_description    - Human-readable audio description (e.g. Single Audio, Dual Audio, Multi Audio)
+#   custom_variable              - A user-defined custom string that can be included in renaming templates for additional personalization or metadata.
 
-episode_template = {series_title} - S{season}E{episode} - {episode_title}-{air_date}-{resolution}
+episode_template = {custom_variable} + {series_title} - S{season}E{episode} - {episode_title}-{air_date}-{resolution}
 
 # Example:
 #   "Friends - S01E03 - The One with the Thumb-1994-09-22-720p"
@@ -139,7 +155,6 @@ episode_template = {series_title} - S{season}E{episode} - {episode_title}-{air_d
 # False -> S1E1
 
 zero_padding = True
-
 
 [API]
 # Your API key for OMDb.

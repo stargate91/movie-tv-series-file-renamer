@@ -1,4 +1,4 @@
-from ui_ux import show_list_and_get_user_choice, print_cancellation_summary, switch_api, get_title_and_year_input
+from ui_ux import show_list_and_get_user_choice, print_cancellation_summary, switch_api, prompt_search_decision, get_title_and_year_input
 from ui_ux import display_res, action_menu, process_number_choice
 from helper import extract_results, search_api
 
@@ -20,6 +20,14 @@ def handle_movie_no(movie_no, api_client, current_api='omdb'):
     remaining_movies = []
 
     for idx, movie in enumerate(movie_no):
+        choice, handled_movies, skipped_movies, remaining_movies = prompt_search_decision(
+        movie, idx, handled_movies, skipped_movies, movie_no, content="movies", action="search"
+        )
+        if choice == 'c':
+            return handled_movies, skipped_movies, remaining_movies
+        if choice == 'n' or choice == 's':
+            continue
+
         title, year = get_title_and_year_input(mo=True, file=movie, current_api=current_api)
         while True:
             result, options = search_api(api_client, current_api, title, year)
