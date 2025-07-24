@@ -93,7 +93,6 @@ use_emojis = False
 # Always check the log during a dry run to verify which values are being picked up
 # and ensure they match your expectations.
 
-
 # Custom variable for use in renaming templates.
 # You can define any custom string value here to be included in your
 # movie or episode filename templates, allowing personalized or
@@ -155,6 +154,15 @@ episode_template = {custom_variable} + {series_title} - S{season}E{episode} - {e
 # False -> S1E1
 
 zero_padding = True
+
+# Controls the case of the new filename: lower, upper, title, or none
+
+filename_case = title
+
+# Controls the separator used between words in the filename:
+# options: space, dot, dash, underscore
+
+separator = space
 
 [API]
 # Your API key for OMDb.

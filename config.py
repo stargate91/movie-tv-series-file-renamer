@@ -71,24 +71,14 @@ class Config:
             help="Path to the folder containing the movie files to rename."
         )
         parser.add_argument(
-            "--interactive",
+            "--recursive",
             action="store_true",
-            help="Enable interactive mode with manual search and selection for ambiguous or missing matches."
-        )
-        parser.add_argument(
-            "--skipped",
-            action="store_true",
-            help="Saves skipped files during interactive mode and allows reloading them in a future run. Only applicable in interactive mode."
+            help="Include video files in subdirectories recursively."
         )
         parser.add_argument(
             "--vid_size",
             type=int,
             help="Set the minimum size of video files for processing."
-        ) 
-        parser.add_argument(
-            "--recursive",
-            action="store_true",
-            help="Include video files in subdirectories recursively."
         )
         parser.add_argument(
             "--source",
@@ -101,21 +91,41 @@ class Config:
             choices=["file", "folder", "fallback"]
         )
         parser.add_argument(
-            "--custom_variable",
+            "--interactive",
+            action="store_true",
+            help="Enable interactive mode with manual search and selection for ambiguous or missing matches."
+        )
+        parser.add_argument(
+            "--skipped",
+            action="store_true",
+            help="Saves skipped files during interactive mode and allows reloading them in a future run. Only applicable in interactive mode."
+        )
+        parser.add_argument(
+            "--custom-variable",
             help="Defining a custom variable to use in templates"
         )
         parser.add_argument(
-            "--movie_template",
+            "--movie-template",
             help="The template used for renaming movie files"
         )
         parser.add_argument(
-            "--episode_template",
+            "--episode-template",
             help="The template used for renaming episode files"
         )
         parser.add_argument(
             "--zero-padding",
             action="store_true",
             help="Use zero-padding for season and episode numbers (S01E01)."
+        )
+        parser.add_argument(
+            "--filename-case",
+            choices=["lower", "upper", "title", "none"],
+            help="Change the case of the new filename. Options: 'lower', 'upper', 'title', or 'none' (default)."
+        )
+        parser.add_argument(
+            "--separator",
+            choices=["space", "dot", "dash", "underscore"],
+            help="Set the separator character used in the filename. Options: space (\" \") (default), dot (\".\"), dash (\"-\"), or underscore (\"_\"). Default is space."
         )
         parser.add_argument(
             "--live-run",
@@ -130,47 +140,59 @@ class Config:
         return parser.parse_args()
 
     def get_config(self):
+# -------------------------- Argparse overwrites (non boolean) ------------------------------
         folder_path = self.args.folder if self.args.folder else self.config.get('GENERAL', 'folder_path', fallback=None)
         if folder_path is None:
             raise ValueError("No folder path provided. Use --folder or set it in config.ini.")
-
         folder_path = Path(folder_path).expanduser().resolve()
 
-        interactive = self.config.getboolean('GENERAL', 'interactive', fallback=False)
-
-        skipped = self.config.getboolean('GENERAL', 'skipped', fallback=False)
-
-        vid_size = self.args.vid_size if self.args.vid_size else self.config.getint('GENERAL', 'vid_size', fallback=None)
+        vid_size = self.args.vid_size if self.args.vid_size else self.config.getint('GENERAL', 'vid_size', fallback=500)
         if vid_size is None:
-            raise ValueError("No video size provided. Use --vid_size or set it in config.ini.")
+            raise ValueError("No video size provided. Use --vid-size or set it in config.ini.")
 
+        source = self.args.source if self.args.source else self.config.get('GENERAL', 'source', fallback='tmdb')
+
+        source_mode = self.args.source_mode if self.args.source_mode else self.config.get('GENERAL', 'source_mode', fallback='fallback')
+
+        custom_variable = self.args.custom_variable if self.args.custom_variable else self.config.get('TEMPLATES', 'custom_variable', fallback="Default")
+
+        filename_case = self.args.filename_case if self.args.filename_case else self.config.get('TEMPLATES', 'filename_case', fallback='none')
+        
+        separator = self.args.separator if self.args.separator else self.config.get('TEMPLATES', 'separator', fallback='space')
+
+# -------------------------- Argparse overwrites (boolean) ------------------------------
         recursive = self.config.getboolean('GENERAL', 'recursive', fallback=False)
-        source = self.config.get('GENERAL', 'source', fallback='tmdb')
-        source_mode = self.config.get('GENERAL', 'source_mode', fallback='fallback')
-        live_run = self.config.getboolean('GENERAL', 'live_run', fallback=False)
+        interactive = self.config.getboolean('GENERAL', 'interactive', fallback=False)
+        skipped = self.config.getboolean('GENERAL', 'skipped', fallback=False)
         zero_padding = self.config.getboolean('TEMPLATES', 'zero_padding', fallback=False)
+        live_run = self.config.getboolean('GENERAL', 'live_run', fallback=False)
         use_emojis = self.config.getboolean('GENERAL', 'use_emojis', fallback=False)
 
-        if self.args.skipped:
-            skipped = True
         if self.args.recursive:
             recursive = True
-        if self.args.live_run:
-            live_run = True
+        if self.args.interactive:
+            interactive = True
+        if self.args.skipped:
+            skipped = True
         if self.args.zero_padding:
             zero_padding = True
+        if self.args.live_run:
+            live_run = True
         if self.args.use_emojis:
             use_emojis = True
 
-        custom_variable = self.args.custom_variable or self.config.get('TEMPLATES', 'custom_variable', fallback="Default")
+# -------------------------- Argparse no overwrites (fallback) ------------------------------
         movie_template = self.config.get('TEMPLATES', 'movie_template', fallback="{movie_title} {movie_year}-{resolution}")
         episode_template = self.config.get('TEMPLATES', 'episode_template', fallback="{series_title} - S{season}E{episode} - {episode_title}-{air_date}-{resolution}")
+
 
         return {
             "folder_path": folder_path,
             "interactive": interactive,
             "skipped": skipped,
             "vid_size": vid_size,
+            "filename_case": filename_case,
+            "separator": separator,
             "recursive": recursive,
             "api_source": source,
             "source_mode": source_mode,
@@ -184,3 +206,4 @@ class Config:
             "tmdb_key": self.tmdb_key,
             "tmdb_bearer_token": self.tmdb_bearer_token
         }
+

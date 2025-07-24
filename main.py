@@ -33,6 +33,8 @@ def main():
     zero_padding = config_data["zero_padding"]
     live_run = config_data["live_run"]
     use_emojis = config_data["use_emojis"]
+    filename_case = config_data["filename_case"]
+    separator = config_data["separator"]
     
     omdb_key = config_data["omdb_key"]
     tmdb_key = config_data["tmdb_key"]
