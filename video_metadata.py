@@ -207,3 +207,15 @@ def get_audio_channel_description(file_path):
     except Exception as e:
         print(f"Error reading audio channels for {file_path}: {e}")
         return "unknown"
+
+def get_video_metadata(file_path):
+    metadata = {}
+    metadata['resolution'] = get_res(file_path)
+    metadata['video_codec'] = get_codec(file_path)
+    metadata['video_bitrate'] = get_video_bitrate(file_path)
+    metadata['framerate'] = get_framerate(file_path)
+    metadata['audio_codec'] = get_audio_codec(file_path)
+    metadata['audio_channels'] = get_audio_channels(file_path)
+    metadata['first_audio_channel_language'] = get_first_audio_language_code(file_path)
+    metadata['audio_channels_description'] = get_audio_channel_description(file_path)
+    return metadata

@@ -9,7 +9,9 @@ class APIClient:
         tmdb_bearer_token,
         omdb_cache_file="omdb_cache.json",
         tmdb_movie_cache_file="tmdb_movie_cache.json",
+        tmdb_movie_detail_cache_file="tmdb_movie_detail_cache.json",
         tmdb_tv_cache_file="tmdb_tv_cache.json",
+        tmdb_tv_external_cache_file="tmdb_tv_external_cache.json",
         tmdb_tv_detail_cache_file="tmdb_tv_detail_cache.json",
         tmdb_episode_cache_file="tmdb_episode_cache.json"
     ):
@@ -19,7 +21,9 @@ class APIClient:
         self.tmdb_bearer_token = tmdb_bearer_token
         self.omdb_cache = CacheHandler(omdb_cache_file)
         self.tmdb_movie_cache = CacheHandler(tmdb_movie_cache_file)
+        self.tmdb_movie_detail_cache = CacheHandler(tmdb_movie_detail_cache_file)
         self.tmdb_tv_cache = CacheHandler(tmdb_tv_cache_file)
+        self.tmdb_tv_external_cache = CacheHandler(tmdb_tv_external_cache_file)
         self.tmdb_tv_detail_cache = CacheHandler(tmdb_tv_detail_cache_file)
         self.tmdb_episode_cache = CacheHandler(tmdb_episode_cache_file)
 
@@ -46,17 +50,15 @@ class APIClient:
             print(f"API request failed for {cache_key}: {str(e)}")
             return None
 
-    def get_from_omdb(self, title, year):
-        cache_key = f"{title}-{year}"
-        if year == "unknown":
-            api_url = f"http://www.omdbapi.com/?t={title}&apikey={self.omdb_key}&"
-        else:
-            api_url = f"http://www.omdbapi.com/?t={title}&y={year}&apikey={self.omdb_key}"
+    def get_from_omdb_by_imdb_id(self, imdb_id):
+        cache_key = f"imdb-{imdb_id}"
+
+        api_url = f"http://www.omdbapi.com/?i={imdb_id}&apikey={self.omdb_key}"
         
         return self._get_from_api(api_url, cache_key, self.omdb_cache)
 
     def get_from_tmdb_movie(self, title, year):
-        cache_key = f"{title}-{year}"
+        cache_key = f"movie-{title}-{year}"
         if year == "unknown":
             api_url = f"https://api.themoviedb.org/3/search/movie?api_key={self.tmdb_key}&query={title}"
         else:
@@ -66,27 +68,61 @@ class APIClient:
         }
 
         return self._get_from_api(api_url, cache_key, self.tmdb_movie_cache, headers)
+
+    def get_from_tmdb_movie_detail(self, id):
+        cache_key = f"movie-detail-{id}"
+
+        api_url = f"https://api.themoviedb.org/3/movie/{id}?api_key={self.tmdb_key}"
+
+        headers = {
+            "Authorization": f"Bearer {self.tmdb_bearer_token}"
+        }
+        
+        return self._get_from_api(api_url, cache_key, self.tmdb_movie_cache, headers)
     
     def get_from_tmdb_tv(self, title, year):
-        cache_key = f"{title}-{year}"
+        cache_key = f"series-{title}-{year}"
+        
         if year == "unknown":
             api_url = f"https://api.themoviedb.org/3/search/tv?api_key={self.tmdb_key}&query={title}"
         else:
             api_url = f"https://api.themoviedb.org/3/search/tv?api_key={self.tmdb_key}&query={title}&year={year}"
 
-        return self._get_from_api(api_url, cache_key, self.tmdb_tv_cache)
+        headers = {
+            "Authorization": f"Bearer {self.tmdb_bearer_token}"
+        }        
+
+        return self._get_from_api(api_url, cache_key, self.tmdb_tv_cache, headers)
 
     def get_from_tmdb_tv_detail(self, id):
-        cache_key = f"{id}"
+        cache_key = f"series-detail-{id}"
         
         api_url = f"https://api.themoviedb.org/3/tv/{id}?api_key={self.tmdb_key}"
 
-        return self._get_from_api(api_url, cache_key, self.tmdb_tv_detail_cache)
+        headers = {
+            "Authorization": f"Bearer {self.tmdb_bearer_token}"
+        }        
 
+        return self._get_from_api(api_url, cache_key, self.tmdb_tv_detail_cache, headers)
+
+    def get_from_tmdb_tv_external(self, id):
+        cache_key = f"series-external-{id}"
+        
+        api_url = f"https://api.themoviedb.org/3/tv/{id}/external_ids?api_key={self.tmdb_key}"
+
+        headers = {
+            "Authorization": f"Bearer {self.tmdb_bearer_token}"
+        }
+
+        return self._get_from_api(api_url, cache_key, self.tmdb_tv_external_cache, headers)
 
     def get_from_tmdb_episode(self, id, season, episode):
-        cache_key = f"{id}-S{season}E{episode}"
+        cache_key = f"episode_detail-{id}-S{season}E{episode}"
         
         api_url = f"https://api.themoviedb.org/3/tv/{id}/season/{season}/episode/{episode}?api_key={self.tmdb_key}"
 
-        return self._get_from_api(api_url, cache_key, self.tmdb_episode_cache)
+        headers = {
+            "Authorization": f"Bearer {self.tmdb_bearer_token}"
+        }
+
+        return self._get_from_api(api_url, cache_key, self.tmdb_episode_cache, headers)

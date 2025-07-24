@@ -3,14 +3,14 @@ setup_logging()
 
 from api_client import APIClient
 from config import Config
-from file_ops import get_vid_files_all, rename_vid_files
-from helper import save_skipped_to_file, load_skipped_menu, categorize_skipped_files
-from meta import extract_metadata
-from movie_handler import handle_movie_no, handle_movie_mult
-from series_handler_id import handle_episode_no, handle_episode_mult
-from series_handler_episode import extract_episode_metadata
-from normalizers import normalize_movies, normalize_episodes
-from ui_ux import start_msg, done_msg, skipped_msg
+from collector import get_all_video_files
+from metadata import extract_metadata
+from result_manager import get_handler
+from metadata_standardizer import standardize_metadata
+from metadata_enricher import enricher
+from helper import save_skipped_to_file, load_skipped_menu
+from renamer import rename_video_files
+from ui_ux import start_message, done_message
 import sys
 
 
@@ -25,7 +25,6 @@ def main():
     skipped_mode = config_data["skipped"]
     vid_size = config_data["vid_size"]
     recursive = config_data["recursive"]
-    api_source = config_data["api_source"]
     source_mode = config_data["source_mode"]
     custom_variable = config_data["custom_variable"]
     movie_template = config_data["movie_template"]
@@ -40,7 +39,7 @@ def main():
     tmdb_key = config_data["tmdb_key"]
     tmdb_bearer_token = config_data["tmdb_bearer_token"]
 
-    start_msg(config.source, folder_path, use_emojis)
+    start_message(config.source, folder_path, use_emojis)
 
     api_client = APIClient(omdb_key, tmdb_key, tmdb_bearer_token)
 
@@ -51,143 +50,37 @@ def main():
         if skipped_files is None:
             pass
         else:
-            movie_no, movie_mult, episode_no, episode_mult = categorize_skipped_files(skipped_files)
+            handled, skipped, unprocessed = get_handler(skipped_files, api_client, interactive)
+            standardized, eps_w_missing_data = standardize_metadata(handled)
 
-            h_movie_no, s_movie_no, r_movie_no = handle_movie_no(movie_no, api_client, api_source)
-            h_movie_mult, s_movie_mult, r_movie_mult = handle_movie_mult(movie_mult, api_client, api_source)
+            if not any([standardized, eps_w_missing_data]):
+                sys.exit(0)
 
-            n_movie_no = normalize_movies(h_movie_no, source="There wasn't any movie required manual search.")
-            n_movie_mult = normalize_movies(h_movie_mult, source="There wasn't any movie required manual selection.")
+            enriched, unexpected_eps = enricher(standardized, api_client)
+            renamed_files = rename_video_files(enriched, live_run, zero_padding, custom_variable, movie_template, episode_template, use_emojis, filename_case, separator)
+            done_message(skipped, unprocessed, eps_w_missing_data, unexpected_eps, renamed_files, interactive, skipped_mode)
 
-            h_episode_no, s_episode_no, r_episode_no = handle_episode_no(episode_no, api_client)
-            h_episode_mult, s_episode_mult, r_episode_mult = handle_episode_mult(episode_mult, api_client)
+# -------------------- Normal mode --------------------
 
-            n_episode_mult, x_episodes_mult = normalize_episodes(h_episode_mult, api_client, source="There wasn't any episode required manual search.")
-            n_episode_no, x_episodes_no = normalize_episodes(h_episode_no, api_client, source="There wasn't any episode required manual selection.")
+    video_files = get_all_video_files(folder_path, vid_size, recursive)
+    collected_results, unknown_files = extract_metadata(video_files, api_client, source_mode)
 
-            s_movie_no = s_movie_no or []
-            s_movie_no += s_movie_mult or []
-            s_movie_no += s_episode_no or []
-            s_movie_no += s_episode_mult or []
-            skipped_vids = s_movie_no
-
-            r_movie_no = r_movie_no or []
-            r_movie_no += r_movie_mult or []
-            r_movie_no += r_episode_no or []
-            r_movie_no += r_episode_mult or []
-            remaining = r_movie_no
-
-            n_movie_no = n_movie_no or []
-            n_movie_no += n_movie_mult or []
-            movies = n_movie_no
-            
-            renamed_movie_files = rename_vid_files(movies, live_run, zero_padding, custom_variable, movie_template, episode_template, use_emojis)
-            
-            n_episode_no = n_episode_no or []
-            n_episode_no += n_episode_mult or []
-            n_episodes = n_episode_mult
-
-            episodes, u_episodes = extract_episode_metadata(n_episodes, api_client)
-
-            renamed_episode_files = rename_vid_files(episodes, live_run, zero_padding, custom_variable, movie_template, episode_template, use_emojis)
-
-            x_episodes_no = x_episodes_no or []
-            x_episodes_no += x_episodes_mult or []
-            no_episode_detail = x_episodes_no
-
-            renamed_movie_files = renamed_movie_files or []
-            renamed_movie_files += renamed_episode_files or []
-            renamed_files = renamed_movie_files
-
-            skipped_msg(skipped_vids, remaining, no_episode_detail, u_episodes, renamed_files, use_emojis)
-
-# -------------------- Getting files and metadata --------------------
-
-    video_files = get_vid_files_all(folder_path, vid_size, recursive)
-
-    result = extract_metadata(video_files, api_client, api_source, source_mode)
-    movie_one, movie_no, movie_mult, episode_one, episode_no, episode_mult, unknown_files = result
-
-    if not any([movie_one, movie_no, movie_mult, episode_one, episode_no, episode_mult, unknown_files]):
+    if not any(collected_results):
         sys.exit(0)
 
-# -------------------- Interactive mode --------------------
+    handled_results, skipped_results, unprocessed_results = get_handler(collected_results, api_client, interactive)
+    standardized_files, episodes_with_missing_data = standardize_metadata(handled_results)
 
-    if interactive:
-        h_movie_no, s_movie_no, r_movie_no = handle_movie_no(movie_no, api_client, api_source)
-        h_movie_mult, s_movie_mult, r_movie_mult = handle_movie_mult(movie_mult, api_client, api_source)
+    if not any([standardized_files, episodes_with_missing_data]):
+        sys.exit(0)
 
-        n_movie_no = normalize_movies(h_movie_no, source="There wasn't any movie required manual search.")
-        n_movie_mult = normalize_movies(h_movie_mult, source="There wasn't any movie required manual selection.")
+    enriched_files, unexpected_episodes = enricher(standardized_files, api_client)
+    renamed_files = rename_video_files(enriched_files, live_run, zero_padding, custom_variable, movie_template, episode_template, use_emojis, filename_case, separator)
 
-        h_episode_no, s_episode_no, r_episode_no = handle_episode_no(episode_no, api_client)
-        h_episode_mult, s_episode_mult, r_episode_mult = handle_episode_mult(episode_mult, api_client)
+    if skipped_mode and skipped_results:
+        save_skipped_to_file(skipped_results)
 
-        n_episode_mult, x_episodes_mult = normalize_episodes(h_episode_mult, api_client, source="There wasn't any episode required manual search.")
-        n_episode_no, x_episodes_no = normalize_episodes(h_episode_no, api_client, source="There wasn't any episode required manual selection.")
-
-        s_movie_no = s_movie_no or []
-        s_movie_no += s_movie_mult or []
-        s_movie_no += s_episode_no or []
-        s_movie_no += s_episode_mult or []
-        skipped_vids = s_movie_no
-
-        r_movie_no = r_movie_no or []
-        r_movie_no += r_movie_mult or []
-        r_movie_no += r_episode_no or []
-        r_movie_no += r_episode_mult or []
-        remaining = r_movie_no
-
-# -------------------- Batch mode  --------------------
-    if not interactive:
-        n_movie_no = []
-        n_movie_mult = []
-        n_episode_no = []
-        n_episode_mult = []
-        x_episodes_no = []
-        x_episodes_mult = []
-        skipped_vids = []
-        movie_no = movie_no or []
-        movie_no += movie_mult or []
-        movie_no += episode_no or []
-        movie_no += episode_mult or []
-        remaining = movie_no
-
-# -------------------- Both batch and interactive mode --------------------
-
-    n_movie_one = normalize_movies(movie_one, source="There wasn't any movie with exact match.")
-
-    n_movie_one = n_movie_one or []
-    n_movie_one += n_movie_no or []
-    n_movie_one += n_movie_mult or []
-    movies = n_movie_one
-    
-    renamed_movie_files = rename_vid_files(movies, live_run, zero_padding, custom_variable, movie_template, episode_template, use_emojis)
-
-    n_episode_one, x_episodes_one = normalize_episodes(episode_one, api_client, source="There wasn't any episode with exact series match.")
-    
-    n_episode_one = n_episode_one or []
-    n_episode_one += n_episode_no or []
-    n_episode_one += n_episode_mult or []
-    n_episodes = n_episode_one
-
-    episodes, u_episodes = extract_episode_metadata(n_episodes, api_client)
-
-    renamed_episode_files = rename_vid_files(episodes, live_run, zero_padding, custom_variable, movie_template, episode_template, use_emojis)
-
-    x_episodes_one = x_episodes_one or []
-    x_episodes_one += x_episodes_mult or []
-    x_episodes_one += x_episodes_no or []
-    no_episode_detail = x_episodes_one
-
-    renamed_movie_files = renamed_movie_files or []
-    renamed_movie_files += renamed_episode_files or []
-    renamed_files = renamed_movie_files
-
-    if skipped_mode and skipped_vids:
-        save_skipped_to_file(skipped_vids)
-
-    done_msg(unknown_files, skipped_vids, remaining, no_episode_detail, u_episodes, renamed_files, use_emojis, interactive)
+    done_message(skipped_results, unprocessed_results, episodes_with_missing_data, unexpected_episodes, renamed_files, use_emojis, interactive, skipped_mode, unknown_files)
 
 if __name__ == "__main__":
     try:

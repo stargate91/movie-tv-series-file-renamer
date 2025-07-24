@@ -81,11 +81,6 @@ class Config:
             help="Set the minimum size of video files for processing."
         )
         parser.add_argument(
-            "--source",
-            help="Which database to use for searching ('omdb' or 'tmdb').",
-            choices=["omdb", "tmdb"]
-        )
-        parser.add_argument(
             "--source-mode",
             help="Source of metadata (title and optionally year) for API lookup: 'file' uses the filename, 'folder' uses the folder name, 'fallback' tries the filename first, then the folder if needed.",
             choices=["file", "folder", "fallback"]
@@ -150,8 +145,6 @@ class Config:
         if vid_size is None:
             raise ValueError("No video size provided. Use --vid-size or set it in config.ini.")
 
-        source = self.args.source if self.args.source else self.config.get('GENERAL', 'source', fallback='tmdb')
-
         source_mode = self.args.source_mode if self.args.source_mode else self.config.get('GENERAL', 'source_mode', fallback='fallback')
 
         custom_variable = self.args.custom_variable if self.args.custom_variable else self.config.get('TEMPLATES', 'custom_variable', fallback="Default")
@@ -194,7 +187,6 @@ class Config:
             "filename_case": filename_case,
             "separator": separator,
             "recursive": recursive,
-            "api_source": source,
             "source_mode": source_mode,
             "custom_variable": custom_variable,
             "movie_template": movie_template,

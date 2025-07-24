@@ -60,31 +60,21 @@ def build_entry(item, selected):
 
 def get_api_func(api_client, source):
     return {
-        'omdb': api_client.get_from_omdb,
         'tmdb': api_client.get_from_tmdb_movie,
         'tmdb_tv': api_client.get_from_tmdb_tv
     }.get(source)
 
-def has_results(result, source):
-    if source == 'omdb':
-        return result.get("Response") == "True"
-    if source in {'tmdb', 'tmdb_tv'}:
-        return result.get("total_results", 0) > 0
-    return False
+def has_results(result):
+    return result.get("total_results", 0) > 0 if result else False
 
-def extract_results(result, source):
-    if source == 'omdb':
-        return [result]
-    if source in {'tmdb', 'tmdb_tv'}:
-        return result.get('results', [])
-    return []
+def extract_results(result):
+    return result.get('results', []) if result else []
 
 def search_api(api_client, source, title, year):
     api_func = get_api_func(api_client, source)
     result = api_func(title, year)
-    results = extract_results(result, source) if result else []
+    results = extract_results(result)
     return result, results
-
 
 def save_skipped_to_file(skipped, data_dir="data", filename="skipped_latest.json"):
     os.makedirs(data_dir, exist_ok=True)
@@ -128,11 +118,3 @@ def load_skipped_menu(path="data/skipped_latest.json", max_examples=2):
             exit(0)
         else:
             print("Invalid choice. Please enter 1, 2, or 0.")
-
-def categorize_skipped_files(skipped_files):
-    movies_no = [x for x in skipped_files if x['file_type'] == 'movie' and 'details' not in x]
-    movies_mult = [x for x in skipped_files if x['file_type'] == 'movie' and 'details' in x]
-    episodes_no = [x for x in skipped_files if x['file_type'] == 'episode' and 'details' not in x]
-    episodes_mult = [x for x in skipped_files if x['file_type'] == 'episode' and 'details' in x]
-
-    return movies_no, movies_mult, episodes_no, episodes_mult

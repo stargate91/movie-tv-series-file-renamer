@@ -1,19 +1,22 @@
-from ui_ux import show_list_and_get_user_choice, print_cancellation_summary, switch_api, prompt_search_decision, get_title_and_year_input
+from ui_ux import show_list_and_get_user_choice, print_cancellation_summary, prompt_search_decision, get_title_and_year_input
 from ui_ux import display_res, action_menu, process_number_choice
 from helper import extract_results, search_api
 
-def handle_movie_no(movie_no, api_client, current_api='omdb'):
+def handle_movies_with_no_match(movie_no, api_client):
+
+    if not movie_no:
+        print(f"\n[INFO] There are no movies with no match. Continue with the next task.")
+        return [], [], []
     
     handled, skipped, remaining, choice = show_list_and_get_user_choice(
         movie_no,
-        current_api=current_api,
         content="movies",
         action="search",
         res_quantity="no match"
     )
 
     if choice == 2:
-        return handled, skipped, remaining
+        return [], [], []
 
     handled_movies = []
     skipped_movies = []
@@ -28,18 +31,15 @@ def handle_movie_no(movie_no, api_client, current_api='omdb'):
         if choice == 'n' or choice == 's':
             continue
 
-        title, year = get_title_and_year_input(mo=True, file=movie, current_api=current_api)
+        title, year = get_title_and_year_input(mo=True, file=movie)
         while True:
-            result, options = search_api(api_client, current_api, title, year)
+            result, options = search_api(api_client, 'tmdb', title, year)
 
             if not options:
-                action_menu(no=True, mult_api=True)
+                action_menu(no=True)
                 sel = input("Choice: ").strip().lower()
                 if sel == 'r':
                     title, year = get_title_and_year_input(re=True, mo=True)
-                    continue
-                elif sel == 'a':
-                    current_api = switch_api(current_api)
                     continue
                 elif sel == 's':
                     skipped_movies.append(movie)
@@ -56,18 +56,15 @@ def handle_movie_no(movie_no, api_client, current_api='omdb'):
                     )
                     return handled_movies, skipped_movies, remaining_movies
                 else:
-                    print("Invalid input. Please enter r, a, s, or c.")
+                    print("Invalid input. Please enter r, s, or c.")
 
             display_res(options)
-            action_menu(mult_api=True)
+            action_menu()
             sel = input("Choice: ").strip().lower()
             if process_number_choice(sel, options, movie, handled_movies):
                 break
             if sel == 'r':
                 title, year = get_title_and_year_input(re=True, mo=True)
-                continue
-            elif sel == 'a':
-                current_api = switch_api(current_api)
                 continue
             elif sel == 's':
                 skipped_movies.append(movie)
@@ -92,18 +89,21 @@ def handle_movie_no(movie_no, api_client, current_api='omdb'):
 # ======================================================================
 # ======================================================================
 
-def handle_movie_mult(movie_mult, api_client, current_api='omdb'):
+def handle_movies_with_multiple_matches(movie_mult, api_client):
+
+    if not movie_mult:
+        print(f"\n[INFO] There are no movies with multiple_matches. Continue with the next task.")
+        return [], [], []
     
     handled, skipped, remaining, choice = show_list_and_get_user_choice(
         movie_mult,
-        current_api=current_api,
         content="movies",
         action="selection",
         res_quantity="multiple matches"
     )
 
     if choice == 2:
-        return handled, skipped, remaining
+        return [], [], []
 
     handled_movies = []
     skipped_movies = []
@@ -111,24 +111,21 @@ def handle_movie_mult(movie_mult, api_client, current_api='omdb'):
 
     for idx, movie in enumerate(movie_mult):
         details = movie['details']
-        options = extract_results(details, current_api)
+        options = extract_results(details)
 
         display_res(options, movie, content="movie")
-        action_menu(mult_api=True)
+        action_menu()
         while True:
             sel = input("Choice: ").strip().lower()
             if process_number_choice(sel, options, movie, handled_movies):
                 break
             elif sel == 'r':
                 title, year = get_title_and_year_input(mo=True)
-                result, options = search_api(api_client, current_api, title, year)
+                result, options = search_api(api_client, 'tmdb', title, year)
                 if options:
                     display_res(options)
                 else:
                     print("No results.")
-            elif sel == 'a':
-                current_api = switch_api(current_api)
-                continue
             elif sel == 's':
                 skipped_movies.append(movie)
                 break

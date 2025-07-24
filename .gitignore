@@ -3,3 +3,4 @@ data/
 test.py
 builds/
 logs/
+.pytest_cache

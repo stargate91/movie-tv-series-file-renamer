@@ -3,11 +3,14 @@ from ui_ux import get_title_and_year_input, display_res, action_menu
 from helper import build_entry, extract_results, search_api
 import os
 
-def handle_episode_no(episode_no, api_client):
+def handle_episodes_with_no_match(episode_no, api_client):
 
-    folders, main_folders, action_choice, placeholder = show_list_and_get_user_choice(
+    if not episode_no:
+        print(f"\n[INFO] There are no episodes with no match. Continue with the next task.")
+        return [], [], []
+
+    folders, main_folders, action_choice = show_list_and_get_user_choice(
         episode_no,
-        current_api=None,
         content="episodes",
         action="search",
         res_quantity="no match"
@@ -204,11 +207,14 @@ def handle_episode_no(episode_no, api_client):
 # ======================================================================
 # ======================================================================
 
-def handle_episode_mult(episode_mult, api_client):
+def handle_episodes_with_multiple_matches(episode_mult, api_client):
 
-    folders, main_folders, action_choice, placeholder = show_list_and_get_user_choice(
+    if not episode_mult:
+        print(f"\n[INFO] There are no episodes with multiple matches. Continue with the next task.")
+        return [], [], []
+
+    folders, main_folders, action_choice = show_list_and_get_user_choice(
         episode_mult,
-        current_api=None,
         content="episodes",
         action="selection",
         res_quantity="multiple matches"
@@ -222,7 +228,7 @@ def handle_episode_mult(episode_mult, api_client):
 
         for idx, episode in enumerate(episode_mult):
             details = episode['details']
-            options = extract_results(details, 'tmdb_tv')
+            options = extract_results(details)
 
             display_res(options, episode, content="episode")
             action_menu()
@@ -260,7 +266,7 @@ def handle_episode_mult(episode_mult, api_client):
         for season_dir, episodes in folders.items():
             prototype = episodes[0]
             details = prototype['details']
-            options = extract_results(details, 'tmdb_tv')
+            options = extract_results(details)
 
             display_res(options, file=None, folder=season_dir, content=None)
             action_menu()
@@ -302,7 +308,7 @@ def handle_episode_mult(episode_mult, api_client):
         for series_dir, episodes in main_folders.items():
             prototype = episodes[0]
             details = prototype['details']
-            options = extract_results(details, 'tmdb_tv')
+            options = extract_results(details)
 
             display_res(options, file=None, folder=series_dir, content=None)
             action_menu()
