@@ -3,4 +3,5 @@ data/
 test.py
 builds/
 logs/
-.pytest_cache
+.pytest_cache/
+rename_history/
