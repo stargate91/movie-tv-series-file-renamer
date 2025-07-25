@@ -26,6 +26,8 @@ def main():
     vid_size = config_data["vid_size"]
     recursive = config_data["recursive"]
     source_mode = config_data["source_mode"]
+    undo = config_data['undo']
+    history_file = config_data['history_file']
     custom_variable = config_data["custom_variable"]
     movie_template = config_data["movie_template"]
     episode_template = config_data["episode_template"]
@@ -38,6 +40,10 @@ def main():
     omdb_key = config_data["omdb_key"]
     tmdb_key = config_data["tmdb_key"]
     tmdb_bearer_token = config_data["tmdb_bearer_token"]
+
+    if undo:
+        undo_rename(history_file=history_file, use_emojis=use_emojis)
+        sys.exit(0)
 
     start_message(config.source, folder_path, use_emojis)
 

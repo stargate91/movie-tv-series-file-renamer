@@ -96,6 +96,16 @@ class Config:
             help="Saves skipped files during interactive mode and allows reloading them in a future run. Only applicable in interactive mode."
         )
         parser.add_argument(
+            "--undo",
+            action="store_true",
+            help="Undo the last rename operation using rename history."
+        )
+        parser.add_argument(
+            "--history-file",
+            type=str,
+            help="Path to the rename history JSON file to use for undo. If omitted, the latest file from the configured history directory will be used."
+        )
+        parser.add_argument(
             "--custom-variable",
             help="Defining a custom variable to use in templates"
         )
@@ -147,6 +157,8 @@ class Config:
 
         source_mode = self.args.source_mode if self.args.source_mode else self.config.get('GENERAL', 'source_mode', fallback='fallback')
 
+        history_file = self.args.history_file if self.args.history_file else self.config.get('GENERAL', 'history_file', fallback=None)
+
         custom_variable = self.args.custom_variable if self.args.custom_variable else self.config.get('TEMPLATES', 'custom_variable', fallback="Default")
 
         filename_case = self.args.filename_case if self.args.filename_case else self.config.get('TEMPLATES', 'filename_case', fallback='none')
@@ -157,6 +169,7 @@ class Config:
         recursive = self.config.getboolean('GENERAL', 'recursive', fallback=False)
         interactive = self.config.getboolean('GENERAL', 'interactive', fallback=False)
         skipped = self.config.getboolean('GENERAL', 'skipped', fallback=False)
+        undo = self.config.getboolean('GENERAL', 'undo', fallback=False)
         zero_padding = self.config.getboolean('TEMPLATES', 'zero_padding', fallback=False)
         live_run = self.config.getboolean('GENERAL', 'live_run', fallback=False)
         use_emojis = self.config.getboolean('GENERAL', 'use_emojis', fallback=False)
@@ -167,6 +180,8 @@ class Config:
             interactive = True
         if self.args.skipped:
             skipped = True
+        if self.args.undo:
+            undo = True
         if self.args.zero_padding:
             zero_padding = True
         if self.args.live_run:
@@ -188,6 +203,8 @@ class Config:
             "separator": separator,
             "recursive": recursive,
             "source_mode": source_mode,
+            "undo": undo,
+            "history_file": history_file,
             "custom_variable": custom_variable,
             "movie_template": movie_template,
             "episode_template": episode_template,

@@ -17,7 +17,8 @@ LABELS = {
     "no_se_ep":        ("⚠️ ", ""),
     "unexpected_ep":   ("❓ ", ""),
     "renamed":         ("✅ ", ""),
-    "done":            ("🎉 ", "")
+    "done":            ("🎉 ", ""),
+    "paper":           ("🧾 ", "")
 }
 
 def get_label(name, use_emojis):

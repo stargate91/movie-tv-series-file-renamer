@@ -21,6 +21,15 @@ skipped = False
 # Minimum video file size (in megabytes) to include in processing.
 # Helps exclude sample clips or other small, irrelevant video files.
 
+
+# Enable undo functionality to restore original filenames from history
+undo = False
+
+# Path to the rename history JSON file used for undo
+# If you leave it empty, it uses your latest rename session.
+history_file = \rename_history\rename_history_2025-07-25_1310.json
+
+
 vid_size = 500
 
 # Whether to search subdirectories recursively for video files.
