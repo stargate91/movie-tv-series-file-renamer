@@ -268,8 +268,8 @@ def done_message(skipped, remaining, no_episode_detail, u_episodes, renamed_file
 
     if renamed_files:
         print(f"\n{get_label('renamed', use_emojis)}Files renamed:")
-        for file_data in renamed_files:
-            print(f"   • {file_data['file_path']}")
+        for file_path in renamed_files:
+            print(f"   • {file_path}")
         print(f"\n {len(renamed_files)} file(s) renamed successfully.")
     else:
         print(f"\n{get_label('renamed', use_emojis)}No files were renamed - either a dry run or nothing matched.")
@@ -280,4 +280,3 @@ def done_message(skipped, remaining, no_episode_detail, u_episodes, renamed_file
     else:
         print("Your video library is now cleaner and better organized.")
         print("If you spot any issues or have feature ideas, feel free to open an issue on GitHub!")
-    print("="*30 + "\n")
