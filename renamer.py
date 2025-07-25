@@ -29,6 +29,7 @@ def rename_video_files(api_results, live_run, zero_padding, custom_variable,
                      filename_case, separator):
     rename_starts_message(live_run, use_emojis)
     renamed_files = []
+    rename_history = []
 
     for file_data in api_results:
         file_path = file_data['file_path']
@@ -93,16 +94,20 @@ def rename_video_files(api_results, live_run, zero_padding, custom_variable,
             episode_title = file_data.get('episode_title')
             season_number = file_data.get('season_number')
             episode_number = file_data.get('episode_number')
+            first_air_date = file_data.get('first_air_date')
+            first_air_year = file_data.get('first_air_year')
+            last_air_date = file_data.get('last_air_date')
+            last_air_year = file_data.get('last_air_year')
             air_date = file_data.get('air_date')
             air_year = file_data.get('air_year')
             status = file_data.get('status')
 
             if zero_padding:
-                season_str = f"{season:02}"
-                episode_str = f"{episode:02}"
+                season_str = f"{season_number:02}"
+                episode_str = f"{episode_number:02}"
             else:
-                season_str = str(season)
-                episode_str = str(episode)
+                season_str = str(season_number)
+                episode_str = str(episode_number)
 
             new_filename = episode_template.format(
                 series_title=series_title,
@@ -112,8 +117,8 @@ def rename_video_files(api_results, live_run, zero_padding, custom_variable,
                 last_air_year=last_air_year,
                 status=status,
                 episode_title=episode_title,
-                season=season_str,
-                episode=episode_str,
+                season_number=season_str,
+                episode_number=episode_str,
                 air_date=air_date,
                 air_year=air_year,
                 resolution=resolution,
@@ -146,8 +151,9 @@ def rename_video_files(api_results, live_run, zero_padding, custom_variable,
         if live_run:
             os.rename(file_path, new_file_path)
             renamed_files.append(new_file_path)
+            rename_history.append((file_path, new_file_path))
             rename_success_message(file_path, new_filename)
         else:
             dry_rename_message(file_path, new_filename)
 
-    return renamed_files
+    return renamed_files, rename_history

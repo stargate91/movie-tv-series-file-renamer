@@ -16,7 +16,7 @@ interactive = True
 # will be saved during interactive mode and can be reloaded in a future run.
 # Only has an effect when interactive mode is enabled.
 
-skipped = True
+skipped = False
 
 # Minimum video file size (in megabytes) to include in processing.
 # Helps exclude sample clips or other small, irrelevant video files.
@@ -27,13 +27,6 @@ vid_size = 500
 # Possible values: True or False
 
 recursive = True
-
-# API source for metadata lookup.
-# Options: "omdb", "tmdb"
-# OMDb only gives one result if there is one and only useable for movies.
-# TMDb handles both movies and series, in case you choose "omdb" here, for episode files still the API source is TMDb.
-
-source = tmdb
 
 # Source of metadata (title and optionally year) used for API lookup.
 # Options: "file", "folder", "fallback"
@@ -115,6 +108,10 @@ custom_variable = default
 #   first_audio_channel_language - Language of the first audio track (e.g. en, hu)
 #   audio_channels_description   - Human-readable audio description (e.g. Single Audio, Dual Audio, Multi Audio)
 #   custom_variable              - A user-defined custom string that can be included in renaming templates for additional personalization or metadata.
+#   genres			 - Genres of the movie (e.g: Action Drama Sci-Fi, it gives you a list if there're more genres than one with space separator)
+#   imdb_rating			 - IMDb rating of the movie(format: 7.0)
+#   rotten_rating		 - Rotten Tomatoes rating of the movie (format: 52)
+#   metacritic_rating		 - Metacritic rating of the movie (format: 49)
 
 movie_template = {custom_variable} + {movie_title} {movie_year}-{resolution}
 
@@ -130,8 +127,8 @@ movie_template = {custom_variable} + {movie_title} {movie_year}-{resolution}
 #   last_air_year                 - Year of the last air date (e.g. 2024)
 #   status                        - Current status of the series (e.g. Returning Series, Ended)
 #   episode_title                 - Title of the episode
-#   season                        - Season number (with zero padding, next setting, e.g. 01, 02)
-#   episode                       - Episode number (with zero padding, next setting, e.g. 03, 10)
+#   season_number                 - Season number (with zero padding, next setting, e.g. 01, 02)
+#   episode_number                - Episode number (with zero padding, next setting, e.g. 03, 10)
 #   air_date                      - Episode air date (e.g. 2023-03-05)
 #   air_year                      - Year of the air date (e.g. 2023)
 #   resolution                    - Video resolution (e.g. 1080p, 4K)
@@ -142,9 +139,13 @@ movie_template = {custom_variable} + {movie_title} {movie_year}-{resolution}
 #   audio_channels                - Number of audio channels of the first audio track (e.g. Stereo, 5.1)
 #   first_audio_channel_language  - Language of the first audio track (e.g. en, hu)
 #   audio_channels_description    - Human-readable audio description (e.g. Single Audio, Dual Audio, Multi Audio)
-#   custom_variable              - A user-defined custom string that can be included in renaming templates for additional personalization or metadata.
+#   custom_variable               - A user-defined custom string that can be included in renaming templates for additional personalization or metadata.
+#   genres			  - Genres of the series (e.g: Action Drama Sci-Fi, it gives you a list if there're more genres than one with space separator)
+#   imdb_rating			  - IMDb rating of the series (format: 7.0)
+#   rotten_rating		  - Rotten Tomatoes rating of the series (format: 52)
+#   metacritic_rating		  - Metacritic rating of the series (format: 49)
 
-episode_template = {custom_variable} + {series_title} - S{season}E{episode} - {episode_title}-{air_date}-{resolution}
+episode_template = {custom_variable} + {series_title} - S{season_number}E{episode_number} - {episode_title}-{air_date}-{resolution}
 
 # Example:
 #   "Friends - S01E03 - The One with the Thumb-1994-09-22-720p"
@@ -166,18 +167,17 @@ separator = space
 
 [API]
 # Your API key for OMDb.
-# Required if you use "omdb" as the source
-# Only for movies and you can get only 1 result / movie
+# Even though, the script uses TMDb as the main metadata source, some informations obtained from OMDb.
 
 omdb_key = your_omdb_key_here
 
 # Your API key for TMDb.
-# Required if you use "tmdb" as the source.
+# Required to run the script.
 
 tmdb_key = your_tmdb_key_here
 
 # Bearer token for TMDb API authorization.
-# Required if you use "tmdb" as the source.
+# Required to run the script.
 
 tmdb_bearer_token = your_tmdb_token_here
 """

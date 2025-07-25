@@ -8,7 +8,7 @@ from metadata import extract_metadata
 from result_manager import get_handler
 from metadata_standardizer import standardize_metadata
 from metadata_enricher import enricher
-from helper import save_skipped_to_file, load_skipped_menu
+from helper import save_skipped_to_file, load_skipped_menu, save_rename_history_to_file
 from renamer import rename_video_files
 from ui_ux import start_message, done_message
 import sys
@@ -57,8 +57,12 @@ def main():
                 sys.exit(0)
 
             enriched, unexpected_eps = enricher(standardized, api_client)
-            renamed_files = rename_video_files(enriched, live_run, zero_padding, custom_variable, movie_template, episode_template, use_emojis, filename_case, separator)
-            done_message(skipped, unprocessed, eps_w_missing_data, unexpected_eps, renamed_files, interactive, skipped_mode)
+            renamed_skipped, renamed_skipped_history = rename_video_files(enriched, live_run, zero_padding, custom_variable, movie_template, episode_template, use_emojis, filename_case, separator)
+
+            if live_run:
+                save_rename_history_to_file(renamed_skipped_history)
+
+            done_message(skipped, unprocessed, eps_w_missing_data, unexpected_eps, renamed_skipped, interactive, skipped_mode)
 
 # -------------------- Normal mode --------------------
 
@@ -75,10 +79,13 @@ def main():
         sys.exit(0)
 
     enriched_files, unexpected_episodes = enricher(standardized_files, api_client)
-    renamed_files = rename_video_files(enriched_files, live_run, zero_padding, custom_variable, movie_template, episode_template, use_emojis, filename_case, separator)
+    renamed_files, rename_history = rename_video_files(enriched_files, live_run, zero_padding, custom_variable, movie_template, episode_template, use_emojis, filename_case, separator)
 
     if skipped_mode and skipped_results:
         save_skipped_to_file(skipped_results)
+
+    if live_run:
+        save_rename_history_to_file(rename_history)
 
     done_message(skipped_results, unprocessed_results, episodes_with_missing_data, unexpected_episodes, renamed_files, use_emojis, interactive, skipped_mode, unknown_files)
 

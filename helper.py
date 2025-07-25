@@ -1,5 +1,6 @@
 import os
 import json
+from datetime import datetime
 
 LABELS = {
     "start":           ("🚀 ", ""),
@@ -118,3 +119,15 @@ def load_skipped_menu(path="data/skipped_latest.json", max_examples=2):
             exit(0)
         else:
             print("Invalid choice. Please enter 1, 2, or 0.")
+
+def save_rename_history_to_file(rename_history, data_dir="rename_history"):
+    os.makedirs(data_dir, exist_ok=True)
+
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H%M")
+    history_filename = f"rename_history_{timestamp}.json"
+    file_path = os.path.join(data_dir, history_filename)
+
+    with open(file_path, "w", encoding="utf-8") as f:
+        json.dump(rename_history, f, ensure_ascii=False, indent=2)
+
+    print(f"\n[SAVED] Rename history saved to: {file_path}")
