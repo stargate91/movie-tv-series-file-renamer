@@ -33,12 +33,17 @@ def rename_video_files(api_results, live_run, zero_padding, custom_variable,
     for file_data in api_results:
         file_path = file_data['file_path']
         file_type = file_data['file_type']
-        extras = file_data.get('extras', {})
-        release_group = extras.get('release_group', 'unknown')
-        source = extras.get('source', 'unknown')
-        other = extras.get('other', 'unknown')
-        edition = extras.get('edition', 'unknown')
-        streaming_service = extras.get('streaming_service', 'unknown')
+        genres = file_data.get('genres')
+        imdb_rating = file_data.get('imdb_rating')
+        rotten_rating = file_data.get('rotten_rating')
+        metacritic_rating = file_data.get('metacritic_rating')
+
+        extras = file_data['extras']
+        release_group = extras.get('release_group', 'Unknown Release Group')
+        source = extras.get('source', 'Unknown Source')
+        other = extras.get('other', 'Unknown')
+        edition = extras.get('edition', 'Unknown Edition')
+        streaming_service = extras.get('streaming_service', 'Unknown Streaming Service')
 
         metadata = get_video_metadata(file_path)
         resolution = metadata['resolution']
@@ -53,10 +58,9 @@ def rename_video_files(api_results, live_run, zero_padding, custom_variable,
         file_extension = os.path.splitext(file_path)[1].lower()
 
         if file_type == "movie":
-            movie_details = file_data['movie_details']
-            movie_title = movie_details['title']
-            movie_year = movie_details['year']
-            movie_release_date = movie_details['release_date']
+            movie_title = file_data.get('title')
+            movie_release_date = file_data.get('release_date')
+            movie_year = file_data.get('year')
 
             new_filename = movie_template.format(
                 movie_title=movie_title,
@@ -75,24 +79,23 @@ def rename_video_files(api_results, live_run, zero_padding, custom_variable,
                 other=other,
                 edition=edition,
                 streaming_service=streaming_service,
-                custom_variable=custom_variable
+                custom_variable=custom_variable,
+                genres=genres,
+                imdb_rating=imdb_rating,
+                rotten_rating=rotten_rating,
+                metacritic_rating=metacritic_rating
             )
 
         elif file_type == "episode":
-            series_details = file_data['series_details']
-            series_title = series_details['title']
-            first_air_date = series_details['first_air_date']
-            first_air_year = series_details['first_air_year']
-            last_air_date = series_details['last_air_date']
-            last_air_year = series_details['last_air_year']
-            status = series_details['status']
-
-            episode_details = file_data['episode_details']
-            episode_title = episode_details['name']
-            season = episode_details['season_number']
-            episode = episode_details['episode_number']
-            air_date = episode_details['air_date']
-            air_year = air_date.split('-')[0]
+            series_title = file_data.get('series_title')
+            last_air_date = file_data.get('last_air_date')
+            last_air_year = file_data.get('last_air_year')
+            episode_title = file_data.get('episode_title')
+            season_number = file_data.get('season_number')
+            episode_number = file_data.get('episode_number')
+            air_date = file_data.get('air_date')
+            air_year = file_data.get('air_year')
+            status = file_data.get('status')
 
             if zero_padding:
                 season_str = f"{season:02}"
@@ -126,7 +129,11 @@ def rename_video_files(api_results, live_run, zero_padding, custom_variable,
                 other=other,
                 edition=edition,
                 streaming_service=streaming_service,
-                custom_variable=custom_variable
+                custom_variable=custom_variable,
+                genres=genres,
+                imdb_rating=imdb_rating,
+                rotten_rating=rotten_rating,
+                metacritic_rating=metacritic_rating
             )
 
         name_without_ext = format_filename(new_filename, filename_case, separator)
