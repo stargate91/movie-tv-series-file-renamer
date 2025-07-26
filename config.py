@@ -138,6 +138,16 @@ class Config:
             help="Perform the actual renaming, modifying files."
         )
         parser.add_argument(
+            "--sample",
+            action="store_true",
+            help="Detect and collect sample video files separately."
+        )
+        parser.add_argument(
+            "--sample-keywords",
+            type=str,
+            help="Comma-separated keywords to detect sample videos (e.g. sample,minta,trailer). Case insensitive, automatically matches suffixes '_' and '-'."
+        )
+        parser.add_argument(
             "--use-emojis",
             action="store_true",
             help="Enable emoji icons in terminal output for better readability."
@@ -159,6 +169,8 @@ class Config:
 
         history_file = self.args.history_file if self.args.history_file else self.config.get('GENERAL', 'history_file', fallback=None)
 
+        sample_keywords = self.args.sample_keywords if self.args.sample_keywords else self.config.get('GENERAL', 'sample_keywords', fallback="trailer,preview,sample")
+
         custom_variable = self.args.custom_variable if self.args.custom_variable else self.config.get('TEMPLATES', 'custom_variable', fallback="Default")
 
         filename_case = self.args.filename_case if self.args.filename_case else self.config.get('TEMPLATES', 'filename_case', fallback='none')
@@ -170,6 +182,7 @@ class Config:
         interactive = self.config.getboolean('GENERAL', 'interactive', fallback=False)
         skipped = self.config.getboolean('GENERAL', 'skipped', fallback=False)
         undo = self.config.getboolean('GENERAL', 'undo', fallback=False)
+        sample = self.config.getboolean('GENERAL', 'sample', fallback=False)
         zero_padding = self.config.getboolean('TEMPLATES', 'zero_padding', fallback=False)
         live_run = self.config.getboolean('GENERAL', 'live_run', fallback=False)
         use_emojis = self.config.getboolean('GENERAL', 'use_emojis', fallback=False)
@@ -186,6 +199,8 @@ class Config:
             zero_padding = True
         if self.args.live_run:
             live_run = True
+        if self.args.sample:
+            sample = True
         if self.args.use_emojis:
             use_emojis = True
 
@@ -205,6 +220,8 @@ class Config:
             "source_mode": source_mode,
             "undo": undo,
             "history_file": history_file,
+            "sample": sample,
+            "sample_keywords": sample_keywords,
             "custom_variable": custom_variable,
             "movie_template": movie_template,
             "episode_template": episode_template,

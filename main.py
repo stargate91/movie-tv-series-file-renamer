@@ -4,6 +4,7 @@ setup_logging()
 from api_client import APIClient
 from config import Config
 from collector import get_all_video_files
+from sample import collect_sample_videos, expand_sample_keywords, sample_files_summary
 from metadata import extract_metadata
 from result_manager import get_handler
 from metadata_standardizer import standardize_metadata
@@ -33,6 +34,12 @@ def main():
     episode_template = config_data["episode_template"]
     zero_padding = config_data["zero_padding"]
     live_run = config_data["live_run"]
+
+
+    sample = config_data["sample"]
+    raw_keywords = config_data['sample_keywords']
+    sample_keywords = expand_sample_keywords(raw_keywords)
+
     use_emojis = config_data["use_emojis"]
     filename_case = config_data["filename_case"]
     separator = config_data["separator"]
@@ -70,6 +77,13 @@ def main():
 
             done_message(skipped, unprocessed, eps_w_missing_data, unexpected_eps, renamed_skipped, interactive, skipped_mode)
 
+
+# -------------------- Sample mode --------------------
+
+    if sample:
+        sample_files = collect_sample_videos(folder_path, recursive, sample_keywords)
+
+    sample_files_summary(sample_files)
 # -------------------- Normal mode --------------------
 
     video_files = get_all_video_files(folder_path, vid_size, recursive)

@@ -35,3 +35,4 @@ def get_all_video_files(root_folder, vid_size, recursive):
         video_files.extend(get_video_files(root_folder, min_size_bytes, root_folder))
 
     return video_files
+
