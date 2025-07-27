@@ -121,7 +121,7 @@ python main.py --undo
 ### Skip Config File and Use CLI Args Only
 
 ```bash
-python main.py --folder "E:\dl\anime" --interactive False --recursive True
+python main.py --folder "E:\dl\anime" --interactive --recursive
 ```
 
 ---
@@ -159,7 +159,7 @@ python main.py --folder "E:\dl\anime" --interactive False --recursive True
 
 ---
 
-## 🎞 Supported Video Formats
+## 🎞 Supported Video Formats (Scalable)
 
 - `.mp4`
 - `.mkv`
