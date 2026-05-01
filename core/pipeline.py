@@ -59,6 +59,31 @@ class RenamePipeline:
         self.ui.update_progress(100, 100, f"Status: Found {len(self.video_files)} files")
         return len(self.video_files) > 0
 
+    def unified_analysis(self):
+        """One-click analysis: Discovery -> Match -> Enrich."""
+        if not self.video_files:
+            self.step_1_collect_files()
+            
+        if not self.video_files:
+            return False
+
+        # 1. Local Discovery (NFO, MKV Headers, Parts)
+        self.step_1b_discovery()
+        
+        # 2. Matching (API Search using IDs, Title Tags, and Filenames)
+        self.step_2_extract_metadata()
+        
+        # 3. Enrichment (Full details, Posters, Ratings)
+        ready_results = [r for r in self.collected_results if r.get('status') == 'one_match']
+        if ready_results:
+            self.handled_results = ready_results
+            self.step_4_standardize_and_enrich()
+            
+        if self.ui:
+            self.ui.update_progress(100, 100, "Status: Analysis Complete!")
+            
+        return True
+
     def step_1b_discovery(self):
         """Analyzes files for NFOs and internal metadata."""
         from metadata.discovery import MetadataDiscovery

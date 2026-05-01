@@ -71,26 +71,11 @@ class MainWindow(QMainWindow):
         self.browse_btn.clicked.connect(self.browse_and_scan)
         side_layout.addWidget(self.browse_btn)
         
-        self.analyze_btn = QPushButton("🔍 Deep Analyze")
-        self.analyze_btn.setFixedHeight(45)
-        self.analyze_btn.setEnabled(False)
-        self.analyze_btn.setCursor(Qt.PointingHandCursor)
-        self.analyze_btn.setStyleSheet("""
-            QPushButton { 
-                background: #1f2937; color: #9ca3af; border: 1px solid #374151; 
-                border-radius: 8px; font-weight: bold; font-size: 13px; 
-            }
-            QPushButton:enabled { background: #3b82f6; color: white; border: none; }
-            QPushButton:hover:enabled { background: #2563eb; }
-        """)
-        self.analyze_btn.clicked.connect(self.on_start_discovery)
-        side_layout.addWidget(self.analyze_btn)
-
-        self.download_btn = QPushButton("🌐 Download Metadata")
-        self.download_btn.setObjectName("PrimaryBtn")
-        self.download_btn.setEnabled(False)
-        self.download_btn.clicked.connect(self.start_download)
-        side_layout.addWidget(self.download_btn)
+        self.unified_btn = QPushButton("🔍 Analyze & Match")
+        self.unified_btn.setObjectName("PrimaryBtn")
+        self.unified_btn.setEnabled(False)
+        self.unified_btn.clicked.connect(self.on_start_unified_analysis)
+        side_layout.addWidget(self.unified_btn)
         
         self.settings_btn = QPushButton("⚙️ Settings")
         self.settings_btn.clicked.connect(self.open_settings)
@@ -273,10 +258,11 @@ class MainWindow(QMainWindow):
     def clear_all(self):
         self.pipeline = None
         self.clear_results()
+        self.unified_btn.setEnabled(False)
+        self.rename_btn.setEnabled(False)
+        self.status_lbl.setText("Status: Ready")
         self.stat_total.setText("Total Files: 0")
         self.stat_matches.setText("Matched: 0")
-        self.download_btn.setEnabled(False)
-        self.rename_btn.setEnabled(False)
         self.folder_lbl.setText("Folder: None")
         self.display_items = []
         self.selected_files.clear()
@@ -301,47 +287,23 @@ class MainWindow(QMainWindow):
         if not self.pipeline:
             return
         self.stat_total.setText(f"Total Files: {len(self.pipeline.video_files)}")
-        self.analyze_btn.setEnabled(True)
-        self.download_btn.setEnabled(True)
-        self.status_lbl.setText("Status: Scan Complete. (Deep Scan recommended)")
+        self.unified_btn.setEnabled(True)
+        self.status_lbl.setText("Status: Scan Complete. Ready for Analysis.")
         self.refresh_list()
 
-    def on_start_discovery(self):
-        self.status_lbl.setText("Status: Deep Analyzing Files (NFO/MediaInfo)...")
-        self.analyze_btn.setEnabled(False)
-        self.download_btn.setEnabled(False)
-        self.worker = WorkerThread(self.pipeline.step_1b_discovery)
-        self.worker.finished.connect(self.on_discovery_finished)
+    def on_start_unified_analysis(self):
+        self.status_lbl.setText("Status: Deep Analyzing & Matching (NFO/MediaInfo/API)...")
+        self.unified_btn.setEnabled(False)
+        self.rename_btn.setEnabled(False)
+        
+        self.worker = WorkerThread(self.pipeline.unified_analysis)
+        self.worker.finished.connect(self.on_unified_analysis_finished)
         self.worker.start()
 
-    def on_discovery_finished(self):
-        count = len(getattr(self.pipeline, 'discovery_results', {}))
-        self.status_lbl.setText(f"Status: Discovery Complete! Found info for {count} files.")
-        self.analyze_btn.setEnabled(False)
-        self.download_btn.setEnabled(True)
-        self.refresh_list()
-
-    def start_download(self):
-        self.status_lbl.setText("Status: Downloading Metadata...")
-        self.download_btn.setEnabled(False)
-        self.worker = WorkerThread(self.pipeline.step_2_extract_metadata)
-        self.worker.finished.connect(self.on_download_finished)
-        self.worker.start()
-
-    def on_download_finished(self):
-        ready_results = [r for r in self.pipeline.collected_results if r.get('status') == 'one_match']
-        if ready_results:
-            self.status_lbl.setText("Status: Enriching and Analyzing Files...")
-            self.pipeline.handled_results = ready_results
-            self.worker = WorkerThread(self.pipeline.step_4_standardize_and_enrich)
-            self.worker.finished.connect(self.on_enrichment_finished)
-            self.worker.start()
-        else:
-            self.on_enrichment_finished()
-
-    def on_enrichment_finished(self):
-        self.status_lbl.setText("Status: Data Ready")
-        self.download_btn.setEnabled(True)
+    def on_unified_analysis_finished(self):
+        self.status_lbl.setText("Status: Analysis Complete!")
+        self.unified_btn.setEnabled(True)
+        
         has_matches = any(r.get('status') == 'one_match' for r in self.pipeline.collected_results)
         self.rename_btn.setEnabled(has_matches)
         self.refresh_list()
@@ -349,7 +311,7 @@ class MainWindow(QMainWindow):
     def start_renaming(self):
         self.status_lbl.setText("Status: Preparing files for renaming...")
         self.rename_btn.setEnabled(False)
-        self.download_btn.setEnabled(False)
+        self.unified_btn.setEnabled(False)
         
         def run_rename_logic():
             self.pipeline.step_5_rename()
@@ -378,7 +340,7 @@ class MainWindow(QMainWindow):
             self.clear_all()
         else:
             self.rename_btn.setEnabled(True)
-            self.download_btn.setEnabled(True)
+            self.unified_btn.setEnabled(True)
             self.refresh_list()
 
     def handle_progress(self, current, total, status):
@@ -510,6 +472,8 @@ class MainWindow(QMainWindow):
             self.load_next_chunk()
 
     def load_next_chunk(self):
+        if not self.pipeline:
+            return
         if self.current_loaded_index >= len(self.display_items):
             return
             

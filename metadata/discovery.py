@@ -49,6 +49,10 @@ class MetadataDiscovery:
                 if media_info:
                     discovery_data['internal_title'] = media_info.get('title')
                     discovery_data['technical'] = media_info.get('technical', {})
+            
+            # Fallback to FFmpeg if internal_title is still missing
+            if not discovery_data['internal_title']:
+                discovery_data['internal_title'] = self._get_ffmpeg_title(path)
 
             # 3. Quick filename check for Part/CD (to be extra safe)
             import guessit
@@ -62,6 +66,22 @@ class MetadataDiscovery:
                 results[path] = discovery_data
                 
         return results
+
+    def _get_ffmpeg_title(self, path):
+        """Extracts title tag using ffmpeg-python."""
+        try:
+            import ffmpeg
+            probe = ffmpeg.probe(path)
+            # Check format tags
+            tags = probe.get('format', {}).get('tags', {})
+            title = tags.get('title')
+            if title and len(title) > 2:
+                # Basic filter
+                if title.strip().upper() not in ["SDR RELEASE", "BAKER-RLS"]:
+                    return title
+        except Exception:
+            pass
+        return None
 
     def _find_nfo(self, video_path):
         """Looks for an NFO file with the same name or in the same directory."""
@@ -80,8 +100,8 @@ class MetadataDiscovery:
         return None
 
     def _parse_nfo(self, nfo_path):
-        """Extracts IDs from NFO content."""
-        results = {'imdb_id': None, 'tmdb_id': None}
+        """Extracts IDs and Type from NFO content."""
+        results = {'imdb_id': None, 'tmdb_id': None, 'nfo_type': None}
         try:
             with open(nfo_path, 'r', encoding='utf-8', errors='ignore') as f:
                 content = f.read()
@@ -90,6 +110,13 @@ class MetadataDiscovery:
                 
                 if imdb: results['imdb_id'] = imdb.group(0)
                 if tmdb: results['tmdb_id'] = tmdb.group(2)
+                
+                # Type detection based on XML tags
+                low_content = content.lower()
+                if '<movie' in low_content:
+                    results['nfo_type'] = 'movie'
+                elif '<tvshow' in low_content or '<episodedetails' in low_content:
+                    results['nfo_type'] = 'episode'
         except Exception as e:
             logger.error(f"Error parsing NFO {nfo_path}: {e}")
             
