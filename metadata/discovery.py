@@ -11,6 +11,9 @@ class MetadataDiscovery:
         self.imdb_pattern = re.compile(r'tt\d{7,8}')
         self.tmdb_pattern = re.compile(r'themoviedb\.org/(movie|tv)/(\d+)')
         
+        from utils.cache import DataStore
+        self.cache = DataStore("discovery")
+
         try:
             from pymediainfo import MediaInfo
             self.MediaInfo = MediaInfo
@@ -21,27 +24,41 @@ class MetadataDiscovery:
             logger.warning("pymediainfo not installed. Internal metadata discovery disabled.")
 
     def discover(self, file_paths, ui=None):
-        """Discovers metadata for a list of files."""
+        """Discovers metadata for a list of files with persistent caching."""
         results = {}
         total = len(file_paths)
         
         for i, path in enumerate(file_paths):
-            if ui: ui.update_progress(i + 1, total, f"Analyzing: {os.path.basename(path)}")
+            if ui: ui.update_progress(i + 1, total, f"Discovery: {os.path.basename(path)}")
             
+            # Check Cache first
+            mtime = os.path.getmtime(path)
+            cached = self.cache.get(path)
+            if cached and cached.get('mtime') == mtime:
+                # Quick check if NFO status changed
+                current_nfo = self._find_nfo(path)
+                current_nfo_mtime = os.path.getmtime(current_nfo) if current_nfo else None
+                
+                if current_nfo == cached.get('source_nfo') and current_nfo_mtime == cached.get('nfo_mtime'):
+                    results[path] = cached['data']
+                    continue
+
             discovery_data = {
                 'imdb_id': None,
                 'tmdb_id': None,
                 'internal_title': None,
                 'source_nfo': None,
-                'technical': {} # Resolution, Codecs, etc.
+                'technical': {}
             }
             
             # 1. Search for NFO
             nfo_path = self._find_nfo(path)
+            nfo_mtime = None
             if nfo_path:
                 ids = self._parse_nfo(nfo_path)
                 discovery_data.update(ids)
                 discovery_data['source_nfo'] = nfo_path
+                nfo_mtime = os.path.getmtime(nfo_path)
             
             # 2. Search Internal Metadata (Technical + Title)
             if self.has_mediainfo:
@@ -54,16 +71,21 @@ class MetadataDiscovery:
             if not discovery_data['internal_title']:
                 discovery_data['internal_title'] = self._get_ffmpeg_title(path)
 
-            # 3. Quick filename check for Part/CD (to be extra safe)
+            # 3. Quick filename check for Part/CD
             import guessit
             g = guessit.guessit(os.path.basename(path))
             p_val = g.get('part') or g.get('cd')
             if p_val:
                 discovery_data['part'] = f"CD{p_val}"
             
-            # Only add if we found something (IDs, Title, Technical OR Part info)
-            if any([discovery_data['imdb_id'], discovery_data['tmdb_id'], discovery_data['internal_title'], discovery_data['technical'], discovery_data.get('part')]):
-                results[path] = discovery_data
+            # Store in results and Cache
+            results[path] = discovery_data
+            self.cache.set(path, {
+                'mtime': mtime,
+                'nfo_mtime': nfo_mtime,
+                'source_nfo': nfo_path,
+                'data': discovery_data
+            })
                 
         return results
 
