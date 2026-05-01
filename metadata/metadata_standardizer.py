@@ -31,7 +31,11 @@ def standardize_metadata(handled_results):
         file_path = file_data['file_path']
         file_type = file_data['file_type']
         extras = ExtraMetadata.from_dict(file_data.get('extras', {}))
-        data = file_data['details']
+        data = file_data.get('details')
+        
+        if not isinstance(data, dict):
+            logger.error(f"Data for {file_path} is not a dict! It is {type(data)}: {data}")
+            data = {}
 
         if file_type == "movie":
             title = data.get('title', 'Unknown Title')

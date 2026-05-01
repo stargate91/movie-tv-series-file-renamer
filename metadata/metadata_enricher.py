@@ -69,12 +69,13 @@ def enricher(standardized_files, api_client, ui=None, language="hu-HU", fallback
 
             if isinstance(item, Movie):
                 movie_data = api_client.get_from_tmdb_movie_detail(item.tmdb_id, language=language)
+                if not isinstance(movie_data, dict): movie_data = {}
                 orig_title = movie_data.get('original_title')
                 curr_title = movie_data.get('title')
                 orig_lang = movie_data.get('original_language')
                 if fallback_language and curr_title == orig_title and orig_lang != language.split('-')[0]:
                     fb_data = api_client.get_from_tmdb_movie_detail(item.tmdb_id, language=fallback_language)
-                    if fb_data.get('title'): movie_data = fb_data
+                    if isinstance(fb_data, dict) and fb_data.get('title'): movie_data = fb_data
                 
                 imdb_id = movie_data.get('imdb_id', 'Unknown IMDb ID')
                 genres_raw = movie_data.get('genres', 'Unknown Genres')
@@ -84,12 +85,13 @@ def enricher(standardized_files, api_client, ui=None, language="hu-HU", fallback
                 
             elif isinstance(item, Episode):
                 series_data = api_client.get_from_tmdb_tv_detail(item.tmdb_id, language=language)
+                if not isinstance(series_data, dict): series_data = {}
                 orig_name = series_data.get('original_name')
                 curr_name = series_data.get('name')
                 orig_lang = series_data.get('original_language')
                 if fallback_language and curr_name == orig_name and orig_lang != language.split('-')[0]:
                     fb_data = api_client.get_from_tmdb_tv_detail(item.tmdb_id, language=fallback_language)
-                    if fb_data.get('name'): series_data = fb_data
+                    if isinstance(fb_data, dict) and fb_data.get('name'): series_data = fb_data
 
                 item.series_title = series_data.get('name', item.series_title)
                 item.series_status = series_data.get('status', 'unknown')
@@ -102,13 +104,15 @@ def enricher(standardized_files, api_client, ui=None, language="hu-HU", fallback
                 item.genres = " ".join(genre_names)
                 
                 series_external_data = api_client.get_from_tmdb_tv_external(item.tmdb_id)
+                if not isinstance(series_external_data, dict): series_external_data = {}
                 imdb_id = series_external_data.get('imdb_id', 'Unknown IMDb ID')
                 episode_data = api_client.get_from_tmdb_episode(item.tmdb_id, item.season_number, item.episode_number, language=language)
+                if not isinstance(episode_data, dict): episode_data = {}
                 
                 if episode_data and fallback_language:
                     if not episode_data.get('name') or episode_data.get('name') == f"Episode {item.episode_number}":
                         fb_ep_data = api_client.get_from_tmdb_episode(item.tmdb_id, item.season_number, item.episode_number, language=fallback_language)
-                        if fb_ep_data.get('name'): episode_data = fb_ep_data
+                        if isinstance(fb_ep_data, dict) and fb_ep_data.get('name'): episode_data = fb_ep_data
 
                 if episode_data:
                     item.episode_title = episode_data.get('name', 'Unknown Episode Title')

@@ -12,6 +12,7 @@ from ui.styles import QSS
 from ui.utils import WorkerThread, QtUIBridge
 from ui.components.movie_card import MovieCard
 from ui.components.group_headers import SeriesHeader, SeasonHeader
+from ui.components.inspector_panel import InspectorPanel
 from ui.dialogs.selection_dialog import SelectionDialog
 from ui.dialogs.settings_dialog import SettingsDialog
 from ui.dialogs.preview_dialog import PreviewDialog
@@ -32,6 +33,8 @@ class MainWindow(QMainWindow):
         self.pipeline = None
         self.worker = None
         self.selected_files = set()
+        self.is_multi_select_mode = False
+        self.ignore_multi_select_trigger = False
         
         # Virtual List State
         self.display_items = []  # Flat list of (type, data, extra) tasks
@@ -166,45 +169,17 @@ class MainWindow(QMainWindow):
         
         layout.addWidget(main_area)
         
-        # --- Selection Toolbar ---
-        self.selection_bar = QFrame()
-        self.selection_bar.setObjectName("SelectionBar")
-        self.selection_bar.setFixedHeight(70)
-        self.selection_bar.setVisible(False)
-        self.selection_bar.setStyleSheet("""
-            #SelectionBar {
-                background-color: #1f2937; border-top: 3px solid #3b82f6; 
-                border-radius: 15px 15px 0 0;
-            }
-            QLabel { color: white; font-weight: bold; font-size: 14px; }
-        """)
-        
-        bar_layout = QHBoxLayout(self.selection_bar)
-        bar_layout.setContentsMargins(25, 0, 25, 0)
-        self.selection_lbl = QLabel("0 items selected")
-        bar_layout.addWidget(self.selection_lbl)
-        
-        bar_layout.addStretch()
-        
-        self.bulk_resolve_btn = QPushButton("🪄 Resolve Selected")
-        self.bulk_resolve_btn.setCursor(Qt.PointingHandCursor)
-        self.bulk_resolve_btn.setStyleSheet("""
-            QPushButton { background: #6366f1; color: white; padding: 10px 20px; border-radius: 8px; font-weight: bold; }
-            QPushButton:hover { background: #4f46e5; }
-        """)
-        self.bulk_resolve_btn.clicked.connect(self.bulk_resolve_selected)
-        bar_layout.addWidget(self.bulk_resolve_btn)
-        
-        self.bulk_remove_btn = QPushButton("🗑️ Remove")
-        self.bulk_remove_btn.setCursor(Qt.PointingHandCursor)
-        self.bulk_remove_btn.setStyleSheet("""
-            QPushButton { background: transparent; color: #f85149; border: 1px solid #f85149; padding: 10px 20px; border-radius: 8px; }
-            QPushButton:hover { background: #451a1a; }
-        """)
-        self.bulk_remove_btn.clicked.connect(self.bulk_remove_selected)
-        bar_layout.addWidget(self.bulk_remove_btn)
-        
-        main_layout.addWidget(self.selection_bar)
+        # --- Inspector Panel (Right) ---
+        self.inspector = InspectorPanel(self, None)
+        self.inspector.setVisible(False)
+        self.inspector.remove_requested.connect(self.bulk_remove_selected)
+        self.inspector.apply_metadata.connect(self.bulk_resolve_selected)
+        self.inspector.type_change_requested.connect(self.bulk_change_type)
+        self.inspector.season_change_requested.connect(self.bulk_change_season)
+        self.inspector.episode_change_requested.connect(self.bulk_change_episode)
+        self.inspector.sequence_requested.connect(self.open_sequence_wizard)
+        self.inspector.clear_btn.clicked.connect(self.clear_selection)
+        layout.addWidget(self.inspector)
 
     # --- Drag & Drop ---
     def dragEnterEvent(self, event):
@@ -262,11 +237,10 @@ class MainWindow(QMainWindow):
         self.rename_btn.setEnabled(False)
         self.status_lbl.setText("Status: Ready")
         self.stat_total.setText("Total Files: 0")
-        self.stat_matches.setText("Matched: 0")
         self.folder_lbl.setText("Folder: None")
         self.display_items = []
-        self.selected_files.clear()
-        self.selection_bar.setVisible(False)
+        self.clear_selection()
+
 
     def start_scan(self):
         self.status_lbl.setText("Status: Scanning...")
@@ -289,6 +263,7 @@ class MainWindow(QMainWindow):
         self.stat_total.setText(f"Total Files: {len(self.pipeline.video_files)}")
         self.unified_btn.setEnabled(True)
         self.status_lbl.setText("Status: Scan Complete. Ready for Analysis.")
+        self.inspector.pipeline = self.pipeline # Connect pipeline to inspector
         self.refresh_list()
 
     def on_start_unified_analysis(self):
@@ -304,7 +279,7 @@ class MainWindow(QMainWindow):
         self.status_lbl.setText("Status: Analysis Complete!")
         self.unified_btn.setEnabled(True)
         
-        has_matches = any(r.get('status') == 'one_match' for r in self.pipeline.collected_results)
+        has_matches = any(isinstance(r, dict) and r.get('status') == 'one_match' for r in self.pipeline.collected_results)
         self.rename_btn.setEnabled(has_matches)
         self.refresh_list()
 
@@ -412,6 +387,7 @@ class MainWindow(QMainWindow):
             series_groups = {}
             for v in vids:
                 meta = self.pipeline.metadata_map.get(v)
+                if not isinstance(meta, dict): meta = {}
                 det = meta.get('details') if meta else {}
                 if not isinstance(det, dict): det = {}
                 
@@ -492,7 +468,7 @@ class MainWindow(QMainWindow):
                 s_title, poster, files, is_complex = data
                 header = SeriesHeader(
                     s_title, poster,
-                    on_edit=(lambda _, f=files: self.open_batch_selection(f, self.pipeline.metadata_map.get(f[0]))) if not is_complex else None
+                    on_edit=(lambda _, f=files, t=s_title: self.select_files_for_inspector(f, t)) if not is_complex else None
                 )
                 self.results_layout.addWidget(header)
                 
@@ -500,7 +476,7 @@ class MainWindow(QMainWindow):
                 sn, poster, year_range, eps, is_complex = data
                 header = SeasonHeader(
                     sn, poster, year_range,
-                    on_edit=(lambda _, f=eps: self.open_batch_selection(f, self.pipeline.metadata_map.get(f[0]))) if not is_complex else None
+                    on_edit=(lambda _, f=eps, s=sn: self.select_files_for_inspector(f, season=s)) if not is_complex else None
                 )
                 self.results_layout.addWidget(header)
                 
@@ -509,12 +485,16 @@ class MainWindow(QMainWindow):
                 meta = self.pipeline.metadata_map.get(file_path)
                 card = MovieCard(
                     file_path, meta,
-                    on_edit=lambda _, p=file_path, m=meta: self.open_selection(p, m),
+                    on_click=lambda _, p=file_path, m=meta: self.open_selection(p, m),
+                    on_edit=lambda _, p=file_path, m=meta: self.open_single_edit_popup(p, m),
                     on_remove=lambda _, p=file_path: self.remove_file(p)
                 )
                 card.selection_changed.connect(lambda s, p=file_path: self.update_selection(p, s))
                 if file_path in self.selected_files:
-                    card.checkbox.setChecked(True)
+                    if self.is_multi_select_mode:
+                        card.checkbox.setChecked(True)
+                    else:
+                        card.set_active(True)
                 
                 if extra: # Indented for episodes
                     container = QWidget()
@@ -545,7 +525,7 @@ class MainWindow(QMainWindow):
             return
         v_norm = os.path.abspath(os.path.normpath(file_path))
         self.pipeline.video_files = [f for f in self.pipeline.video_files if os.path.abspath(os.path.normpath(f)) != v_norm]
-        self.pipeline.collected_results = [r for r in self.pipeline.collected_results if os.path.abspath(os.path.normpath(r['file_path'])) != v_norm]
+        self.pipeline.collected_results = [r for r in self.pipeline.collected_results if isinstance(r, dict) and os.path.abspath(os.path.normpath(r.get('file_path', ''))) != v_norm]
         if v_norm in self.pipeline.metadata_map:
             del self.pipeline.metadata_map[v_norm]
         self.refresh_list()
@@ -553,50 +533,242 @@ class MainWindow(QMainWindow):
     def update_selection(self, file_path, is_selected):
         if is_selected:
             self.selected_files.add(file_path)
+            if not getattr(self, 'ignore_multi_select_trigger', False):
+                self.is_multi_select_mode = True
         else:
             self.selected_files.discard(file_path)
-        
-        count = len(self.selected_files)
-        self.selection_bar.setVisible(count > 0)
-        self.selection_lbl.setText(f"{count} items selected")
+            if not self.selected_files:
+                self.is_multi_select_mode = False
+        self.update_selection_ui()
 
-    def bulk_remove_selected(self):
-        for f in list(self.selected_files):
-            self.remove_file(f)
+    def clear_selection(self):
+        self.ignore_multi_select_trigger = True
         self.selected_files.clear()
-        self.selection_bar.setVisible(False)
+        from ui.components.movie_card import MovieCard
+        for i in range(self.results_layout.count()):
+            item = self.results_layout.itemAt(i)
+            if not item: continue
+            w = item.widget()
+            if not w: continue
+            if isinstance(w, MovieCard):
+                card = w
+            else:
+                card = w.findChild(MovieCard)
+            if card:
+                card.checkbox.setChecked(False)
+                card.set_active(False)
+        self.is_multi_select_mode = False
+        self.ignore_multi_select_trigger = False
+        self.update_selection_ui()
 
-    def bulk_resolve_selected(self):
-        if not self.selected_files:
-            return
-        first_file = list(self.selected_files)[0]
-        meta = self.pipeline.metadata_map.get(first_file)
+    def update_selection_ui(self):
+        from ui.components.movie_card import MovieCard
+        for i in range(self.results_layout.count()):
+            item = self.results_layout.itemAt(i)
+            if not item: continue
+            w = item.widget()
+            if not w: continue
+            if isinstance(w, MovieCard):
+                card = w
+            else:
+                card = w.findChild(MovieCard)
+            if card:
+                is_selected = card.file_path in self.selected_files
+                
+                # In multi-select mode, sync the checkbox state
+                if self.is_multi_select_mode:
+                    self.ignore_multi_select_trigger = True
+                    card.checkbox.setChecked(is_selected)
+                    self.ignore_multi_select_trigger = False
+                    card.set_active(False) # No blue border in multi-select
+                else:
+                    # In single-select mode, show blue border for the selected item, but NO checkbox
+                    card.set_active(is_selected)
+                    self.ignore_multi_select_trigger = True
+                    card.checkbox.setChecked(False)
+                    self.ignore_multi_select_trigger = False
+                
+        self.inspector.update_selection(list(self.selected_files))
+
+    def set_card_checkbox_visually(self, file_path, checked):
+        from ui.components.movie_card import MovieCard
+        for i in range(self.results_layout.count()):
+            item = self.results_layout.itemAt(i)
+            if not item: continue
+            w = item.widget()
+            if not w: continue
+            if isinstance(w, MovieCard):
+                card = w
+            else:
+                card = w.findChild(MovieCard)
+            if card and card.file_path == file_path:
+                card.checkbox.setChecked(checked)
+                break
+
+    def select_files_for_inspector(self, file_paths, title=None, season=None):
+        """Programmatically select files and open the inspector panel with pre-filled data."""
+        # Clear previous selection properly
+        self.clear_selection()
         
-        from ui.dialogs.selection_dialog import SelectionDialog
-        dialog = SelectionDialog(self, self.pipeline, meta)
-        if dialog.exec():
-            selected = dialog.selected_item
-            if not selected: return
+        # Select all provided files
+        for f in file_paths:
+            self.selected_files.add(f)
             
-            ready_to_enrich = []
-            for f_path in sorted(list(self.selected_files)):
-                current_meta = self.pipeline.metadata_map.get(f_path)
-                if not current_meta: continue
-                
-                new_meta = current_meta.copy()
-                new_meta.update({'is_manual': True, 'status': 'one_match'})
-                
-                from metadata.metadata import classify_result
-                classify_result({'results': [selected], 'total_results': 1}, new_meta, [], self.pipeline.api)
-                self.pipeline.metadata_map[f_path] = new_meta
-                ready_to_enrich.append(new_meta)
+        # If we selected multiple files (e.g. a whole season), we should be in multi-select mode
+        if len(file_paths) > 1:
+            self.is_multi_select_mode = True
+            # In multi-select mode, we DO want to see the checkboxes
+            self.ignore_multi_select_trigger = True
+            from ui.components.movie_card import MovieCard
+            for i in range(self.results_layout.count()):
+                item = self.results_layout.itemAt(i)
+                if not item: continue
+                w = item.widget()
+                if not w: continue
+                if isinstance(w, MovieCard): card = w
+                else: card = w.findChild(MovieCard)
+                if card:
+                    card.checkbox.setChecked(card.file_path in self.selected_files)
+            self.ignore_multi_select_trigger = False
+        else:
+            # Single-select items are just highlighted with set_active via update_selection_ui
+            self.is_multi_select_mode = False
+        
+        self.update_selection_ui()
+        
+        # Pre-fill search with title
+        if title and title not in ['Unknown Series', 'Unknown Collection']:
+            self.inspector.search_input.setText(title)
+            self.inspector.type_combo.setCurrentText("TV Show")
+            self.inspector.perform_search()
+        
+        # Pre-fill season override
+        if season is not None:
+            self.inspector.season_input.setText(str(season))
+
+    def bulk_remove_selected(self, paths=None):
+        targets = paths if paths else list(self.selected_files)
+        for f in targets:
+            self.remove_file(f)
+        self.clear_selection()
+
+    def bulk_resolve_selected(self, paths, selected):
+        if not selected: return
+        
+        ready_to_enrich = []
+        for f_path in sorted(list(paths)):
+            current_meta = self.pipeline.metadata_map.get(f_path)
+            if not current_meta: continue
             
-            self.selected_files.clear()
-            self.selection_bar.setVisible(False)
-            self.refresh_list()
+            new_meta = current_meta.copy()
+            new_meta.update({'is_manual': True, 'status': 'one_match'})
+            
+            # Apply Season Override if present
+            s_override = selected.get('season_override')
+            if s_override:
+                try: new_meta['season_file'] = int(s_override)
+                except: pass
+
+            from metadata.metadata import classify_result
+            classify_result({'results': [selected], 'total_results': 1}, new_meta, [], self.pipeline.api)
+            self.pipeline.metadata_map[f_path] = new_meta
+            ready_to_enrich.append(new_meta)
+        
+        self.clear_selection()
+        self.refresh_list()
+        self.trigger_background_enrichment(ready_to_enrich)
+
+    def bulk_change_type(self, paths, new_type):
+        for f in paths:
+            meta = self.pipeline.metadata_map.get(f)
+            if meta and isinstance(meta, dict):
+                meta['file_type'] = new_type
+                meta['status'] = 'no_match' # Reset match status since type changed
+                meta['details'] = None
+        self.clear_selection()
+        self.refresh_list()
+
+    def bulk_change_season(self, paths, new_season):
+        ready_to_enrich = []
+        for f in paths:
+            meta = self.pipeline.metadata_map.get(f)
+            if meta and isinstance(meta, dict):
+                try:
+                    meta['season_file'] = int(new_season)
+                    if meta.get('status') == 'one_match':
+                        ready_to_enrich.append(meta)
+                except ValueError:
+                    pass
+        self.clear_selection()
+        self.refresh_list()
+        if ready_to_enrich:
+            self.trigger_background_enrichment(ready_to_enrich)
+
+    def bulk_change_episode(self, paths, new_episode):
+        try:
+            num = int(new_episode)
+        except ValueError:
+            return
+            
+        ready_to_enrich = []
+        for f in paths:
+            meta = self.pipeline.metadata_map.get(f)
+            if meta and isinstance(meta, dict):
+                meta['episode_file'] = num
+                if meta.get('status') == 'one_match':
+                    ready_to_enrich.append(meta)
+        
+        self.clear_selection()
+        self.refresh_list()
+        if ready_to_enrich:
+            self.trigger_background_enrichment(ready_to_enrich)
+
+    def open_sequence_wizard(self):
+        paths = list(self.selected_files)
+        if len(paths) < 2: return
+        
+        from ui.dialogs.episode_order_dialog import EpisodeOrderDialog
+        from PySide6.QtWidgets import QDialog
+        
+        dialog = EpisodeOrderDialog(self, paths, default_start=1)
+        if dialog.exec() == QDialog.Accepted:
+            ordered_paths, start_num = dialog.get_results()
+        else:
+            return # Cancelled
+            
+        ready_to_enrich = []
+        for i, f in enumerate(ordered_paths):
+            meta = self.pipeline.metadata_map.get(f)
+            if meta and isinstance(meta, dict):
+                meta['episode_file'] = start_num + i
+                if meta.get('status') == 'one_match':
+                    ready_to_enrich.append(meta)
+        
+        self.clear_selection()
+        self.refresh_list()
+        if ready_to_enrich:
             self.trigger_background_enrichment(ready_to_enrich)
 
     def open_selection(self, file_path, meta):
+        if not meta: return
+        
+        # Only handle body clicks if we are already in multi-select mode
+        if getattr(self, 'is_multi_select_mode', False):
+            # In multi-select mode, clicking the card body just toggles the checkbox
+            is_currently_selected = file_path in self.selected_files
+            self.set_card_checkbox_visually(file_path, not is_currently_selected)
+            return
+        
+        # In normal state, a single click on the card body does nothing.
+        # This prevents accidental inspector openings.
+        # Users must use the checkbox to enter selection mode, or double-click for quick edit.
+        pass
+
+    def open_single_edit_popup(self, file_path, meta):
+        # Disable single-edit popup in multi-select mode
+        if getattr(self, 'is_multi_select_mode', False):
+            return
+            
         if not meta: return
         from ui.dialogs.selection_dialog import SelectionDialog
         dialog = SelectionDialog(self, self.pipeline, meta)
@@ -604,6 +776,7 @@ class MainWindow(QMainWindow):
             meta['status'] = 'one_match'
             meta['details'] = dialog.selected_item
             meta['is_manual'] = True
+            self.pipeline.metadata_map[file_path] = meta
             FILE_CACHE.set_match(file_path, meta)
             self.refresh_list()
             self.trigger_background_enrichment([meta])
@@ -616,6 +789,10 @@ class MainWindow(QMainWindow):
         self.worker = WorkerThread(run_enrich)
         self.worker.finished.connect(self.on_enrichment_finished)
         self.worker.start()
+
+    def on_enrichment_finished(self):
+        self.status_lbl.setText("Status: Enrichment Complete!")
+        self.refresh_list()
 
     def open_settings(self):
         dialog = SettingsDialog(self, self.cfg)

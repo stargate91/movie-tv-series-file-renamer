@@ -137,11 +137,15 @@ class FileMatchCache:
     def __init__(self):
         self.store = DataStore("file_matches")
 
+    def _norm(self, path):
+        if not path: return ""
+        return os.path.normcase(os.path.normpath(os.path.abspath(path)))
+
     def get_match(self, file_path):
-        return self.store.get(file_path)
+        return self.store.get(self._norm(file_path))
 
     def set_match(self, file_path, match_data):
-        self.store.set(file_path, match_data)
+        self.store.set(self._norm(file_path), match_data)
 
     def clear(self):
         self.store.clear_all()

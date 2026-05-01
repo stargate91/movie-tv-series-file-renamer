@@ -13,6 +13,7 @@ class ExtraMetadata:
 
     @classmethod
     def from_dict(cls, data: dict) -> "ExtraMetadata":
+        if not isinstance(data, dict): return cls()
         return cls(
             release_group=data.get('release_group', cls.release_group),
             source=data.get('source', cls.source),
@@ -28,6 +29,15 @@ class Ratings:
     imdb: Any = "Unknown IMDb Rating"
     rotten_tomatoes: str = "Unknown Rotten Tomatoes Rating"
     metacritic: str = "Unknown Metacritic Rating"
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "Ratings":
+        if not isinstance(data, dict): return cls()
+        return cls(
+            imdb=data.get('imdb', cls.imdb),
+            rotten_tomatoes=data.get('rotten_tomatoes', cls.rotten_tomatoes),
+            metacritic=data.get('metacritic', cls.metacritic)
+        )
 
 
 @dataclass
@@ -49,6 +59,28 @@ class Movie:
     @property
     def file_type(self) -> str:
         return "movie"
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "Movie":
+        if not isinstance(data, dict): return None
+        extras = ExtraMetadata.from_dict(data.get('extras', {}))
+        ratings = Ratings.from_dict(data.get('ratings', {}))
+        
+        # We handle known keys and discard unknowns (like is_enriched)
+        return cls(
+            file_path=data.get('file_path'),
+            title=data.get('title', "Unknown Title"),
+            release_date=data.get('release_date', "Unknown Release Date"),
+            year=data.get('year', "Unknown Year"),
+            tmdb_id=data.get('tmdb_id', "Unknown ID"),
+            extras=extras,
+            tech_metadata=data.get('tech_metadata', {}),
+            genres=data.get('genres', "Unknown Genres"),
+            ratings=ratings,
+            poster_path=data.get('poster_path'),
+            associated_samples=data.get('associated_samples', []),
+            part=data.get('part', "")
+        )
 
     def to_template_dict(self) -> dict:
         """Returns a flat dict suitable for str.format() in rename templates."""
@@ -102,6 +134,37 @@ class Episode:
     @property
     def file_type(self) -> str:
         return "episode"
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "Episode":
+        if not isinstance(data, dict): return None
+        extras = ExtraMetadata.from_dict(data.get('extras', {}))
+        ratings = Ratings.from_dict(data.get('ratings', {}))
+        
+        return cls(
+            file_path=data.get('file_path'),
+            series_title=data.get('series_title', "Unknown Title"),
+            episode_title=data.get('episode_title', "Unknown Episode Title"),
+            season_number=data.get('season_number', "unknown"),
+            episode_number=data.get('episode_number', "unknown"),
+            first_air_date=data.get('first_air_date', "Unknown First Air Date"),
+            first_air_year=data.get('first_air_year', "Unknown First Air Year"),
+            last_air_date=data.get('last_air_date', "unknown"),
+            last_air_year=data.get('last_air_year', "unknown"),
+            air_date=data.get('air_date', "unknown"),
+            air_year=data.get('air_year', "unknown"),
+            series_status=data.get('series_status', "unknown"),
+            tmdb_id=data.get('tmdb_id', "Unknown ID"),
+            extras=extras,
+            tech_metadata=data.get('tech_metadata', {}),
+            genres=data.get('genres', "Unknown Genres"),
+            ratings=ratings,
+            poster_path=data.get('poster_path'),
+            series_poster_path=data.get('series_poster_path'),
+            season_poster_path=data.get('season_poster_path'),
+            associated_samples=data.get('associated_samples', []),
+            part=data.get('part', "")
+        )
 
     def to_template_dict(self, season_str: str, episode_str: str) -> dict:
         """Returns a flat dict suitable for str.format() in rename templates."""

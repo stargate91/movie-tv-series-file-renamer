@@ -74,9 +74,24 @@ class RenamePipeline:
         self.step_2_extract_metadata()
         
         # 3. Enrichment (Full details, Posters, Ratings)
-        ready_results = [r for r in self.collected_results if r.get('status') == 'one_match']
-        if ready_results:
-            self.handled_results = ready_results
+        # Filter out those that are already enriched in cache
+        to_enrich = [r for r in self.collected_results if isinstance(r, dict) and r.get('status') == 'one_match' and not r.get('is_enriched')]
+        already_enriched = [r for r in self.collected_results if isinstance(r, dict) and r.get('status') == 'one_match' and r.get('is_enriched')]
+        
+        if already_enriched:
+            from core.models import Movie, Episode
+            for res in already_enriched:
+                f_type = res.get('file_type')
+                details = res.get('details', {})
+                if f_type == 'movie':
+                    model = Movie.from_dict(details)
+                else:
+                    model = Episode.from_dict(details)
+                if model:
+                    self.enriched_files.append(model)
+
+        if to_enrich:
+            self.handled_results = to_enrich
             self.step_4_standardize_and_enrich()
             
         if self.ui:
@@ -108,8 +123,10 @@ class RenamePipeline:
         )
         # Build map for UI
         for res in self.collected_results:
-            norm_p = os.path.abspath(os.path.normpath(res['file_path']))
-            self.metadata_map[norm_p] = res
+            if not isinstance(res, dict): continue
+            norm_p = os.path.abspath(os.path.normpath(res.get('file_path', '')))
+            if norm_p:
+                self.metadata_map[norm_p] = res
             
         return any(self.collected_results)
 
@@ -139,16 +156,20 @@ class RenamePipeline:
         self.enriched_files = list(enriched_map.values())
         self.unexpected_episodes.extend(unexpected)
 
-        # Update metadata_map for UI with enriched data
+        # Update metadata_map and CACHE for UI with enriched data
+        from metadata.metadata import FILE_CACHE
         for item in self.enriched_files:
             norm_p = os.path.abspath(os.path.normpath(item.file_path))
-            self.metadata_map[norm_p] = {
+            cached_data = {
                 'file_path': item.file_path,
                 'file_type': item.file_type,
                 'status': 'one_match',
                 'details': item.__dict__,
-                'is_manual': self.metadata_map.get(norm_p, {}).get('is_manual', False)
+                'is_manual': self.metadata_map.get(norm_p, {}).get('is_manual', False),
+                'is_enriched': True # Mark as fully enriched
             }
+            self.metadata_map[norm_p] = cached_data
+            FILE_CACHE.set_match(item.file_path, cached_data)
         
         if self.ui:
             self.ui.update_progress(100, 100, "Status: Data Ready")

@@ -7,7 +7,7 @@ from ui.dialogs.metadata_dialog import MetadataDialog
 class MovieCard(QFrame):
     selection_changed = Signal(bool) # Signal to notify MainWindow
     
-    def __init__(self, file_path, meta, on_edit, on_remove=None):
+    def __init__(self, file_path, meta, on_click, on_edit, on_remove=None):
         super().__init__()
         self.setObjectName("Card")
         self.setMinimumHeight(80)
@@ -19,10 +19,9 @@ class MovieCard(QFrame):
         layout = QHBoxLayout(self)
         layout.setContentsMargins(10, 10, 15, 10)
         
-        # Checkbox for multi-select
         self.checkbox = QCheckBox()
         self.checkbox.setFixedWidth(30)
-        self.checkbox.stateChanged.connect(lambda state: self.selection_changed.emit(state == Qt.Checked.value))
+        self.checkbox.toggled.connect(self.selection_changed.emit)
         layout.addWidget(self.checkbox, 0, Qt.AlignVCenter)
         
         # Status Icon/Indicator
@@ -101,6 +100,7 @@ class MovieCard(QFrame):
         layout.addLayout(info_layout, 1)
         
         # Store callbacks
+        self.on_click_cb = on_click
         self.on_edit_cb = on_edit
         self.on_remove_cb = on_remove
 
@@ -135,3 +135,33 @@ class MovieCard(QFrame):
     def mouseDoubleClickEvent(self, event):
         if self.on_edit_cb:
             self.on_edit_cb(None)
+
+    def set_active(self, is_active):
+        if is_active:
+            self.setStyleSheet("""
+                QFrame#Card {
+                    background-color: #f8faff;
+                    border: 2px solid #0078d4;
+                    border-radius: 8px;
+                }
+            """)
+        else:
+            self.setStyleSheet("""
+                QFrame#Card {
+                    background-color: #ffffff;
+                    border: 1px solid #e1dfdd;
+                    border-radius: 8px;
+                }
+                QFrame#Card:hover {
+                    border: 1px solid #0078d4;
+                }
+            """)
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            # Check if clicked on a child button/checkbox to prevent double firing
+            child = self.childAt(event.pos())
+            if not isinstance(child, (QPushButton, QCheckBox)):
+                if self.on_click_cb:
+                    self.on_click_cb(None)
+        super().mousePressEvent(event)
