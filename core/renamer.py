@@ -35,6 +35,12 @@ def format_filename(name, case="none", separator="space"):
     }
     sep_char = separator_map.get(separator, " ")
 
+    # Safety for CD parts: prevent 'Cd1' if using Title Case
+    if case != "lower":
+        import re
+        # Find Cd followed by numbers and make it CD
+        name = re.sub(r'\bCd(\d+)\b', r'CD\1', name)
+
     # Clean up double spaces first
     while "  " in name:
         name = name.replace("  ", " ")
@@ -54,23 +60,17 @@ def rename_video_files(api_results, live_run, zero_padding, custom_variable,
     """
     results = []
     rename_history = []
-
     total = len(api_results)
-    for idx, item in enumerate(api_results, 1):
-        if ui:
-            ui.update_progress(idx, total, f"Status: Processing {idx}/{total}")
-        
+
+    # --- PASS 1: Calculate names and detect collisions ---
+    for item in api_results:
         file_path = str(item.file_path)
         file_extension = os.path.splitext(file_path)[1].lower()
-
-        # Tech metadata is already enriched
-        tech_meta = item.tech_metadata
-
+        
         # Prepare template variables
         if isinstance(item, Movie):
             template_vars = item.to_template_dict()
         else:
-            # Prepare season/episode strings for TV
             season_str = str(item.season_number)
             episode_str = str(item.episode_number)
             if zero_padding:
@@ -81,11 +81,15 @@ def rename_video_files(api_results, live_run, zero_padding, custom_variable,
             template_vars = item.to_template_dict(season_str, episode_str)
 
         template_vars["custom_variable"] = custom_variable
-
-        if isinstance(item, Movie):
-            new_filename = movie_template.format(**template_vars)
-        elif isinstance(item, Episode):
-            new_filename = episode_template.format(**template_vars)
+        
+        try:
+            if isinstance(item, Movie):
+                new_filename = movie_template.format(**template_vars)
+            elif isinstance(item, Episode):
+                new_filename = episode_template.format(**template_vars)
+        except Exception as e:
+            logger.error(f"Template formatting error: {e}")
+            new_filename = os.path.basename(file_path).replace(file_extension, "")
 
         # Safety: If part info exists but was not used in template, append it to avoid collisions
         if item.part and item.part not in new_filename:
@@ -97,71 +101,76 @@ def rename_video_files(api_results, live_run, zero_padding, custom_variable,
         directory = os.path.dirname(file_path)
         new_file_path = os.path.join(directory, new_filename)
 
-        task = RenamingTask(
+        main_task = RenamingTask(
             old_path=file_path,
             new_filename=new_filename,
             new_path=new_file_path,
         )
-
-        if live_run:
-            try:
-                os.rename(file_path, new_file_path)
-                task.status = "success"
-                rename_history.append((file_path, new_file_path))
-
-
-            except Exception as e:
-                task.status = "error"
-                task.error_message = str(e)
-        else:
-            task.status = "dry_run"
-
-        results.append(task)
+        results.append(main_task)
 
         # Handle associated samples
         if hasattr(item, 'associated_samples') and item.associated_samples:
             for sample_path in item.associated_samples:
-                if sample_action == "ignore":
-                    continue
-
+                if sample_action == "ignore": continue
+                
                 if sample_action == "delete":
-                    sample_task = RenamingTask(
-                        old_path=sample_path,
-                        new_filename="DELETED",
-                        new_path="",
-                    )
-                    if live_run:
-                        try:
-                            os.remove(sample_path)
-                            sample_task.status = "success"
-                        except Exception as e:
-                            sample_task.status = "error"
-                            sample_task.error_message = str(e)
-                    else:
-                        sample_task.status = "dry_run"
-                    results.append(sample_task)
-
+                    results.append(RenamingTask(old_path=sample_path, new_filename="DELETED", new_path="", status="pending"))
                 elif sample_action == "rename":
                     sample_ext = os.path.splitext(sample_path)[1].lower()
-                    raw_sample_name = f"{new_filename.replace(file_extension, '')} {sample_suffix}"
+                    raw_sample_name = f"{name_without_ext} {sample_suffix}"
                     formatted_sample_name = format_filename(raw_sample_name, filename_case, separator) + sample_ext
                     sample_new_path = os.path.join(directory, formatted_sample_name)
+                    results.append(RenamingTask(old_path=sample_path, new_filename=formatted_sample_name, new_path=sample_new_path, status="pending"))
 
-                    sample_task = RenamingTask(
-                        old_path=sample_path,
-                        new_filename=formatted_sample_name,
-                        new_path=sample_new_path,
-                    )
-                    if live_run:
-                        try:
-                            os.rename(sample_path, sample_new_path)
-                            sample_task.status = "success"
-                            rename_history.append((sample_path, sample_new_path))
-                        except Exception as e:
-                            sample_task.status = "error"
-                            sample_task.error_message = str(e)
-                    else:
-                        sample_task.status = "dry_run"
-                    results.append(sample_task)
+    # Collision Detection logic
+    path_counts = {}
+    for task in results:
+        if not task.new_path: continue
+        p = os.path.abspath(task.new_path)
+        path_counts[p] = path_counts.get(p, 0) + 1
+    
+    for task in results:
+        if not task.new_path: continue
+        p = os.path.abspath(task.new_path)
+        if path_counts[p] > 1:
+            task.has_collision = True
+        if os.path.exists(task.new_path) and os.path.abspath(task.new_path) != os.path.abspath(task.old_path):
+            task.has_collision = True
+
+    # --- PASS 2: Execute (if live_run and NO collisions in entire batch) ---
+    if live_run:
+        # Safety check: If there's even one collision, abort the whole batch for safety
+        has_any_collision = any(task.has_collision for task in results)
+        
+        if has_any_collision:
+            logger.error("Batch rename aborted: Collisions detected.")
+            for task in results:
+                if task.has_collision:
+                    task.status = "error"
+                    task.error_message = "CRITICAL: Collision detected. Batch aborted for safety."
+                else:
+                    task.status = "dry_run" # Revert to dry run status for UI
+            return results, rename_history
+
+        total_ops = len(results)
+        for idx, task in enumerate(results):
+            try:
+                if task.new_filename == "DELETED":
+                    os.remove(task.old_path)
+                else:
+                    if os.path.abspath(task.old_path) != os.path.abspath(task.new_path):
+                        os.rename(task.old_path, task.new_path)
+                        rename_history.append((task.old_path, task.new_path))
+                task.status = "success"
+            except Exception as e:
+                task.status = "error"
+                task.error_message = str(e)
+            
+            if ui:
+                ui.update_progress(idx + 1, total_ops, f"Processing: {idx + 1}/{total_ops}")
+    else:
+        for task in results:
+            if task.status == "pending":
+                task.status = "dry_run"
 
     return results, rename_history

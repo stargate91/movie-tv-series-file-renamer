@@ -42,6 +42,12 @@ class PreviewDialog(QDialog):
         th_layout.addWidget(new_h, 1)
         layout.addWidget(table_header)
 
+        has_any_collision = any(t.has_collision for t in self.tasks)
+        if has_any_collision:
+            warn_lbl = QLabel("⚠️ WARNING: Naming collisions detected! Some files have the same target name.")
+            warn_lbl.setStyleSheet("color: #dc2626; font-weight: bold; background: #fee2e2; padding: 10px; border-radius: 5px;")
+            layout.addWidget(warn_lbl)
+
         # Scroll Area
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
@@ -55,8 +61,12 @@ class PreviewDialog(QDialog):
         
         for idx, task in enumerate(self.tasks):
             row = QFrame()
-            # Zebra striping
-            bg_color = "#ffffff" if idx % 2 == 0 else "#f6f8fa"
+            # Zebra striping / Collision highlight
+            if task.has_collision:
+                bg_color = "#fee2e2" # Light red for collisions
+            else:
+                bg_color = "#ffffff" if idx % 2 == 0 else "#f6f8fa"
+            
             row.setStyleSheet(f"background-color: {bg_color}; border-radius: 4px;")
             
             row_layout = QHBoxLayout(row)
@@ -64,6 +74,8 @@ class PreviewDialog(QDialog):
             
             old_name = os.path.basename(task.old_path)
             new_name = task.new_filename
+            if task.has_collision:
+                new_name = "⚠️ " + new_name
             
             old_lbl = QLabel(old_name)
             old_lbl.setStyleSheet("color: #656d76; font-family: 'Consolas', monospace; font-size: 12px;")

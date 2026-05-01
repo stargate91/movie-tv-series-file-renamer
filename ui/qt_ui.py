@@ -360,12 +360,26 @@ class MainWindow(QMainWindow):
 
     def on_rename_finished(self):
         is_live = self.cfg.settings.live_run
-        mode_str = "RENAMED" if is_live else "PREVIEW (No changes made)"
-        self.status_lbl.setText(f"Status: {mode_str} Complete!")
         
         dialog = PreviewDialog(self, self.pipeline.renamed_files)
         dialog.exec()
-        self.clear_all()
+        
+        has_errors = any(t.status == "error" for t in self.pipeline.renamed_files)
+
+        if has_errors:
+            self.status_lbl.setText("Status: Rename Aborted! Please resolve collisions.")
+            self.status_lbl.setStyleSheet("color: #f85149; font-weight: bold;")
+        else:
+            mode_str = "RENAMED" if is_live else "PREVIEW"
+            self.status_lbl.setText(f"Status: {mode_str} Complete!")
+            self.status_lbl.setStyleSheet("color: #3fb950; font-weight: bold;")
+
+        if is_live and not has_errors:
+            self.clear_all()
+        else:
+            self.rename_btn.setEnabled(True)
+            self.download_btn.setEnabled(True)
+            self.refresh_list()
 
     def handle_progress(self, current, total, status):
         self.pbar.setMaximum(total)
@@ -636,7 +650,7 @@ class MainWindow(QMainWindow):
             self.pipeline.step_4_standardize_and_enrich()
             
         self.worker = WorkerThread(run_enrich)
-        self.worker.finished.connect(self.refresh_list)
+        self.worker.finished.connect(self.on_enrichment_finished)
         self.worker.start()
 
     def open_settings(self):

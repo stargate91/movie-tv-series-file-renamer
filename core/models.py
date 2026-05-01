@@ -142,3 +142,4 @@ class RenamingTask:
     new_path: str
     status: str = "pending"  # pending, success, dry_run, error
     error_message: Optional[str] = None
+    has_collision: bool = False

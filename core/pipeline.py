@@ -90,32 +90,30 @@ class RenamePipeline:
 
     def step_4_standardize_and_enrich(self):
         """Converts dicts to Models, fetches extra details (ratings, genres) and maps samples."""
-        self.standardized_files, self.episodes_with_missing_data = standardize_metadata(self.handled_results)
+        standardized, missing = standardize_metadata(self.handled_results)
         
-        if not any([self.standardized_files, self.episodes_with_missing_data]):
+        if not any([standardized, missing]):
             return False
 
-        self.enriched_files, self.unexpected_episodes = enricher(
-            self.standardized_files, self.api, self.ui, 
+        new_enriched, unexpected = enricher(
+            standardized, self.api, self.ui, 
             language=self.s.metadata_language,
             fallback_language=self.s.fallback_language,
             templates=[self.s.movie_template, self.s.episode_template],
             discovery_data=self.discovery_results
         )
         
-        # Map samples to enriched objects
-        if self.sample_files:
-            unassigned_samples = set(self.sample_files)
-            for item in self.enriched_files:
-                item_dir = os.path.dirname(item.file_path)
-                assigned = []
-                for sample in list(unassigned_samples):
-                    if sample.startswith(item_dir):
-                        item.associated_samples.append(sample)
-                        assigned.append(sample)
-                for sample in assigned:
-                    unassigned_samples.remove(sample)
-                    
+        # Accumulate results: use a map to avoid duplicates and preserve previous matches
+        # Initialize map from current enriched_files if not exists
+        enriched_map = {os.path.abspath(os.path.normpath(f.file_path)): f for f in self.enriched_files}
+        
+        for item in new_enriched:
+            norm_p = os.path.abspath(os.path.normpath(item.file_path))
+            enriched_map[norm_p] = item
+            
+        self.enriched_files = list(enriched_map.values())
+        self.unexpected_episodes.extend(unexpected)
+
         # Update metadata_map for UI with enriched data
         for item in self.enriched_files:
             norm_p = os.path.abspath(os.path.normpath(item.file_path))
@@ -126,6 +124,9 @@ class RenamePipeline:
                 'details': item.__dict__,
                 'is_manual': self.metadata_map.get(norm_p, {}).get('is_manual', False)
             }
+        
+        if self.ui:
+            self.ui.update_progress(100, 100, "Status: Data Ready")
                     
         return True
 
