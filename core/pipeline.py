@@ -4,7 +4,6 @@ import sys
 from metadata.collector import get_all_video_files
 from utils.sample import collect_sample_videos, expand_sample_keywords
 from metadata.metadata import extract_metadata
-from handlers.result_manager import get_handler
 from metadata.metadata_standardizer import standardize_metadata
 from metadata.metadata_enricher import enricher
 from core.renamer import rename_video_files
@@ -25,6 +24,8 @@ class RenamePipeline:
         # State tracking for GUI/CLI
         self.sample_files = []
         self.video_files = []
+        self.metadata_map = {} # Maps file_path -> result dict
+        self.discovery_results = {} # Maps file_path -> discovery dict
         self.collected_results = []
         self.unknown_files = []
         
@@ -40,6 +41,7 @@ class RenamePipeline:
         
         self.renamed_files = []
         self.rename_history = []
+        self.metadata_map = {} # path -> meta mapping for fast UI lookup
 
     def step_1_collect_files(self):
         """Collects sample videos and main video files from the target directory."""
@@ -51,10 +53,18 @@ class RenamePipeline:
             self.sample_files = []
 
         valid_exts = [ext.strip().lower() for ext in self.s.video_extensions.split(",") if ext.strip()]
-        self.video_files = get_all_video_files(self.s.folder_path, self.s.vid_size, self.s.recursive, valid_exts)
+        raw_files = get_all_video_files(self.s.folder_path, self.s.vid_size, self.s.recursive, valid_exts)
+        self.video_files = [os.path.abspath(os.path.normpath(f)) for f in raw_files]
         
         self.ui.update_progress(100, 100, f"Status: Found {len(self.video_files)} files")
         return len(self.video_files) > 0
+
+    def step_1b_discovery(self):
+        """Analyzes files for NFOs and internal metadata."""
+        from metadata.discovery import MetadataDiscovery
+        discovery = MetadataDiscovery()
+        self.discovery_results = discovery.discover(self.video_files, ui=self.ui)
+        return any(self.discovery_results)
 
     def step_2_extract_metadata(self, custom_files=None):
         """
@@ -62,15 +72,21 @@ class RenamePipeline:
         Can optionally take a custom list of files (e.g. from skipped menu).
         """
         files_to_process = custom_files if custom_files is not None else self.video_files
-        self.collected_results, self.unknown_files = extract_metadata(files_to_process, self.api, self.s.source_mode, self.ui)
-        return any(self.collected_results)
-
-    def step_3_resolve_conflicts(self, custom_results=None):
-        """Prompts the UI (CLI/GUI) to resolve multiple or no-matches."""
-        results_to_process = custom_results if custom_results is not None else self.collected_results
-        self.handled_results, self.skipped_results, self.unprocessed_results = get_handler(
-            results_to_process, self.api, self.s.interactive, self.ui
+        
+        # Pass discovered IDs to the extractor if they exist
+        discovered = getattr(self, 'discovery_results', {})
+        
+        self.collected_results, self.unknown_files = extract_metadata(
+            files_to_process, self.api, self.s.source_mode, self.ui, 
+            language=self.s.metadata_language,
+            discovery_data=discovered
         )
+        # Build map for UI
+        for res in self.collected_results:
+            norm_p = os.path.abspath(os.path.normpath(res['file_path']))
+            self.metadata_map[norm_p] = res
+            
+        return any(self.collected_results)
 
     def step_4_standardize_and_enrich(self):
         """Converts dicts to Models, fetches extra details (ratings, genres) and maps samples."""
@@ -79,7 +95,13 @@ class RenamePipeline:
         if not any([self.standardized_files, self.episodes_with_missing_data]):
             return False
 
-        self.enriched_files, self.unexpected_episodes = enricher(self.standardized_files, self.api)
+        self.enriched_files, self.unexpected_episodes = enricher(
+            self.standardized_files, self.api, self.ui, 
+            language=self.s.metadata_language,
+            fallback_language=self.s.fallback_language,
+            templates=[self.s.movie_template, self.s.episode_template],
+            discovery_data=self.discovery_results
+        )
         
         # Map samples to enriched objects
         if self.sample_files:
@@ -94,6 +116,17 @@ class RenamePipeline:
                 for sample in assigned:
                     unassigned_samples.remove(sample)
                     
+        # Update metadata_map for UI with enriched data
+        for item in self.enriched_files:
+            norm_p = os.path.abspath(os.path.normpath(item.file_path))
+            self.metadata_map[norm_p] = {
+                'file_path': item.file_path,
+                'file_type': item.file_type,
+                'status': 'one_match',
+                'details': item.__dict__,
+                'is_manual': self.metadata_map.get(norm_p, {}).get('is_manual', False)
+            }
+                    
         return True
 
     def step_5_rename(self):
@@ -101,6 +134,6 @@ class RenamePipeline:
         self.renamed_files, self.rename_history = rename_video_files(
             self.enriched_files, self.s.live_run, self.s.zero_padding, self.s.custom_variable,
             self.s.movie_template, self.s.episode_template, self.s.filename_case, self.s.separator,
-            self.s.sample_action, self.s.sample_suffix, self.s.download_posters
+            self.s.sample_action, self.s.sample_suffix, self.ui
         )
         return self.renamed_files

@@ -39,10 +39,12 @@ class Movie:
     year: str = "Unknown Year"
     tmdb_id: Any = "Unknown ID"
     extras: ExtraMetadata = field(default_factory=ExtraMetadata)
+    tech_metadata: Dict[str, Any] = field(default_factory=dict)
     genres: str = "Unknown Genres"
     ratings: Ratings = field(default_factory=Ratings)
     poster_path: Optional[str] = None
     associated_samples: list[str] = field(default_factory=list)
+    part: str = "" # CD1, CD2, Part 1, etc.
 
     @property
     def file_type(self) -> str:
@@ -50,7 +52,7 @@ class Movie:
 
     def to_template_dict(self) -> dict:
         """Returns a flat dict suitable for str.format() in rename templates."""
-        return {
+        d = {
             "movie_title": self.title,
             "movie_release_date": self.release_date,
             "movie_year": self.year,
@@ -63,7 +65,12 @@ class Movie:
             "other": self.extras.other,
             "edition": self.extras.edition,
             "streaming_service": self.extras.streaming_service,
+            "part": f" - {self.part}" if self.part else ""
         }
+        # Add technical metadata
+        if self.tech_metadata:
+            d.update(self.tech_metadata)
+        return d
 
 
 @dataclass
@@ -83,10 +90,14 @@ class Episode:
     series_status: str = "unknown"
     tmdb_id: Any = "Unknown ID"
     extras: ExtraMetadata = field(default_factory=ExtraMetadata)
+    tech_metadata: Dict[str, Any] = field(default_factory=dict)
     genres: str = "Unknown Genres"
     ratings: Ratings = field(default_factory=Ratings)
     poster_path: Optional[str] = None
+    series_poster_path: Optional[str] = None
+    season_poster_path: Optional[str] = None
     associated_samples: list[str] = field(default_factory=list)
+    part: str = ""
 
     @property
     def file_type(self) -> str:
@@ -94,7 +105,7 @@ class Episode:
 
     def to_template_dict(self, season_str: str, episode_str: str) -> dict:
         """Returns a flat dict suitable for str.format() in rename templates."""
-        return {
+        d = {
             "series_title": self.series_title,
             "episode_title": self.episode_title,
             "season_number": season_str,
@@ -115,7 +126,12 @@ class Episode:
             "other": self.extras.other,
             "edition": self.extras.edition,
             "streaming_service": self.extras.streaming_service,
+            "part": f" - {self.part}" if self.part else ""
         }
+        # Add technical metadata
+        if self.tech_metadata:
+            d.update(self.tech_metadata)
+        return d
 
 
 @dataclass

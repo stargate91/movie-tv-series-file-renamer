@@ -2,6 +2,7 @@ import os
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QVBoxLayout, QLabel, QPushButton, QCheckBox
 from PySide6.QtCore import Qt, Signal
 from ui.components.image_widgets import ImageLoader
+from ui.dialogs.metadata_dialog import MetadataDialog
 
 class MovieCard(QFrame):
     selection_changed = Signal(bool) # Signal to notify MainWindow
@@ -56,20 +57,32 @@ class MovieCard(QFrame):
         info_layout.setAlignment(Qt.AlignVCenter)
         if meta and status == 'one_match':
             d = meta.get('details', {})
-            title_text = f"{d.get('title') or d.get('name')}"
-            year_val = (d.get('release_date') or d.get('first_air_date', ''))[:4]
-            if year_val: title_text += f" ({year_val})"
+            is_ep = meta.get('file_type') == 'episode'
+            
+            if is_ep:
+                title_text = f"{d.get('episode_title') or 'Unknown Episode'}"
+                subtitle_text = f"{d.get('series_title') or 'Unknown Series'}"
+                year_val = (d.get('air_date', ''))[:4]
+            else:
+                title_text = f"{d.get('title') or d.get('name') or 'Unknown Title'}"
+                subtitle_text = ""
+                year_val = (d.get('release_date') or d.get('first_air_date', ''))[:4]
+            
+            if year_val and year_val != 'Unkn': title_text += f" ({year_val})"
             
             title_lbl = QLabel(title_text)
             title_lbl.setStyleSheet("font-weight: bold; font-size: 15px; color: #111827;")
+            info_layout.addWidget(title_lbl)
+
+            if subtitle_text:
+                sub_lbl = QLabel(subtitle_text)
+                sub_lbl.setStyleSheet("font-size: 12px; color: #4b5563; font-style: italic;")
+                info_layout.addWidget(sub_lbl)
             
-            if is_episode and d.get('air_date'):
+            if is_ep and d.get('air_date'):
                 air_lbl = QLabel(f"Aired: {d.get('air_date')}")
                 air_lbl.setStyleSheet("font-size: 10px; color: #6b7280; margin-top: -2px;")
-                info_layout.addWidget(title_lbl)
                 info_layout.addWidget(air_lbl)
-            else:
-                info_layout.addWidget(title_lbl)
         
         elif meta and status == 'multiple_matches':
             guessed = meta.get('extras', {}).get('title', 'Unknown')

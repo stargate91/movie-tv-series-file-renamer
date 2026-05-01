@@ -7,21 +7,18 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-def download_poster(url, target_path):
-    try:
-        if not url: return False
-        # Use large image for saved poster
-        large_url = url.replace("/w200/", "/original/").replace("/w500/", "/original/")
-        response = requests.get(large_url, stream=True, timeout=15)
-        if response.status_code == 200:
-            with open(target_path, 'wb') as f:
-                shutil.copyfileobj(response.raw, f)
-            return True
-    except Exception as e:
-        logger.error(f"Failed to download poster: {e}")
-    return False
+
 
 def format_filename(name, case="none", separator="space"):
+    # 1. Clean illegal characters for Windows
+    illegal_chars = ['<', '>', '"', '/', '\\', '|', '?', '*']
+    for char in illegal_chars:
+        name = name.replace(char, '')
+    
+    # Replace colon with space (standard for titles)
+    name = name.replace(':', ' ')
+    
+    # 2. Apply Case
     if case == "lower":
         name = name.lower()
     elif case == "upper":
@@ -29,14 +26,19 @@ def format_filename(name, case="none", separator="space"):
     elif case == "title":
         name = name.title()
 
+    # 3. Apply Separator
     separator_map = {
         "space": " ",
         "dot": ".",
         "dash": "-",
         "underscore": "_"
     }
-
     sep_char = separator_map.get(separator, " ")
+
+    # Clean up double spaces first
+    while "  " in name:
+        name = name.replace("  ", " ")
+    name = name.strip()
 
     if sep_char != " ":
         name = name.replace(" ", sep_char)
@@ -45,8 +47,7 @@ def format_filename(name, case="none", separator="space"):
 
 def rename_video_files(api_results, live_run, zero_padding, custom_variable,
                       movie_template, episode_template, filename_case, separator,
-                      sample_action="rename", sample_suffix="sample",
-                      download_posters=False):
+                      sample_action="rename", sample_suffix="sample", ui=None):
     """
     Renames video files based on enriched Movie/Episode objects.
     Returns a list of RenamingTask objects and a rename history list.
@@ -54,44 +55,41 @@ def rename_video_files(api_results, live_run, zero_padding, custom_variable,
     results = []
     rename_history = []
 
-    for item in api_results:
+    total = len(api_results)
+    for idx, item in enumerate(api_results, 1):
+        if ui:
+            ui.update_progress(idx, total, f"Status: Processing {idx}/{total}")
+        
         file_path = str(item.file_path)
         file_extension = os.path.splitext(file_path)[1].lower()
 
-        # Get technical metadata from the actual video file
-        tech_meta = get_video_metadata(file_path)
+        # Tech metadata is already enriched
+        tech_meta = item.tech_metadata
 
-        # Common template variables (tech + custom)
-        common_vars = {
-            "resolution": tech_meta['resolution'],
-            "video_codec": tech_meta['video_codec'],
-            "video_bitrate": tech_meta['video_bitrate'],
-            "framerate": tech_meta['framerate'],
-            "audio_codec": tech_meta['audio_codec'],
-            "audio_channels": tech_meta['audio_channels'],
-            "first_audio_channel_language": tech_meta['first_audio_channel_language'],
-            "audio_channels_description": tech_meta['audio_channels_description'],
-            "hdr_type": tech_meta['hdr_type'],
-            "bit_depth": tech_meta['bit_depth'],
-            "subtitle_languages": tech_meta['subtitle_languages'],
-            "audio_streams_count": tech_meta['audio_streams_count'],
-            "custom_variable": custom_variable,
-        }
+        # Prepare template variables
+        if isinstance(item, Movie):
+            template_vars = item.to_template_dict()
+        else:
+            # Prepare season/episode strings for TV
+            season_str = str(item.season_number)
+            episode_str = str(item.episode_number)
+            if zero_padding:
+                try:
+                    season_str = f"{int(item.season_number):02}"
+                    episode_str = f"{int(item.episode_number):02}"
+                except: pass
+            template_vars = item.to_template_dict(season_str, episode_str)
+
+        template_vars["custom_variable"] = custom_variable
 
         if isinstance(item, Movie):
-            template_vars = {**item.to_template_dict(), **common_vars}
             new_filename = movie_template.format(**template_vars)
-
         elif isinstance(item, Episode):
-            if zero_padding:
-                season_str = f"{item.season_number:02}"
-                episode_str = f"{item.episode_number:02}"
-            else:
-                season_str = str(item.season_number)
-                episode_str = str(item.episode_number)
-
-            template_vars = {**item.to_template_dict(season_str, episode_str), **common_vars}
             new_filename = episode_template.format(**template_vars)
+
+        # Safety: If part info exists but was not used in template, append it to avoid collisions
+        if item.part and item.part not in new_filename:
+            new_filename += f" {item.part}"
 
         name_without_ext = format_filename(new_filename, filename_case, separator)
         new_filename = name_without_ext + file_extension
@@ -111,13 +109,6 @@ def rename_video_files(api_results, live_run, zero_padding, custom_variable,
                 task.status = "success"
                 rename_history.append((file_path, new_file_path))
 
-                # Download poster if enabled
-                if download_posters and item.poster_path:
-                    poster_url = f"https://image.tmdb.org/t/p/w500{item.poster_path}"
-                    poster_target = os.path.join(directory, "poster.jpg")
-                    # Only download if it doesn't exist yet
-                    if not os.path.exists(poster_target):
-                        download_poster(poster_url, poster_target)
 
             except Exception as e:
                 task.status = "error"

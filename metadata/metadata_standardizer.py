@@ -50,17 +50,21 @@ def standardize_metadata(handled_results):
                 year=year,
                 tmdb_id=tmdb_id,
                 extras=extras,
-                poster_path=data.get('poster_path')
+                poster_path=data.get('poster_path'),
+                part=file_data.get('part', "")
             ))
 
         if file_type == "episode":
-            title = data.get('name', 'Unknown Title')
+            series_title = data.get('series_name') or data.get('name') or 'Unknown Series'
+            episode_title = data.get('name') if data.get('series_name') else 'Unknown Episode'
+            
             first_air_date = data.get('first_air_date', 'Unknown First Air Date')
             if first_air_date != "Unknown First Air Date":
                 first_air_year = first_air_date.split('-')[0]
             else:
                 first_air_year = 'Unknown First Air Year'
-            tmdb_id = data.get('id', 'Unknown ID')
+                
+            tmdb_id = data.get('series_id') or data.get('id', 'Unknown ID')
             season_number, episode_number = standardize_season_episode_numbers(file_data)
 
             if 'unknown' in [season_number, episode_number]:
@@ -69,16 +73,20 @@ def standardize_metadata(handled_results):
 
             standardized_files.append(Episode(
                 file_path=file_path,
-                series_title=title,
+                series_title=series_title,
+                episode_title=episode_title,
                 season_number=season_number,
                 episode_number=episode_number,
                 first_air_date=first_air_date,
                 first_air_year=first_air_year,
+                air_date=data.get('air_date', 'unknown'),
+                air_year=data.get('air_date', '')[:4] if data.get('air_date') else 'unknown',
                 tmdb_id=tmdb_id,
                 extras=extras,
                 poster_path=data.get('still_path') or data.get('poster_path'),
-                series_poster_path=data.get('series_poster_path'), # Custom field we might pass from handlers
-                season_poster_path=data.get('season_poster_path')
+                series_poster_path=data.get('series_poster_path'),
+                season_poster_path=data.get('season_poster_path'),
+                part=file_data.get('part', "")
             ))
 
     return standardized_files, unexpected_files

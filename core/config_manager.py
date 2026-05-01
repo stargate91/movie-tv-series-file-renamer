@@ -40,9 +40,10 @@ class AppSettings:
     episode_template: str = "{custom_variable} + {series_title} - S{season_number}E{episode_number} - {episode_title}-{air_date}-{resolution}"
     custom_variable: str = "default"
     zero_padding: bool = True
-    filename_case: str = "title"  # lower | upper | title | none
-    separator: str = "space"  # space | dot | dash | underscore
-    download_posters: bool = False
+    filename_case: str = "none" # none, lower, upper, title
+    separator: str = "space"   # space, dot, dash, underscore
+    metadata_language: str = "en-US" # Target language
+    fallback_language: str = ""      # Fallback if target is missing
 
     # UI
     use_emojis: bool = False
