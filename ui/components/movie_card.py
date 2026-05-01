@@ -113,11 +113,12 @@ class MovieCard(QFrame):
         layout.addWidget(self.info_btn, 0, Qt.AlignVCenter)
 
         # Edit Button
-        self.edit_btn = QPushButton("✎")
-        self.edit_btn.setFixedSize(50, 50)
-        self.edit_btn.setStyleSheet("font-size: 20px; font-weight: bold;")
-        self.edit_btn.clicked.connect(lambda: self.on_edit_cb(None))
-        layout.addWidget(self.edit_btn, 0, Qt.AlignVCenter)
+        if self.meta:
+            self.edit_btn = QPushButton("✎")
+            self.edit_btn.setFixedSize(50, 50)
+            self.edit_btn.setStyleSheet("font-size: 20px; font-weight: bold;")
+            self.edit_btn.clicked.connect(lambda: self.on_edit_cb(None))
+            layout.addWidget(self.edit_btn, 0, Qt.AlignVCenter)
 
         # Remove Button
         self.remove_btn = QPushButton("✕")

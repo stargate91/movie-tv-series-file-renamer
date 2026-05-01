@@ -145,6 +145,7 @@ class InspectorPanel(QWidget):
         self.remove_btn = QPushButton("🗑️ Remove")
         self.remove_btn.setObjectName("SecondaryBtn")
         self.remove_btn.setStyleSheet("color: #d13438; border-color: #d13438;")
+        self.remove_btn.clicked.connect(self.on_remove_clicked)
         actions_layout.addWidget(self.remove_btn)
         
         self.layout.addWidget(actions_frame)
@@ -154,11 +155,16 @@ class InspectorPanel(QWidget):
         line.setStyleSheet("background-color: #30363d;")
         self.layout.addWidget(line)
 
-        # --- Resolution Controls ---
-        self.layout.addWidget(QLabel("BATCH RESOLVE", objectName="SubTitle"))
+        # --- Resolution Controls Container ---
+        self.res_container = QWidget()
+        res_layout = QVBoxLayout(self.res_container)
+        res_layout.setContentsMargins(0, 0, 0, 0)
+        res_layout.setSpacing(10)
+        
+        res_layout.addWidget(QLabel("BATCH RESOLVE", objectName="SubTitle"))
         
         # Type Toggle
-        self.layout.addWidget(QLabel("TYPE", objectName="SubTitle"))
+        res_layout.addWidget(QLabel("TYPE", objectName="SubTitle"))
         type_box = QWidget()
         t_layout = QHBoxLayout(type_box)
         t_layout.setContentsMargins(0,0,0,0)
@@ -169,14 +175,12 @@ class InspectorPanel(QWidget):
         
         self.set_type_btn = QPushButton("Set Type")
         self.set_type_btn.setObjectName("SecondaryBtn")
-        self.set_type_btn.setToolTip("Only update the type (resets match status)")
         self.set_type_btn.clicked.connect(self.on_set_type_clicked)
         t_layout.addWidget(self.set_type_btn)
-        
-        self.layout.addWidget(type_box)
+        res_layout.addWidget(type_box)
         
         # Search Box
-        self.layout.addWidget(QLabel("SEARCH & MATCH", objectName="SubTitle"))
+        res_layout.addWidget(QLabel("SEARCH & MATCH", objectName="SubTitle"))
         search_box = QWidget()
         s_layout = QHBoxLayout(search_box)
         s_layout.setContentsMargins(0,0,0,0)
@@ -191,71 +195,69 @@ class InspectorPanel(QWidget):
         self.search_btn.setObjectName("SecondaryBtn")
         self.search_btn.clicked.connect(self.perform_search)
         s_layout.addWidget(self.search_btn)
+        res_layout.addWidget(search_box)
         
-        self.layout.addWidget(search_box)
-        
-        # Season & Episode Override (TV Only)
+        # Season & Episode Override
         self.tv_overrides_frame = QWidget()
         tv_layout = QVBoxLayout(self.tv_overrides_frame)
         tv_layout.setContentsMargins(0, 0, 0, 0)
-        tv_layout.setSpacing(6)
         
-        # Season
         s_box = QWidget()
-        s_layout = QHBoxLayout(s_box)
-        s_layout.setContentsMargins(0, 0, 0, 0)
+        s_lay = QHBoxLayout(s_box)
+        s_lay.setContentsMargins(0, 0, 0, 0)
         self.season_input = QLineEdit()
-        self.season_input.setPlaceholderText("Season Override (e.g. 2)")
+        self.season_input.setPlaceholderText("Season Override")
         self.set_season_btn = QPushButton("Set")
         self.set_season_btn.setObjectName("SecondaryBtn")
         self.set_season_btn.clicked.connect(self.on_set_season_clicked)
-        s_layout.addWidget(self.season_input, 1)
-        s_layout.addWidget(self.set_season_btn)
+        s_lay.addWidget(self.season_input, 1)
+        s_lay.addWidget(self.set_season_btn)
         tv_layout.addWidget(s_box)
         
-        # Episode
         self.e_box = QWidget()
-        e_layout = QHBoxLayout(self.e_box)
-        e_layout.setContentsMargins(0, 0, 0, 0)
+        e_lay = QHBoxLayout(self.e_box)
+        e_lay.setContentsMargins(0, 0, 0, 0)
         self.episode_input = QLineEdit()
-        self.episode_input.setPlaceholderText("Episode Override (e.g. 1)")
+        self.episode_input.setPlaceholderText("Episode Override")
         self.set_episode_btn = QPushButton("Set")
         self.set_episode_btn.setObjectName("SecondaryBtn")
         self.set_episode_btn.clicked.connect(self.on_set_episode_clicked)
-        e_layout.addWidget(self.episode_input, 1)
-        e_layout.addWidget(self.set_episode_btn)
+        e_lay.addWidget(self.episode_input, 1)
+        e_lay.addWidget(self.set_episode_btn)
         tv_layout.addWidget(self.e_box)
         
-        # Sequence Wizard Button (Bulk Only)
         self.sequence_btn = QPushButton("🪄 Sequence Episodes Wizard")
         self.sequence_btn.setObjectName("PrimaryBtn")
-        self.sequence_btn.setToolTip("Reorder and automatically number selected episodes")
         self.sequence_btn.clicked.connect(self.sequence_requested.emit)
         self.sequence_btn.setVisible(False)
         tv_layout.addWidget(self.sequence_btn)
         
-        self.layout.addWidget(self.tv_overrides_frame)
-        
+        res_layout.addWidget(self.tv_overrides_frame)
         self.type_combo.currentTextChanged.connect(lambda t: self.tv_overrides_frame.setVisible(t == "TV Show"))
         self.tv_overrides_frame.setVisible(False)
         
-        # Results List
-        self.layout.addWidget(QLabel("RESULTS", objectName="SubTitle"))
+        res_layout.addWidget(QLabel("RESULTS", objectName="SubTitle"))
         self.results_list = QListWidget()
         self.results_list.setFixedHeight(280)
-        self.layout.addWidget(self.results_list)
+        res_layout.addWidget(self.results_list)
         
         self.apply_btn = QPushButton("✅ Apply to Selection")
         self.apply_btn.setObjectName("ActionBtn")
         self.apply_btn.setEnabled(False)
-        self.apply_btn.setCursor(Qt.PointingHandCursor)
         self.apply_btn.clicked.connect(self.on_apply_clicked)
-        self.layout.addWidget(self.apply_btn)
+        res_layout.addWidget(self.apply_btn)
         
+        self.layout.addWidget(self.res_container)
         self.layout.addStretch()
         
-        # Connect internal triggers
         self.results_list.itemSelectionChanged.connect(lambda: self.apply_btn.setEnabled(True))
+        
+    def set_minimal_mode(self, minimal):
+        self.res_container.setVisible(not minimal)
+        
+    def on_remove_clicked(self):
+        if self.selected_paths:
+            self.remove_requested.emit(self.selected_paths)
 
     def update_selection(self, paths):
         self.selected_paths = paths

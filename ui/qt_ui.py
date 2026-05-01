@@ -172,6 +172,7 @@ class MainWindow(QMainWindow):
         # --- Inspector Panel (Right) ---
         self.inspector = InspectorPanel(self, None)
         self.inspector.setVisible(False)
+        self.inspector.set_minimal_mode(True)
         self.inspector.remove_requested.connect(self.bulk_remove_selected)
         self.inspector.apply_metadata.connect(self.bulk_resolve_selected)
         self.inspector.type_change_requested.connect(self.bulk_change_type)
@@ -246,6 +247,7 @@ class MainWindow(QMainWindow):
         self.status_lbl.setText("Status: Scanning...")
         self.clear_results()
         self.pipeline = None
+        self.inspector.set_minimal_mode(True)
         
         def run_logic():
             bridge = QtUIBridge(self)
@@ -264,6 +266,7 @@ class MainWindow(QMainWindow):
         self.unified_btn.setEnabled(True)
         self.status_lbl.setText("Status: Scan Complete. Ready for Analysis.")
         self.inspector.pipeline = self.pipeline # Connect pipeline to inspector
+        self.inspector.set_minimal_mode(True)
         self.refresh_list()
 
     def on_start_unified_analysis(self):
@@ -278,6 +281,7 @@ class MainWindow(QMainWindow):
     def on_unified_analysis_finished(self):
         self.status_lbl.setText("Status: Analysis Complete!")
         self.unified_btn.setEnabled(True)
+        self.inspector.set_minimal_mode(False)
         
         has_matches = any(isinstance(r, dict) and r.get('status') == 'one_match' for r in self.pipeline.collected_results)
         self.rename_btn.setEnabled(has_matches)
@@ -520,15 +524,22 @@ class MainWindow(QMainWindow):
             pass
 
     # --- Item Actions ---
-    def remove_file(self, file_path):
+    def remove_file(self, file_path, refresh=True):
         if not self.pipeline:
             return
         v_norm = os.path.abspath(os.path.normpath(file_path))
         self.pipeline.video_files = [f for f in self.pipeline.video_files if os.path.abspath(os.path.normpath(f)) != v_norm]
-        self.pipeline.collected_results = [r for r in self.pipeline.collected_results if isinstance(r, dict) and os.path.abspath(os.path.normpath(r.get('file_path', ''))) != v_norm]
+        
+        # Filter results if they exist
+        if hasattr(self.pipeline, 'collected_results') and self.pipeline.collected_results:
+            self.pipeline.collected_results = [r for r in self.pipeline.collected_results 
+                                              if isinstance(r, dict) and os.path.abspath(os.path.normpath(r.get('file_path', ''))) != v_norm]
+        
         if v_norm in self.pipeline.metadata_map:
             del self.pipeline.metadata_map[v_norm]
-        self.refresh_list()
+            
+        if refresh:
+            self.refresh_list()
 
     def update_selection(self, file_path, is_selected):
         if is_selected:
@@ -648,9 +659,14 @@ class MainWindow(QMainWindow):
 
     def bulk_remove_selected(self, paths=None):
         targets = paths if paths else list(self.selected_files)
+        if not targets: return
+        
         for f in targets:
-            self.remove_file(f)
+            self.remove_file(f, refresh=False)
+            
         self.clear_selection()
+        self.refresh_list()
+        self.stat_total.setText(f"Total Files: {len(self.pipeline.video_files)}")
 
     def bulk_resolve_selected(self, paths, selected):
         if not selected: return
@@ -750,7 +766,7 @@ class MainWindow(QMainWindow):
             self.trigger_background_enrichment(ready_to_enrich)
 
     def open_selection(self, file_path, meta):
-        if not meta: return
+        # Allow toggling even if meta is None (e.g. freshly scanned files)
         
         # Only handle body clicks if we are already in multi-select mode
         if getattr(self, 'is_multi_select_mode', False):
