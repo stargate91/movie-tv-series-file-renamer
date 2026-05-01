@@ -1,7 +1,41 @@
+# Byte-compiled / optimized / DLL files
 __pycache__/
+*.py[cod]
+*$py.class
+pycache/
+
+# Virtual environments
+venv/
+.venv/
+env/
+bin/
+include/
+lib/
+share/
+pyvenv.cfg
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Project specific caches and data
 data/
-test.py
-builds/
+assets_cache/
 logs/
+builds/
 .pytest_cache/
 rename_history/
+*.log
+
+# Environment variables
+.env
+
+# Assistant
+.gemini/
+
+# Misc
+Thumbs.db
+.DS_Store
+test.py
