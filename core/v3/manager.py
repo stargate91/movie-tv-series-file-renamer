@@ -1,4 +1,5 @@
 import logging
+from core.v3.logger_setup import setup_logger
 from core.v3.database import LibraryDB
 from core.v3.scanner import SmartScanner
 from core.v3.collector import Collector
@@ -17,6 +18,7 @@ class RenamerEngineV3:
     """
     
     def __init__(self):
+        setup_logger() # Initialize global logging
         self.config = ConfigManager()
         self.db = LibraryDB()
         
