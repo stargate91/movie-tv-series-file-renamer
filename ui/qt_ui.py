@@ -8,10 +8,15 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, Signal
 
 # Import our new modules
-from ui.styles import QSS
+from ui.styles import UIStyles
+from ui.controllers.main_controller import MainController
+from ui.managers.list_manager import MediaListManager
+from ui.managers.task_coordinator import TaskCoordinator
+from ui.views.main_window_ui import MainWindowUI
+from core.state import AppState
 from ui.utils import WorkerThread, QtUIBridge
 from ui.components.movie_card import MovieCard
-from ui.components.group_headers import SeriesHeader, SeasonHeader
+from ui.widgets.group_headers import SeriesHeader, SeasonHeader
 from ui.components.inspector_panel import InspectorPanel
 from ui.dialogs.selection_dialog import SelectionDialog
 from ui.dialogs.settings_dialog import SettingsDialog
@@ -30,157 +35,124 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.cfg = ConfigManager()
+        self.state = AppState() # Centralized state
         self.pipeline = None
-        self.worker = None
-        self.selected_files = set()
-        self.is_multi_select_mode = False
+        
         self.ignore_multi_select_trigger = False
         
-        # Virtual List State
-        self.display_items = []  # Flat list of (type, data, extra) tasks
-        self.current_loaded_index = 0
-        self.chunk_size = 25
+        # Managers & UI Setup
+        self.ui_setup = MainWindowUI()
+        self.list_mgr = None
+        self.ctrl = None
+        self.tasks = None
         
-        self.setWindowTitle("Movie & TV Renamer Pro (Qt Edition)")
-        self.resize(1100, 750)
-        self.setStyleSheet(QSS)
+        # Setup Layout
+        self.ui_setup.setup_ui(self)
+        
         self.setAcceptDrops(True)
-        
         self.progress_signal.connect(self.handle_progress)
-        self.init_ui()
+        self.ctrl = None # Init placeholder
+        
+        
+        # Connect AppState signals (Observer Pattern) - Must be after setup_ui
+        self.state.selection_changed.connect(lambda _: self.update_selection_ui())
+        self.state.list_reset.connect(self.clear_results)
+        self.state.status_msg.connect(lambda msg: self.status_lbl.setText(f"Status: {msg}"))
+        
+        # Initialize Managers
+        self.list_mgr = MediaListManager(self, self.state, self.pipeline, self.results_layout, self.scroll)
+        self.tasks = TaskCoordinator(self, self.pipeline, self.state)
+        
+        # Connect Task Signals
+        self.tasks.task_started.connect(self._on_task_started)
+        self.tasks.task_finished.connect(self._on_task_finished)
         
         # Connect scroll listener once
-        self.scroll.verticalScrollBar().valueChanged.connect(self.on_scroll_changed)
+        self.scroll.verticalScrollBar().valueChanged.connect(self.list_mgr.handle_scroll)
 
-    def init_ui(self):
-        central = QWidget()
-        self.setCentralWidget(central)
-        layout = QHBoxLayout(central)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
-        
-        # --- Sidebar ---
-        sidebar = QWidget()
-        sidebar.setObjectName("Sidebar")
-        side_layout = QVBoxLayout(sidebar)
-        side_layout.setContentsMargins(20, 30, 20, 30)
-        side_layout.setSpacing(15)
-        
-        title = QLabel("Auto Renamer")
-        title.setStyleSheet("font-size: 22px; font-weight: bold; color: #0078d4; margin-bottom: 20px;")
-        side_layout.addWidget(title)
-        
-        self.browse_btn = QPushButton("📁 Select Folder")
-        self.browse_btn.clicked.connect(self.browse_and_scan)
-        side_layout.addWidget(self.browse_btn)
-        
-        self.unified_btn = QPushButton("🔍 Analyze & Match")
-        self.unified_btn.setObjectName("PrimaryBtn")
-        self.unified_btn.setEnabled(False)
-        self.unified_btn.clicked.connect(self.on_start_unified_analysis)
-        side_layout.addWidget(self.unified_btn)
-        
-        self.settings_btn = QPushButton("⚙️ Settings")
-        self.settings_btn.clicked.connect(self.open_settings)
-        side_layout.addWidget(self.settings_btn)
+        # Initialize Filter Pills
+        self.pills = {}
+        self.init_filter_pills()
 
-        self.clear_btn = QPushButton("🗑️ Clear List")
-        self.clear_btn.setStyleSheet("color: #f85149; border-color: #f85149;")
-        self.clear_btn.clicked.connect(self.clear_all)
-        side_layout.addWidget(self.clear_btn)
+    def init_filter_pills(self):
+        """Creates the filter chips in the header."""
+        modes = [
+            ('all', "All"),
+            ('pending', "Pending"),
+            ('review', "Review Required"),
+            ('movies', "Movies"),
+            ('series', "Series"),
+            ('extras', "Extras")
+        ]
+        
+        for mode, label in modes:
+            btn = QPushButton(label)
+            btn.setObjectName("FilterPill")
+            btn.setProperty("mode", mode)
+            btn.setProperty("active", "false")
+            btn.setCursor(Qt.PointingHandCursor)
+            btn.clicked.connect(lambda checked=False, m=mode: self.on_filter_pill_clicked(m))
+            
+            self.window().filters_layout.addWidget(btn)
+            self.pills[mode] = btn
+            
+        # Set default
+        self.refresh_filter_pills()
+        self.on_filter_pill_clicked('all')
 
-        side_layout.addSpacing(20)
+    def refresh_filter_pills(self):
+        """Updates which pills are visible based on analysis state."""
+        # Check if we have any analysis results
+        analysis_done = len(self.state.collected_results) > 0 or len(self.state.metadata_map) > 0
+        # If all metadata statuses are 'pending' or 'extra', we are still in discovery phase
+        if analysis_done:
+            has_real_matches = any(m.get('status') not in ['pending', 'extra'] for m in self.state.metadata_map.values())
+            if not has_real_matches:
+                analysis_done = False
 
-        self.live_mode_cb = QCheckBox("🔥 Live Mode (Real Rename)")
-        self.live_mode_cb.setStyleSheet("color: #8b949e; font-weight: bold;")
-        self.live_mode_cb.setChecked(self.cfg.settings.live_run)
-        self.live_mode_cb.stateChanged.connect(self.toggle_live_mode)
-        side_layout.addWidget(self.live_mode_cb)
+        # Discovery Phase Tabs: All, Pending, Extras
+        # Analysis Phase Tabs: All, Needs Review, Movies, Series, Extras
         
-        self.rename_btn = QPushButton("🚀 Start Renaming")
-        self.rename_btn.setObjectName("PrimaryBtn")
-        self.rename_btn.setStyleSheet("background-color: #3fb950; color: white;")
-        self.rename_btn.setEnabled(False)
-        self.rename_btn.clicked.connect(self.start_renaming)
-        side_layout.addWidget(self.rename_btn)
+        discovery_modes = ['all', 'pending', 'extras']
+        analysis_modes = ['all', 'review', 'movies', 'series', 'extras']
         
-        self.clear_cache_btn = QPushButton("Clear Cache")
-        self.clear_cache_btn.setFixedHeight(35)
-        self.clear_cache_btn.setCursor(Qt.PointingHandCursor)
-        self.clear_cache_btn.setStyleSheet("""
-            QPushButton { 
-                background: #374151; color: #d1d5db; border: none; 
-                border-radius: 6px; font-size: 11px; margin-top: 10px;
-            }
-            QPushButton:hover { background: #4b5563; color: white; }
-        """)
-        self.clear_cache_btn.clicked.connect(self.on_clear_cache)
-        side_layout.addWidget(self.clear_cache_btn)
+        visible_modes = analysis_modes if analysis_done else discovery_modes
         
-        side_layout.addStretch()
-        
-        self.stat_total = QLabel("Total Files: 0")
-        self.stat_matches = QLabel("Matched: 0")
-        side_layout.addWidget(self.stat_total)
-        side_layout.addWidget(self.stat_matches)
-        
-        layout.addWidget(sidebar)
-        
-        # --- Main Area ---
-        main_area = QWidget()
-        main_area.setObjectName("MainArea")
-        main_layout = QVBoxLayout(main_area)
-        main_layout.setContentsMargins(30, 30, 30, 30)
-        
-        self.folder_lbl = QLabel(f"Folder: {self.cfg.settings.folder_path}")
-        self.folder_lbl.setStyleSheet("color: #8b949e; font-style: italic;")
-        main_layout.addWidget(self.folder_lbl)
+        for mode, btn in self.pills.items():
+            btn.setVisible(mode in visible_modes)
+            
+        # If current active filter is now hidden, reset to 'all'
+        active_mode = next((m for m, b in self.pills.items() if b.property("active") == "true"), "all")
+        if active_mode not in visible_modes:
+            self.on_filter_pill_clicked('all')
 
-        # Top Progress Section (Full Width)
-        self.status_lbl = QLabel("Status: Ready")
-        self.status_lbl.setStyleSheet("color: #8b949e; font-size: 11px; margin-top: 5px;")
-        main_layout.addWidget(self.status_lbl)
+    def on_filter_pill_clicked(self, mode):
+        """Switches the list filter and updates UI state."""
+        for m, btn in self.pills.items():
+            is_active = (m == mode)
+            btn.setProperty("active", "true" if is_active else "false")
+            btn.style().unpolish(btn)
+            btn.style().polish(btn)
+        
+        if self.list_mgr:
+            self.list_mgr.set_filter(mode)
 
-        self.pbar = QProgressBar()
-        self.pbar.setFixedHeight(6)
-        self.pbar.setTextVisible(False)
-        self.pbar.setStyleSheet("""
-            QProgressBar {
-                background-color: #f3f4f6;
-                border-radius: 3px;
-                border: none;
-            }
-            QProgressBar::chunk {
-                background-color: #3b82f6;
-                border-radius: 3px;
-            }
-        """)
-        main_layout.addWidget(self.pbar)
-        main_layout.addSpacing(10)
+    def update_pill_counts(self, counts):
+        """Updates the labels on the filter pills with current counts."""
+        labels = {
+            'all': "All",
+            'pending': "Pending",
+            'review': "Needs Review",
+            'movies': "Movies",
+            'series': "Series",
+            'extras': "Extras"
+        }
+        for mode, btn in self.pills.items():
+            count = counts.get(mode, 0)
+            btn.setText(f"{labels[mode]}  {count}")
         
-        self.scroll = QScrollArea()
-        self.scroll.setWidgetResizable(True)
-        self.scroll_content = QWidget()
-        self.results_layout = QVBoxLayout(self.scroll_content)
-        self.results_layout.setAlignment(Qt.AlignTop)
-        self.results_layout.setSpacing(10)
-        self.scroll.setWidget(self.scroll_content)
-        main_layout.addWidget(self.scroll)
-        
-        layout.addWidget(main_area)
-        
-        # --- Inspector Panel (Right) ---
-        self.inspector = InspectorPanel(self, None)
-        self.inspector.setVisible(False)
-        self.inspector.set_minimal_mode(True)
-        self.inspector.remove_requested.connect(self.bulk_remove_selected)
-        self.inspector.apply_metadata.connect(self.bulk_resolve_selected)
-        self.inspector.type_change_requested.connect(self.bulk_change_type)
-        self.inspector.season_change_requested.connect(self.bulk_change_season)
-        self.inspector.episode_change_requested.connect(self.bulk_change_episode)
-        self.inspector.sequence_requested.connect(self.open_sequence_wizard)
-        self.inspector.clear_btn.clicked.connect(self.clear_selection)
-        layout.addWidget(self.inspector)
+        # Also refresh visibility here to ensure sync
+        self.refresh_filter_pills()
 
     # --- Drag & Drop ---
     def dragEnterEvent(self, event):
@@ -215,15 +187,19 @@ class MainWindow(QMainWindow):
             if not self.pipeline:
                 bridge = QtUIBridge(self)
                 api = APIClient(self.cfg.settings.omdb_key, self.cfg.settings.tmdb_key, self.cfg.settings.tmdb_bearer_token)
-                self.pipeline = RenamePipeline(self.cfg, api, bridge)
+                self.pipeline = RenamePipeline(self.cfg, api, bridge, self.state)
+            self.ctrl = MainController(self, self.pipeline, self.state)
+            self.tasks.pipeline = self.pipeline # Update task pipeline
+            self.list_mgr.pipeline = self.pipeline
+            self.inspector.pipeline = self.pipeline
             
-            current_files = [os.path.abspath(os.path.normpath(f)) for f in self.pipeline.video_files]
+            current_files = [os.path.abspath(os.path.normpath(f)) for f in self.state.video_files]
             combined = current_files + dropped_files
-            self.pipeline.video_files = list(dict.fromkeys(combined))
+            self.state.video_files = list(dict.fromkeys(combined))
             self.on_scan_finished()
 
     # --- Scanning & Processing ---
-    def browse_and_scan(self):
+    def open_folder_dialog(self):
         path = QFileDialog.getExistingDirectory(self, "Select Folder", self.cfg.settings.folder_path)
         if path:
             self.cfg.settings.folder_path = path
@@ -232,51 +208,41 @@ class MainWindow(QMainWindow):
             self.start_scan()
 
     def clear_all(self):
+        self.state.reset_state() # This will emit list_reset and clear memory
         self.pipeline = None
-        self.clear_results()
+        self.clear_results() # Clears UI items
+        
         self.unified_btn.setEnabled(False)
         self.rename_btn.setEnabled(False)
         self.status_lbl.setText("Status: Ready")
         self.stat_total.setText("Total Files: 0")
+        self.stat_matches.setText("Matched: 0")
         self.folder_lbl.setText("Folder: None")
         self.display_items = []
         self.clear_selection()
+        self.refresh_filter_pills()
 
 
     def start_scan(self):
-        self.status_lbl.setText("Status: Scanning...")
         self.clear_results()
-        self.pipeline = None
         self.inspector.set_minimal_mode(True)
-        
-        def run_logic():
-            bridge = QtUIBridge(self)
-            api = APIClient(self.cfg.settings.omdb_key, self.cfg.settings.tmdb_key, self.cfg.settings.tmdb_bearer_token)
-            self.pipeline = RenamePipeline(self.cfg, api, bridge)
-            self.pipeline.step_1_collect_files()
-
-        self.worker = WorkerThread(run_logic)
-        self.worker.finished.connect(self.on_scan_finished)
-        self.worker.start()
+        if self.tasks:
+            self.tasks.start_scan()
 
     def on_scan_finished(self):
-        if not self.pipeline:
-            return
-        self.stat_total.setText(f"Total Files: {len(self.pipeline.video_files)}")
-        self.unified_btn.setEnabled(True)
-        self.status_lbl.setText("Status: Scan Complete. Ready for Analysis.")
-        self.inspector.pipeline = self.pipeline # Connect pipeline to inspector
-        self.inspector.set_minimal_mode(True)
+        self.stat_total.setText(f"Total Files: {len(self.state.video_files)}")
+        self.refresh_filter_pills()
         self.refresh_list()
+        self.unified_btn.setEnabled(len(self.state.video_files) > 0)
+        self.rename_btn.setEnabled(len(self.state.video_files) > 0)
+        
+        if self.pipeline:
+            self.inspector.pipeline = self.pipeline
+            self.inspector.set_minimal_mode(True)
+            self.status_lbl.setText("Status: Scan Complete. Ready for Analysis.")
 
     def on_start_unified_analysis(self):
-        self.status_lbl.setText("Status: Deep Analyzing & Matching (NFO/MediaInfo/API)...")
-        self.unified_btn.setEnabled(False)
-        self.rename_btn.setEnabled(False)
-        
-        self.worker = WorkerThread(self.pipeline.unified_analysis)
-        self.worker.finished.connect(self.on_unified_analysis_finished)
-        self.worker.start()
+        self.start_unified_analysis()
 
     def on_unified_analysis_finished(self):
         self.status_lbl.setText("Status: Analysis Complete!")
@@ -285,19 +251,43 @@ class MainWindow(QMainWindow):
         
         has_matches = any(isinstance(r, dict) and r.get('status') == 'one_match' for r in self.pipeline.collected_results)
         self.rename_btn.setEnabled(has_matches)
+        self.refresh_filter_pills()
         self.refresh_list()
 
-    def start_renaming(self):
-        self.status_lbl.setText("Status: Preparing files for renaming...")
-        self.rename_btn.setEnabled(False)
-        self.unified_btn.setEnabled(False)
-        
-        def run_rename_logic():
-            self.pipeline.step_5_rename()
+    def start_unified_analysis(self):
+        if not self.pipeline:
+            from utils.api_client import APIClient
+            from ui.utils import QtUIBridge
+            from core.pipeline import RenamePipeline
+            from ui.controllers.main_controller import MainController
+            
+            bridge = QtUIBridge(self)
+            api = APIClient(self.cfg.settings.omdb_key, self.cfg.settings.tmdb_key, self.cfg.settings.tmdb_bearer_token)
+            self.pipeline = RenamePipeline(self.cfg, api, bridge, self.state)
+            self.ctrl = MainController(self, self.pipeline, self.state)
+            self.tasks.pipeline = self.pipeline
+            self.list_mgr.pipeline = self.pipeline
+            self.inspector.pipeline = self.pipeline
+            
+        self.tasks.start_unified_analysis()
 
-        self.worker = WorkerThread(run_rename_logic)
-        self.worker.finished.connect(self.on_rename_finished)
-        self.worker.start()
+    def start_renaming(self):
+
+        # --- Safety Check: Deletions ---
+        if self.pipeline.s.extra_action == "delete":
+            to_delete = [p for p, m in self.state.metadata_map.items() if m.get('file_type') == 'extra']
+            if to_delete:
+                from PySide6.QtWidgets import QMessageBox
+                reply = QMessageBox.question(
+                    self, 'Confirm Deletion',
+                    f"Warning: {len(to_delete)} extra files are marked for DELETION based on your settings.\n\nAre you sure you want to proceed?",
+                    QMessageBox.Yes | QMessageBox.No, QMessageBox.No
+                )
+                if reply == QMessageBox.No:
+                    return
+
+        self.status_lbl.setText("Status: Preparing files for renaming...")
+        self.tasks.start_renaming()
 
     def on_rename_finished(self):
         is_live = self.cfg.settings.live_run
@@ -323,6 +313,8 @@ class MainWindow(QMainWindow):
             self.refresh_list()
 
     def handle_progress(self, current, total, status):
+        # Setting maximum to 0 triggers indeterminate mode. 
+        # Setting it back to a positive value stops it.
         self.pbar.setMaximum(total)
         self.pbar.setValue(current)
         if status:
@@ -334,227 +326,25 @@ class MainWindow(QMainWindow):
         color = "#f85149" if self.cfg.settings.live_run else "#8b949e"
         self.live_mode_cb.setStyleSheet(f"color: {color}; font-weight: bold;")
 
-    # --- Grouped Lazy Loading ---
     def refresh_list(self):
-        """Builds a display task list and starts lazy loading."""
-        self.clear_results()
-        if not self.pipeline or not self.pipeline.video_files:
-            msg = QLabel("\n\n\n📦\nDrag & Drop Files or Folders Here\n<small>or use the 'Select Folder' button</small>")
-            msg.setAlignment(Qt.AlignCenter)
-            msg.setStyleSheet("color: #8b949e; font-size: 20px; font-weight: bold;")
-            self.results_layout.addWidget(msg)
-            return
-
-        # 1. Ranking Logic
-        def get_rank(vid_path):
-            norm_p = os.path.abspath(os.path.normpath(vid_path))
-            meta = self.pipeline.metadata_map.get(norm_p)
-            if not meta:
-                return 4
-            status = meta.get('status', 'pending')
-            is_manual = meta.get('is_manual', False)
-            
-            if status == 'multiple_matches': return 0
-            if status == 'no_match': return 1
-            if is_manual: return 2
-            if status == 'one_match': return 3
-            if status == 'complex_match': return 5
-            return 4
-
-        # 2. Group Files
-        norm_files = [os.path.abspath(os.path.normpath(f)) for f in self.pipeline.video_files]
-        by_rank = {i: [] for i in range(6)}
-        for f in norm_files:
-            by_rank[get_rank(f)].append(f)
-
-        # 3. Create Display Item Tasks
-        self.display_items = []
-        matched_count = 0
-
-        for rank in [0, 1, 2, 3, 4, 5]:
-            vids = by_rank[rank]
-            if not vids:
-                continue
-
-            # Section Header Task
-            header_text = {
-                0: "⚠️ NEEDS ATTENTION",
-                1: "⚠️ NEEDS ATTENTION",
-                2: "✨ RESOLVED BY YOU",
-                3: "✅ AUTO-MATCHED",
-                4: "📂 FILES READY FOR DOWNLOAD",
-                5: "🚨 COMPLEX CASES (Manual review required)"
-            }[rank]
-            self.display_items.append(('header', header_text, rank == 5))
-
-            movies = []
-            series_groups = {}
-            for v in vids:
-                meta = self.pipeline.metadata_map.get(v)
-                if not isinstance(meta, dict): meta = {}
-                det = meta.get('details') if meta else {}
-                if not isinstance(det, dict): det = {}
-                
-                is_ep = meta and (meta.get('file_type') == 'episode' or meta.get('extras', {}).get('season') is not None)
-                
-                if is_ep:
-                    # For non-matches or multi-matches, group under "Unknown Series" to avoid UI clutter
-                    status = meta.get('status')
-                    extras = meta.get('extras', {})
-                    
-                    if status == 'one_match':
-                        name = det.get('series_title') or det.get('series_name') or det.get('name') or extras.get('title') or "Unknown Series"
-                    else:
-                        name = "Unknown Series"
-                        
-                    sn = det.get('season_number') or extras.get('season') or 1
-                    
-                    if name not in series_groups:
-                        # Prevent misleading posters for generic "Unknown" groups
-                        is_generic = name in ["Unknown Series", "Unknown Collection", "Unknown Saga"]
-                        poster = (det.get('series_poster_path') or det.get('poster_path')) if not is_generic else None
-                        series_groups[name] = {"poster": poster, "seasons": {}}
-                    if sn not in series_groups[name]["seasons"]:
-                        series_groups[name]["seasons"][sn] = []
-                    series_groups[name]["seasons"][sn].append(v)
-                else:
-                    movies.append(v)
-
-            # Add Movie Tasks
-            for m in movies:
-                self.display_items.append(('card', m, False))
-                if rank == 3: matched_count += 1
-
-            # Add Series Tasks
-            for s_title, s_data in series_groups.items():
-                all_files = [f for sn in s_data['seasons'] for f in s_data['seasons'][sn]]
-                self.display_items.append(('series_header', (s_title, s_data['poster'], all_files, rank == 5), False))
-                
-                for sn in sorted(s_data['seasons'].keys()):
-                    eps = s_data['seasons'][sn]
-                    meta = self.pipeline.metadata_map.get(eps[0])
-                    det = meta.get('details') if meta and isinstance(meta.get('details'), dict) else {}
-                    s_poster = det.get('season_poster_path')
-                    s_range = det.get('season_year_range', '')
-                    self.display_items.append(('season_header', (sn, s_poster, s_range, eps, rank == 5), False))
-                    
-                    for ep in eps:
-                        self.display_items.append(('card', ep, True)) # True = indented
-                        if rank == 3: matched_count += 1
-
-        self.stat_matches.setText(f"Matched: {matched_count}")
-        self.current_loaded_index = 0
-        self.load_next_chunk()
-
-    def on_scroll_changed(self, value):
-        bar = self.scroll.verticalScrollBar()
-        if value > bar.maximum() - 250:
-            self.load_next_chunk()
-
-    def load_next_chunk(self):
-        if not self.pipeline:
-            return
-        if self.current_loaded_index >= len(self.display_items):
-            return
-            
-        end_idx = min(self.current_loaded_index + self.chunk_size, len(self.display_items))
-        
-        for i in range(self.current_loaded_index, end_idx):
-            item_type, data, extra = self.display_items[i]
-            
-            if item_type == 'header':
-                header = QLabel(data)
-                color = "#f85149" if extra else "#6b7280"
-                header.setStyleSheet(f"font-weight: bold; color: {color}; font-size: 11px; margin-top: 30px; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1px;")
-                self.results_layout.addWidget(header)
-                
-            elif item_type == 'series_header':
-                s_title, poster, files, is_complex = data
-                header = SeriesHeader(
-                    s_title, poster,
-                    on_edit=(lambda _, f=files, t=s_title: self.select_files_for_inspector(f, t)) if not is_complex else None
-                )
-                self.results_layout.addWidget(header)
-                
-            elif item_type == 'season_header':
-                sn, poster, year_range, eps, is_complex = data
-                header = SeasonHeader(
-                    sn, poster, year_range,
-                    on_edit=(lambda _, f=eps, s=sn: self.select_files_for_inspector(f, season=s)) if not is_complex else None
-                )
-                self.results_layout.addWidget(header)
-                
-            elif item_type == 'card':
-                file_path = data
-                meta = self.pipeline.metadata_map.get(file_path)
-                card = MovieCard(
-                    file_path, meta,
-                    on_click=lambda _, p=file_path, m=meta: self.open_selection(p, m),
-                    on_edit=lambda _, p=file_path, m=meta: self.open_single_edit_popup(p, m),
-                    on_remove=lambda _, p=file_path: self.remove_file(p)
-                )
-                card.selection_changed.connect(lambda s, p=file_path: self.update_selection(p, s))
-                if file_path in self.selected_files:
-                    if self.is_multi_select_mode:
-                        card.checkbox.setChecked(True)
-                    else:
-                        card.set_active(True)
-                
-                if extra: # Indented for episodes
-                    container = QWidget()
-                    inner_layout = QHBoxLayout(container)
-                    inner_layout.setContentsMargins(60, 0, 0, 0)
-                    inner_layout.addWidget(card)
-                    self.results_layout.addWidget(container)
-                else:
-                    self.results_layout.addWidget(card)
-                    
-        self.current_loaded_index = end_idx
+        if self.list_mgr:
+            self.list_mgr.refresh()
 
     def clear_results(self):
-        while self.results_layout.count():
-            item = self.results_layout.takeAt(0)
-            widget = item.widget()
-            if widget:
-                widget.deleteLater()
-        try:
-            # We don't disconnect here because we only connect once in __init__
-            pass
-        except:
-            pass
+        if self.list_mgr:
+            self.list_mgr.clear_results()
 
     # --- Item Actions ---
-    def remove_file(self, file_path, refresh=True):
-        if not self.pipeline:
-            return
-        v_norm = os.path.abspath(os.path.normpath(file_path))
-        self.pipeline.video_files = [f for f in self.pipeline.video_files if os.path.abspath(os.path.normpath(f)) != v_norm]
-        
-        # Filter results if they exist
-        if hasattr(self.pipeline, 'collected_results') and self.pipeline.collected_results:
-            self.pipeline.collected_results = [r for r in self.pipeline.collected_results 
-                                              if isinstance(r, dict) and os.path.abspath(os.path.normpath(r.get('file_path', ''))) != v_norm]
-        
-        if v_norm in self.pipeline.metadata_map:
-            del self.pipeline.metadata_map[v_norm]
-            
-        if refresh:
-            self.refresh_list()
+    # --- (End of Item Actions - Delegated to Controller) ---
 
     def update_selection(self, file_path, is_selected):
         if is_selected:
-            self.selected_files.add(file_path)
-            if not getattr(self, 'ignore_multi_select_trigger', False):
-                self.is_multi_select_mode = True
+            self.state.add_selection(file_path)
         else:
-            self.selected_files.discard(file_path)
-            if not self.selected_files:
-                self.is_multi_select_mode = False
-        self.update_selection_ui()
+            self.state.remove_selection(file_path)
 
     def clear_selection(self):
-        self.ignore_multi_select_trigger = True
-        self.selected_files.clear()
+        self.state.clear_selection()
         from ui.components.movie_card import MovieCard
         for i in range(self.results_layout.count()):
             item = self.results_layout.itemAt(i)
@@ -568,9 +358,36 @@ class MainWindow(QMainWindow):
             if card:
                 card.checkbox.setChecked(False)
                 card.set_active(False)
-        self.is_multi_select_mode = False
+        self.state.is_multi_select_mode = False
         self.ignore_multi_select_trigger = False
         self.update_selection_ui()
+
+    def filter_list(self, text):
+        if self.list_mgr:
+            self.list_mgr.apply_search_filter(text)
+
+    def toggle_sidebar(self):
+        self.is_sidebar_collapsed = not self.is_sidebar_collapsed
+        target_width = 70 if self.is_sidebar_collapsed else 240
+        
+        # Update sidebar width
+        self.sidebar.setFixedWidth(target_width)
+        
+        # Toggle Labels
+        self.brand_full.setVisible(not self.is_sidebar_collapsed)
+        self.tagline_lbl.setVisible(not self.is_sidebar_collapsed)
+        self.stat_total.setVisible(not self.is_sidebar_collapsed)
+        self.stat_matches.setVisible(not self.is_sidebar_collapsed)
+        
+        # Toggle Button Texts
+        for btn in self.side_btns:
+            if self.is_sidebar_collapsed:
+                btn.setText(btn.property("icon_only"))
+            else:
+                btn.setText(btn.property("full_text"))
+        
+        # Update Toggle Button text/icon if needed
+        self.toggle_sidebar_btn.setText("≡" if not self.is_sidebar_collapsed else "»")
 
     def update_selection_ui(self):
         from ui.components.movie_card import MovieCard
@@ -584,10 +401,10 @@ class MainWindow(QMainWindow):
             else:
                 card = w.findChild(MovieCard)
             if card:
-                is_selected = card.file_path in self.selected_files
+                is_selected = card.file_path in self.state.selected_files
                 
                 # In multi-select mode, sync the checkbox state
-                if self.is_multi_select_mode:
+                if self.state.is_multi_select_mode:
                     self.ignore_multi_select_trigger = True
                     card.checkbox.setChecked(is_selected)
                     self.ignore_multi_select_trigger = False
@@ -599,7 +416,9 @@ class MainWindow(QMainWindow):
                     card.checkbox.setChecked(False)
                     self.ignore_multi_select_trigger = False
                 
-        self.inspector.update_selection(list(self.selected_files))
+        selected_count = len(self.state.selected_files)
+        self.inspector.update_selection(list(self.state.selected_files))
+        self.inspector.setVisible(selected_count > 0)
 
     def set_card_checkbox_visually(self, file_path, checked):
         from ui.components.movie_card import MovieCard
@@ -623,11 +442,11 @@ class MainWindow(QMainWindow):
         
         # Select all provided files
         for f in file_paths:
-            self.selected_files.add(f)
+            self.state.selected_files.add(f)
             
         # If we selected multiple files (e.g. a whole season), we should be in multi-select mode
         if len(file_paths) > 1:
-            self.is_multi_select_mode = True
+            self.state.is_multi_select_mode = True
             # In multi-select mode, we DO want to see the checkboxes
             self.ignore_multi_select_trigger = True
             from ui.components.movie_card import MovieCard
@@ -639,11 +458,11 @@ class MainWindow(QMainWindow):
                 if isinstance(w, MovieCard): card = w
                 else: card = w.findChild(MovieCard)
                 if card:
-                    card.checkbox.setChecked(card.file_path in self.selected_files)
+                    card.checkbox.setChecked(card.file_path in self.state.selected_files)
             self.ignore_multi_select_trigger = False
         else:
             # Single-select items are just highlighted with set_active via update_selection_ui
-            self.is_multi_select_mode = False
+            self.state.is_multi_select_mode = False
         
         self.update_selection_ui()
         
@@ -657,121 +476,17 @@ class MainWindow(QMainWindow):
         if season is not None:
             self.inspector.season_input.setText(str(season))
 
-    def bulk_remove_selected(self, paths=None):
-        targets = paths if paths else list(self.selected_files)
-        if not targets: return
-        
-        for f in targets:
-            self.remove_file(f, refresh=False)
-            
-        self.clear_selection()
-        self.refresh_list()
-        self.stat_total.setText(f"Total Files: {len(self.pipeline.video_files)}")
+    # --- (End of Refactored Section - Delegated to Controller) ---
 
-    def bulk_resolve_selected(self, paths, selected):
-        if not selected: return
-        
-        ready_to_enrich = []
-        for f_path in sorted(list(paths)):
-            current_meta = self.pipeline.metadata_map.get(f_path)
-            if not current_meta: continue
-            
-            new_meta = current_meta.copy()
-            new_meta.update({'is_manual': True, 'status': 'one_match'})
-            
-            # Apply Season Override if present
-            s_override = selected.get('season_override')
-            if s_override:
-                try: new_meta['season_file'] = int(s_override)
-                except: pass
-
-            from metadata.metadata import classify_result
-            classify_result({'results': [selected], 'total_results': 1}, new_meta, [], self.pipeline.api)
-            self.pipeline.metadata_map[f_path] = new_meta
-            ready_to_enrich.append(new_meta)
-        
-        self.clear_selection()
-        self.refresh_list()
-        self.trigger_background_enrichment(ready_to_enrich)
-
-    def bulk_change_type(self, paths, new_type):
-        for f in paths:
-            meta = self.pipeline.metadata_map.get(f)
-            if meta and isinstance(meta, dict):
-                meta['file_type'] = new_type
-                meta['status'] = 'no_match' # Reset match status since type changed
-                meta['details'] = None
-        self.clear_selection()
-        self.refresh_list()
-
-    def bulk_change_season(self, paths, new_season):
-        ready_to_enrich = []
-        for f in paths:
-            meta = self.pipeline.metadata_map.get(f)
-            if meta and isinstance(meta, dict):
-                try:
-                    meta['season_file'] = int(new_season)
-                    if meta.get('status') == 'one_match':
-                        ready_to_enrich.append(meta)
-                except ValueError:
-                    pass
-        self.clear_selection()
-        self.refresh_list()
-        if ready_to_enrich:
-            self.trigger_background_enrichment(ready_to_enrich)
-
-    def bulk_change_episode(self, paths, new_episode):
-        try:
-            num = int(new_episode)
-        except ValueError:
-            return
-            
-        ready_to_enrich = []
-        for f in paths:
-            meta = self.pipeline.metadata_map.get(f)
-            if meta and isinstance(meta, dict):
-                meta['episode_file'] = num
-                if meta.get('status') == 'one_match':
-                    ready_to_enrich.append(meta)
-        
-        self.clear_selection()
-        self.refresh_list()
-        if ready_to_enrich:
-            self.trigger_background_enrichment(ready_to_enrich)
-
-    def open_sequence_wizard(self):
-        paths = list(self.selected_files)
-        if len(paths) < 2: return
-        
-        from ui.dialogs.episode_order_dialog import EpisodeOrderDialog
-        from PySide6.QtWidgets import QDialog
-        
-        dialog = EpisodeOrderDialog(self, paths, default_start=1)
-        if dialog.exec() == QDialog.Accepted:
-            ordered_paths, start_num = dialog.get_results()
-        else:
-            return # Cancelled
-            
-        ready_to_enrich = []
-        for i, f in enumerate(ordered_paths):
-            meta = self.pipeline.metadata_map.get(f)
-            if meta and isinstance(meta, dict):
-                meta['episode_file'] = start_num + i
-                if meta.get('status') == 'one_match':
-                    ready_to_enrich.append(meta)
-        
-        self.clear_selection()
-        self.refresh_list()
-        if ready_to_enrich:
-            self.trigger_background_enrichment(ready_to_enrich)
-
+    # --- (End of Refactored Section - Delegated to Controller) ---
+    
     def open_selection(self, file_path, meta):
         # Allow toggling even if meta is None (e.g. freshly scanned files)
         
         # Only handle body clicks if we are already in multi-select mode
-        if getattr(self, 'is_multi_select_mode', False):
+        if self.state.is_multi_select_mode:
             # In multi-select mode, clicking the card body just toggles the checkbox
-            is_currently_selected = file_path in self.selected_files
+            is_currently_selected = file_path in self.state.selected_files
             self.set_card_checkbox_visually(file_path, not is_currently_selected)
             return
         
@@ -782,33 +497,78 @@ class MainWindow(QMainWindow):
 
     def open_single_edit_popup(self, file_path, meta):
         # Disable single-edit popup in multi-select mode
-        if getattr(self, 'is_multi_select_mode', False):
+        if self.state.is_multi_select_mode:
             return
             
         if not meta: return
         from ui.dialogs.selection_dialog import SelectionDialog
         dialog = SelectionDialog(self, self.pipeline, meta)
         if dialog.exec():
-            meta['status'] = 'one_match'
-            meta['details'] = dialog.selected_item
+            res = dialog.selected_item
+            if not res: return
+            
+            # Use controller for consistent multi-episode logic if possible, 
+            # or handle it here to match existing direct-to-state logic
+            if isinstance(res, list):
+                # Multi-Episode Selection
+                sorted_items = sorted(res, key=lambda x: x.get('episode_number', 0))
+                merged_title = " & ".join([item.get('name', 'Unknown') for item in sorted_items])
+                merged_nums = [item.get('episode_number') for item in sorted_items]
+                
+                primary = sorted_items[0]
+                details = primary.copy()
+                details['name'] = merged_title
+                details['episode_number'] = merged_nums
+                details['episode_title'] = merged_title
+                # Ensure series info is kept
+                details['series_title'] = primary.get('series_name') or primary.get('series_title')
+                
+                meta['file_type'] = 'episode'
+                meta['status'] = 'one_match'
+                meta['details'] = details
+            elif res.get('file_type') == 'extra':
+                meta['file_type'] = 'extra'
+                meta['extra_type'] = res.get('extra_type')
+                meta['status'] = 'extra'
+                meta['details'] = {}
+            else:
+                meta['file_type'] = 'movie' if dialog.type_combo.currentText() == "Movie" else "episode"
+                meta['status'] = 'one_match'
+                meta['details'] = res
+            
             meta['is_manual'] = True
-            self.pipeline.metadata_map[file_path] = meta
+            self.state.metadata_map[file_path] = meta # Use self.state instead of self.pipeline.metadata_map for consistency
             FILE_CACHE.set_match(file_path, meta)
             self.refresh_list()
             self.trigger_background_enrichment([meta])
 
     def trigger_background_enrichment(self, items_to_enrich):
-        def run_enrich():
-            self.pipeline.handled_results = items_to_enrich
-            self.pipeline.step_4_standardize_and_enrich()
-            
-        self.worker = WorkerThread(run_enrich)
-        self.worker.finished.connect(self.on_enrichment_finished)
-        self.worker.start()
+        if self.tasks:
+            self.tasks.trigger_enrichment(items_to_enrich)
 
     def on_enrichment_finished(self):
-        self.status_lbl.setText("Status: Enrichment Complete!")
         self.refresh_list()
+        self.status_lbl.setText("Status: Enrichment Complete!")
+
+    def _on_task_started(self, task_id):
+        self.rename_btn.setEnabled(False)
+        self.unified_btn.setEnabled(False)
+        if task_id == 'scan':
+            self.status_lbl.setText("Status: Scanning directory...")
+        elif task_id == 'unified_analysis':
+            self.status_lbl.setText("Status: Deep Analyzing & Matching (API)...")
+        elif task_id == 'renaming':
+            self.status_lbl.setText("Status: Renaming files...")
+        elif task_id == 'enrichment':
+            self.status_lbl.setText("Status: Enriching metadata...")
+
+    def _on_task_finished(self, task_id):
+        self.unified_btn.setEnabled(True)
+        # Rename button enabled logic is usually handled in specific finish handlers
+        if task_id == 'renaming':
+             self.status_lbl.setText("Status: Rename Complete!")
+        elif task_id == 'unified_analysis':
+             self.status_lbl.setText("Status: Analysis Complete!")
 
     def open_settings(self):
         dialog = SettingsDialog(self, self.cfg)
@@ -816,9 +576,9 @@ class MainWindow(QMainWindow):
     def on_clear_cache(self):
         from utils.cache import DataStore
         from PySide6.QtWidgets import QMessageBox
-        DataStore.wipe_all_data()
-        QMessageBox.information(self, "Total Cache Wiped", "All metadata, search results, and images have been cleared.")
-        self.refresh_list()
+        DataStore.clear_transient_data()
+        QMessageBox.information(self, "Cache Cleared", "Metadata, search results, and posters have been cleared. Your settings are preserved.")
+        self.clear_all()
 
 def start_qt_ui():
     app = QApplication(sys.argv)

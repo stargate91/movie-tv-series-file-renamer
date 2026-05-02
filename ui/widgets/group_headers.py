@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QLabel, QFrame, QPushButton
 from PySide6.QtCore import Qt
-from ui.components.image_widgets import ImageLoader
+from ui.widgets.image_widgets import ImageLoader
 
 class SeriesHeader(QFrame):
     def __init__(self, title, poster_path, on_edit=None):
@@ -85,3 +85,35 @@ class SeasonHeader(QWidget):
             """)
             self.btn.clicked.connect(on_edit)
             layout.addWidget(self.btn)
+
+class CollisionGroupHeader(QFrame):
+    """
+    Header for a group of files that have a naming collision (multi-part).
+    """
+    def __init__(self, title):
+        super().__init__()
+        self.setStyleSheet("""
+            QFrame {
+                background-color: #fffbeb; 
+                border: 1px solid #fcd34d; 
+                border-radius: 8px; 
+                margin-top: 15px;
+                margin-bottom: 5px;
+            }
+        """)
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(12, 8, 12, 8)
+        
+        icon = QLabel("📦")
+        icon.setStyleSheet("font-size: 16px; background: transparent; border: none;")
+        layout.addWidget(icon)
+        
+        lbl = QLabel(f"Multi-part Group: <b>{title}</b>")
+        lbl.setStyleSheet("font-size: 14px; color: #92400e; background: transparent; border: none;")
+        layout.addWidget(lbl)
+        
+        layout.addStretch()
+        
+        hint = QLabel("Adjust numbering below if needed")
+        hint.setStyleSheet("font-size: 11px; color: #d97706; font-style: italic; background: transparent; border: none;")
+        layout.addWidget(hint)

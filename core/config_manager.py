@@ -18,16 +18,20 @@ class AppSettings:
     """
     # Paths
     folder_path: str = ""
-    history_file: str = ""
 
     # General behaviour
-    interactive: bool = True
-    skipped: bool = False
-    recursive: bool = True
-    live_run: bool = False
-    undo: bool = False
-    source_mode: str = "fallback"  # file | folder | fallback
     vid_size: int = 500  # minimum MB
+
+    # Extras handling (skip, delete, rename)
+    action_extra_video: str = "rename"     # Small videos (trailers, samples)
+    action_extra_subtitle: str = "rename"  # Subtitle files
+    action_extra_audio: str = "rename"     # Audio tracks
+    action_extra_image: str = "rename"     # Posters, fanart
+    action_extra_metadata: str = "rename"  # NFO, XML
+    
+    extra_template: str = "{Original} - {ExtraCategory}"
+    movie_extra_template: str = "{Title} ({Year}) - {ExtraCategory}"
+    episode_extra_template: str = "{ShowTitle} - {Season}{Episode} - {ExtraCategory}"
 
     # Sample detection
     sample: bool = False
@@ -35,13 +39,40 @@ class AppSettings:
     sample_action: str = "rename"  # ignore | delete | rename
     sample_suffix: str = "sample"
 
-    # Templates
-    movie_template: str = "{custom_variable} + {movie_title} {movie_year}-{resolution}"
-    episode_template: str = "{custom_variable} + {series_title} - S{season_number}E{episode_number} - {episode_title}-{air_date}-{resolution}"
+    # Templates (File Names)
+    movie_template: str = "{Title} ({Year}) - {Resolution}"
+    episode_template: str = "{ShowTitle} - {Season}{Episode} - {EpisodeTitle} - {Resolution}"
     custom_variable: str = "default"
     zero_padding: bool = True
     filename_case: str = "none" # none, lower, upper, title
     separator: str = "space"   # space, dot, dash, underscore
+    
+    # Folder Structure
+    target_dir_movies: str = ""
+    target_dir_shows: str = ""
+    
+    create_movie_folder: bool = True
+    movie_folder_template: str = "{Title} ({Year})"
+    
+    create_show_folder: bool = True
+    show_folder_template: str = "{ShowTitle}"
+    create_season_folder: bool = True
+    season_folder_template: str = "Season {Season}"
+    create_episode_folder: bool = False
+    episode_folder_template: str = "{ShowTitle} - {Season}{Episode}"
+    
+    # Extras Folder Structure (none = next to video, single = all in 1 folder, categorized = separate folders)
+    extras_folder_mode: str = "none" 
+    extras_folder_name: str = "Extras"
+    
+    # Cleanup
+    cleanup_empty_folders: bool = True
+    
+    # Multi-part (Collision) Handling
+    multi_part_position: str = "suffix"  # prefix | suffix
+    multi_part_keyword: str = "Part"     # CD, Part, Disc, Disk, None
+    multi_part_style: str = "number"     # number (1), zero_padded (01), roman (I), letter (A)
+    multi_part_separator: str = "space"  # space, dot, dash, underscore, none
     metadata_language: str = "en-US" # Target language
     fallback_language: str = ""      # Fallback if target is missing
 
@@ -53,18 +84,22 @@ class AppSettings:
     tmdb_key: str = ""
     tmdb_bearer_token: str = ""
 
-    # Filters
-    video_extensions: str = ".mp4, .mkv, .avi, .mov, .wmv, .mpeg, .mpg"
+    # Filters & Extensions
+    video_extensions: str = ".mp4, .mkv, .avi, .mov, .wmv, .flv, .webm, .m4v"
+    subtitle_extensions: str = ".srt, .sub, .ass, .ssa, .vtt"
+    audio_extensions: str = ".mka, .ac3, .dts, .mp3, .flac, .wav, .m4a"
+    image_extensions: str = ".jpg, .jpeg, .png, .gif, .bmp, .webp"
+    metadata_extensions: str = ".nfo, .xml, .txt"
 
-
-from utils.cache import DataStore
+import json
+from core.v3.database import LibraryDB
 
 class ConfigManager:
-    """Centralized configuration loader/saver using SQLite."""
+    """Centralized configuration loader/saver using the v3 LibraryDB."""
 
-    def __init__(self):
+    def __init__(self, db: LibraryDB = None):
         self.settings = AppSettings()
-        self._store = DataStore("app")
+        self.db = db if db else LibraryDB()
         self._load()
 
     def validate_api_keys(self) -> None:
@@ -82,8 +117,11 @@ class ConfigManager:
 
     def save(self) -> None:
         """Persist current settings back to SQLite."""
-        self._store.set("settings", asdict(self.settings))
-        logger.info("Settings saved to DataStore.")
+        settings_dict = asdict(self.settings)
+        for k, v in settings_dict.items():
+            # Store values as JSON strings to preserve types (ints, bools)
+            self.db.set_setting(k, json.dumps(v))
+        logger.info("Settings saved to LibraryDB user_settings.")
 
     def to_dict(self) -> dict:
         """Return all settings as a plain dict."""
@@ -91,10 +129,11 @@ class ConfigManager:
 
     def _load(self) -> None:
         """Load settings from SQLite if available."""
-        loaded_settings = self._store.get("settings")
-        if loaded_settings:
-            for fld in fields(AppSettings):
-                if fld.name in loaded_settings:
-                    setattr(self.settings, fld.name, loaded_settings[fld.name])
-
-
+        all_settings = self.db.get_all_settings()
+        for fld in fields(AppSettings):
+            if fld.name in all_settings:
+                try:
+                    val = json.loads(all_settings[fld.name])
+                    setattr(self.settings, fld.name, val)
+                except Exception:
+                    pass

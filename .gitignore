@@ -39,3 +39,11 @@ rename_history/
 Thumbs.db
 .DS_Store
 test.py
+
+# V3 Testing & Temp
+test_v3_engine.py
+test_v3_scan.py
+v3_test_env/
+v3_target_env/
+*.db
+scratch/

@@ -1,186 +1,129 @@
 import os
-import sys
-
-from metadata.collector import get_all_video_files
-from utils.sample import collect_sample_videos, expand_sample_keywords
-from metadata.metadata import extract_metadata
-from metadata.metadata_standardizer import standardize_metadata
-from metadata.metadata_enricher import enricher
-from core.renamer import rename_video_files
-
+from core.scan_manager import ScanManager
+from core.metadata_manager import MetadataManager
+from core.renaming_engine import RenamingEngine
 
 class RenamePipeline:
     """
-    Orchestrates the entire renaming process step-by-step.
-    Designed to be used both by CLI (synchronously) and GUI (asynchronously/step-by-step).
+    Orchestrates the entire renaming process.
+    Uses AppState for centralized data storage.
     """
-    
-    def __init__(self, config_manager, api_client, ui_interface):
+    def __init__(self, config_manager, api_client, ui_interface, state):
         self.cfg = config_manager
         self.api = api_client
         self.ui = ui_interface
         self.s = self.cfg.settings
+        self.state = state # Centralized state
 
-        # State tracking for GUI/CLI
-        self.sample_files = []
-        self.video_files = []
-        self.metadata_map = {} # Maps file_path -> result dict
-        self.discovery_results = {} # Maps file_path -> discovery dict
-        self.collected_results = []
-        self.unknown_files = []
-        
-        self.handled_results = []
-        self.skipped_results = []
-        self.unprocessed_results = []
-        
-        self.standardized_files = []
-        self.episodes_with_missing_data = []
-        
-        self.enriched_files = []
-        self.unexpected_episodes = []
-        
-        self.renamed_files = []
-        self.rename_history = []
-        self.metadata_map = {} # path -> meta mapping for fast UI lookup
+        # Specialized Managers
+        self.scanner = ScanManager(self.s, self.ui)
+        self.metadata = MetadataManager(self.api, self.s, self.ui)
+        self.renamer = RenamingEngine(self.s, self.ui)
+
+    @property
+    def metadata_map(self): return self.state.metadata_map
+    @metadata_map.setter
+    def metadata_map(self, v): self.state.metadata_map = v
+
+    @property
+    def video_files(self): return self.state.video_files
+    @video_files.setter
+    def video_files(self, v): self.state.video_files = v
+
+    @property
+    def collected_results(self): return self.state.collected_results
+    @collected_results.setter
+    def collected_results(self, v): self.state.collected_results = v
+
+    @property
+    def enriched_files(self): return self.state.enriched_files
+    @enriched_files.setter
+    def enriched_files(self, v): self.state.enriched_files = v
+
+    @property
+    def discovery_results(self): return self.state.discovery_results
+    @discovery_results.setter
+    def discovery_results(self, v): self.state.discovery_results = v
+
+    @property
+    def renamed_files(self): return self.state.renamed_files
+    @renamed_files.setter
+    def renamed_files(self, v): self.state.renamed_files = v
+
+    @property
+    def rename_history(self): return self.state.rename_history
+    @rename_history.setter
+    def rename_history(self, v): self.state.rename_history = v
+
 
     def step_1_collect_files(self):
-        """Collects sample videos and main video files from the target directory."""
-        self.ui.update_progress(10, 100, "Status: Scanning...")
-        if self.s.sample:
-            keywords = expand_sample_keywords(self.s.sample_keywords)
-            self.sample_files = collect_sample_videos(self.s.folder_path, self.s.recursive, keywords, self.s.vid_size)
-        else:
-            self.sample_files = []
-
-        valid_exts = [ext.strip().lower() for ext in self.s.video_extensions.split(",") if ext.strip()]
-        raw_files = get_all_video_files(self.s.folder_path, self.s.vid_size, self.s.recursive, valid_exts)
-        self.video_files = [os.path.abspath(os.path.normpath(f)) for f in raw_files]
-        
-        self.ui.update_progress(100, 100, f"Status: Found {len(self.video_files)} files")
-        return len(self.video_files) > 0
+        """Delegates file collection to ScanManager, writing results to state."""
+        self.state.video_files = self.scanner.collect_files(self.state.metadata_map)
+        return len(self.state.video_files) > 0
 
     def unified_analysis(self):
         """One-click analysis: Discovery -> Match -> Enrich."""
-        if not self.video_files:
+        if not self.state.video_files:
             self.step_1_collect_files()
-            
-        if not self.video_files:
+        if not self.state.video_files:
             return False
 
-        # 1. Local Discovery (NFO, MKV Headers, Parts)
-        self.step_1b_discovery()
+        # Filter out extras for analysis
+        analyze_files = [f for f in self.state.video_files if self.state.metadata_map.get(f, {}).get('file_type') != 'extra']
+        if not analyze_files:
+            if self.ui:
+                self.ui.update_progress(100, 100, "Status: Scan Complete (Only Extras Found)")
+            return True
+
+        # 1. Local Discovery
+        self.state.discovery_results = self.metadata.discover(analyze_files)
         
-        # 2. Matching (API Search using IDs, Title Tags, and Filenames)
-        self.step_2_extract_metadata()
+        # 2. Matching
+        self.state.collected_results, unknown = self.metadata.extract(analyze_files, self.state.discovery_results)
         
-        # 3. Enrichment (Full details, Posters, Ratings)
-        # Filter out those that are already enriched in cache
-        to_enrich = [r for r in self.collected_results if isinstance(r, dict) and r.get('status') == 'one_match' and not r.get('is_enriched')]
-        already_enriched = [r for r in self.collected_results if isinstance(r, dict) and r.get('status') == 'one_match' and r.get('is_enriched')]
+        # Update state map
+        for res in self.state.collected_results:
+            if isinstance(res, dict) and res.get('file_path'):
+                norm_p = os.path.abspath(os.path.normpath(res['file_path']))
+                self.state.metadata_map[norm_p] = res
+
+        # 3. Enrichment
+        to_enrich = [r for r in self.state.collected_results if isinstance(r, dict) and r.get('status') == 'one_match' and not r.get('is_enriched')]
+        already_enriched_dicts = [r for r in self.state.collected_results if isinstance(r, dict) and r.get('status') == 'one_match' and r.get('is_enriched')]
         
-        if already_enriched:
-            from core.models import Movie, Episode
-            for res in already_enriched:
-                f_type = res.get('file_type')
-                details = res.get('details', {})
-                if f_type == 'movie':
-                    model = Movie.from_dict(details)
-                else:
-                    model = Episode.from_dict(details)
-                if model:
-                    self.enriched_files.append(model)
+        self.state.enriched_files = self.metadata.hydrate_from_cache(already_enriched_dicts)
 
         if to_enrich:
-            self.handled_results = to_enrich
-            self.step_4_standardize_and_enrich()
+            self.state.enriched_files, self.state.unexpected_episodes = self.metadata.standardize_and_enrich(
+                to_enrich, self.state.discovery_results, self.state.metadata_map, self.state.enriched_files
+            )
             
         if self.ui:
             self.ui.update_progress(100, 100, "Status: Analysis Complete!")
-            
         return True
 
-    def step_1b_discovery(self):
-        """Analyzes files for NFOs and internal metadata."""
-        from metadata.discovery import MetadataDiscovery
-        discovery = MetadataDiscovery()
-        self.discovery_results = discovery.discover(self.video_files, ui=self.ui)
-        return any(self.discovery_results)
+    def step_1b_discovery(self, target_files=None):
+        files = target_files if target_files is not None else self.state.video_files
+        self.state.discovery_results = self.metadata.discover(files)
+        return any(self.state.discovery_results)
 
     def step_2_extract_metadata(self, custom_files=None):
-        """
-        Parses filenames and queries APIs for initial matches.
-        Can optionally take a custom list of files (e.g. from skipped menu).
-        """
-        files_to_process = custom_files if custom_files is not None else self.video_files
+        files = custom_files if custom_files is not None else self.state.video_files
+        self.state.collected_results, unknown = self.metadata.extract(files, self.state.discovery_results)
         
-        # Pass discovered IDs to the extractor if they exist
-        discovered = getattr(self, 'discovery_results', {})
-        
-        self.collected_results, self.unknown_files = extract_metadata(
-            files_to_process, self.api, self.s.source_mode, self.ui, 
-            language=self.s.metadata_language,
-            discovery_data=discovered
-        )
-        # Build map for UI
-        for res in self.collected_results:
-            if not isinstance(res, dict): continue
-            norm_p = os.path.abspath(os.path.normpath(res.get('file_path', '')))
-            if norm_p:
-                self.metadata_map[norm_p] = res
-            
-        return any(self.collected_results)
+        for res in self.state.collected_results:
+            if isinstance(res, dict) and res.get('file_path'):
+                norm_p = os.path.abspath(os.path.normpath(res['file_path']))
+                self.state.metadata_map[norm_p] = res
+        return any(self.state.collected_results)
 
     def step_4_standardize_and_enrich(self):
-        """Converts dicts to Models, fetches extra details (ratings, genres) and maps samples."""
-        standardized, missing = standardize_metadata(self.handled_results)
-        
-        if not any([standardized, missing]):
-            return False
-
-        new_enriched, unexpected = enricher(
-            standardized, self.api, self.ui, 
-            language=self.s.metadata_language,
-            fallback_language=self.s.fallback_language,
-            templates=[self.s.movie_template, self.s.episode_template],
-            discovery_data=self.discovery_results
+        results_to_enrich = [r for r in self.state.collected_results if isinstance(r, dict) and r.get('status') == 'one_match']
+        self.state.enriched_files, self.state.unexpected_episodes = self.metadata.standardize_and_enrich(
+            results_to_enrich, self.state.discovery_results, self.state.metadata_map, self.state.enriched_files
         )
-        
-        # Accumulate results: use a map to avoid duplicates and preserve previous matches
-        # Initialize map from current enriched_files if not exists
-        enriched_map = {os.path.abspath(os.path.normpath(f.file_path)): f for f in self.enriched_files}
-        
-        for item in new_enriched:
-            norm_p = os.path.abspath(os.path.normpath(item.file_path))
-            enriched_map[norm_p] = item
-            
-        self.enriched_files = list(enriched_map.values())
-        self.unexpected_episodes.extend(unexpected)
-
-        # Update metadata_map and CACHE for UI with enriched data
-        from metadata.metadata import FILE_CACHE
-        for item in self.enriched_files:
-            norm_p = os.path.abspath(os.path.normpath(item.file_path))
-            cached_data = {
-                'file_path': item.file_path,
-                'file_type': item.file_type,
-                'status': 'one_match',
-                'details': item.__dict__,
-                'is_manual': self.metadata_map.get(norm_p, {}).get('is_manual', False),
-                'is_enriched': True # Mark as fully enriched
-            }
-            self.metadata_map[norm_p] = cached_data
-            FILE_CACHE.set_match(item.file_path, cached_data)
-        
-        if self.ui:
-            self.ui.update_progress(100, 100, "Status: Data Ready")
-                    
         return True
 
     def step_5_rename(self):
-        """Executes the renaming (or dry run) based on the enriched models."""
-        self.renamed_files, self.rename_history = rename_video_files(
-            self.enriched_files, self.s.live_run, self.s.zero_padding, self.s.custom_variable,
-            self.s.movie_template, self.s.episode_template, self.s.filename_case, self.s.separator,
-            self.s.sample_action, self.s.sample_suffix, self.ui
-        )
-        return self.renamed_files
+        self.state.renamed_files, self.state.rename_history = self.renamer.execute(self.state.enriched_files, self.state.metadata_map)
+        return self.state.renamed_files

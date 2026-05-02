@@ -47,14 +47,27 @@ class DataStore:
         conn.commit()
 
     @classmethod
+    def clear_transient_data(cls):
+        """Clears only metadata, discovery and search caches. Preserves settings."""
+        conn = cls.get_connection()
+        try:
+            cursor = conn.cursor()
+            categories_to_clear = ['file_matches', 'discovery', 'tmdb_movie_cache', 'tmdb_tv_cache', 'assets']
+            cursor.execute(f"DELETE FROM kv_store WHERE category IN ({','.join(['?']*len(categories_to_clear))})", categories_to_clear)
+            conn.commit()
+            logger.info("Transient cache cleared successfully.")
+        except Exception as e:
+            logger.error(f"Error clearing cache: {e}")
+
+    @classmethod
     def wipe_all_data(cls):
-        """Nuclear option: Clears ALL categories and ALL data from the database."""
+        """Nuclear option: Clears EVERYTHING. Use with caution."""
         conn = cls.get_connection()
         try:
             cursor = conn.cursor()
             cursor.execute('DELETE FROM kv_store')
             conn.commit()
-            logger.info("Database wiped successfully (all categories).")
+            logger.info("Database wiped completely.")
         except Exception as e:
             logger.error(f"Error wiping database: {e}")
 

@@ -11,8 +11,13 @@ class WorkerThread(QThread):
 
     def run(self):
         try:
+            print(f"DEBUG: WorkerThread starting: {self.target_func}")
             self.target_func()
+            print("DEBUG: WorkerThread finished successfully.")
         except Exception as e:
+            print(f"CRITICAL: Worker thread crashed: {e}")
+            import traceback
+            traceback.print_exc()
             logger.error(f"Worker thread error: {e}")
 
 class QtUIBridge(UIInterface):

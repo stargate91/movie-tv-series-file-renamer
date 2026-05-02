@@ -82,7 +82,7 @@ class Movie:
             part=data.get('part', "")
         )
 
-    def to_template_dict(self) -> dict:
+    def to_template_dict(self, is_multi: bool = False) -> dict:
         """Returns a flat dict suitable for str.format() in rename templates."""
         d = {
             "movie_title": self.title,
@@ -97,7 +97,7 @@ class Movie:
             "other": self.extras.other,
             "edition": self.extras.edition,
             "streaming_service": self.extras.streaming_service,
-            "part": f" - {self.part}" if self.part else ""
+            "part": f" - {self.part}" if (self.part and is_multi) else ""
         }
         # Add technical metadata
         if self.tech_metadata:
@@ -141,10 +141,13 @@ class Episode:
         extras = ExtraMetadata.from_dict(data.get('extras', {}))
         ratings = Ratings.from_dict(data.get('ratings', {}))
         
+        # Robust title selection (favor episode_title, fallback to name for TMDB/Manual)
+        ep_title = data.get('episode_title') or data.get('name') or "Unknown Episode Title"
+        
         return cls(
             file_path=data.get('file_path'),
             series_title=data.get('series_title', "Unknown Title"),
-            episode_title=data.get('episode_title', "Unknown Episode Title"),
+            episode_title=ep_title,
             season_number=data.get('season_number', "unknown"),
             episode_number=data.get('episode_number', "unknown"),
             first_air_date=data.get('first_air_date', "Unknown First Air Date"),
@@ -166,7 +169,7 @@ class Episode:
             part=data.get('part', "")
         )
 
-    def to_template_dict(self, season_str: str, episode_str: str) -> dict:
+    def to_template_dict(self, season_str: str, episode_str: str, is_multi: bool = False) -> dict:
         """Returns a flat dict suitable for str.format() in rename templates."""
         d = {
             "series_title": self.series_title,
@@ -189,7 +192,7 @@ class Episode:
             "other": self.extras.other,
             "edition": self.extras.edition,
             "streaming_service": self.extras.streaming_service,
-            "part": f" - {self.part}" if self.part else ""
+            "part": f" - {self.part}" if (self.part and is_multi) else ""
         }
         # Add technical metadata
         if self.tech_metadata:

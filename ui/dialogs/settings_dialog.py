@@ -175,6 +175,124 @@ class SettingsDialog(QDialog):
         
         self.tabs.addTab(rename_tab, "Templates")
         
+        # --- Extras Tab ---
+        extras_tab = QWidget()
+        extras_v_layout = QVBoxLayout(extras_tab)
+        extras_form = QFormLayout()
+        
+        self.extra_action_combo = QComboBox()
+        self.extra_action_combo.addItems(["skip", "delete", "rename"])
+        self.extra_action_combo.setCurrentText(self.cfg.settings.extra_action)
+        
+        self.movie_extra_tmpl = QLineEdit(self.cfg.settings.movie_extra_template)
+        self.episode_extra_tmpl = QLineEdit(self.cfg.settings.episode_extra_template)
+        
+        extras_form.addRow("Action for Extras:", self.extra_action_combo)
+        extras_form.addRow("Movie Extra Template:", self.movie_extra_tmpl)
+        extras_form.addRow("TV Extra Template:", self.episode_extra_tmpl)
+        
+        extras_v_layout.addLayout(extras_form)
+
+        # Legend for Extras
+        extra_legend = QWidget()
+        extra_legend.setStyleSheet(legend_container.styleSheet())
+        extra_leg_layout = QVBoxLayout(extra_legend)
+        
+        extra_leg_layout.addWidget(QLabel("Extra-Specific Variables"))
+        extra_leg_layout.addWidget(create_chip_layout(["extra_type", "original"]))
+        
+        extra_leg_layout.addWidget(QLabel("Inherited from Movie Parent"))
+        extra_leg_layout.addWidget(create_chip_layout(["movie_title", "movie_year", "genres"], self.movie_extra_tmpl))
+        
+        extra_leg_layout.addWidget(QLabel("Inherited from TV Parent"))
+        extra_leg_layout.addWidget(create_chip_layout(["series_title", "season_number", "episode_number"], self.episode_extra_tmpl))
+
+        extras_v_layout.addWidget(extra_legend)
+        extras_v_layout.addStretch()
+        
+        self.tabs.addTab(extras_tab, "Extras")
+        
+        # --- Multi-part Tab ---
+        multipart_tab = QWidget()
+        multipart_layout = QFormLayout(multipart_tab)
+        
+        self.mp_pos_combo = QComboBox()
+        self.mp_pos_combo.addItems(["prefix", "suffix"])
+        self.mp_pos_combo.setCurrentText(self.cfg.settings.multi_part_position)
+        
+        self.mp_keyword_input = QLineEdit(self.cfg.settings.multi_part_keyword)
+        self.mp_keyword_input.setPlaceholderText("CD, Part, Disc, A, B...")
+        
+        self.mp_style_combo = QComboBox()
+        self.mp_style_combo.addItems(["number", "roman", "padded_number", "letter"])
+        self.mp_style_combo.setCurrentText(self.cfg.settings.multi_part_style)
+        
+        self.mp_sep_combo = QComboBox()
+        self.mp_sep_combo.addItems(["space", "dot", "dash", "underscore", "bracket", "none"])
+        self.mp_sep_combo.setCurrentText(self.cfg.settings.multi_part_separator)
+        
+        multipart_layout.addRow("Position:", self.mp_pos_combo)
+        multipart_layout.addRow("Keyword:", self.mp_keyword_input)
+        multipart_layout.addRow("Numbering Style:", self.mp_style_combo)
+        multipart_layout.addRow("Separator:", self.mp_sep_combo)
+        
+        mp_help = QLabel("Controls how multi-part files (CD1, Part II) are renamed when a naming collision occurs.")
+        mp_help.setStyleSheet("color: #6b7280; font-size: 11px; margin-top: 10px;")
+        mp_help.setWordWrap(True)
+        multipart_layout.addRow(mp_help)
+        
+        self.tabs.addTab(multipart_tab, "Multi-part")
+
+        # --- Maintenance Tab ---
+        maint_tab = QWidget()
+        maint_layout = QVBoxLayout(maint_tab)
+        maint_layout.setSpacing(15)
+        maint_layout.setContentsMargins(30, 30, 30, 30)
+
+        maint_title = QLabel("DATABASE MAINTENANCE")
+        maint_title.setStyleSheet("font-weight: bold; color: #374151; font-size: 13px;")
+        maint_layout.addWidget(maint_title)
+
+        maint_desc = QLabel("Use these tools to fix issues or reset the application data.")
+        maint_desc.setStyleSheet("color: #6b7280; font-size: 11px;")
+        maint_desc.setWordWrap(True)
+        maint_layout.addWidget(maint_desc)
+
+        maint_layout.addSpacing(10)
+
+        # Clear Cache Button
+        cache_btn = QPushButton("🧹 Clear Search & Image Cache")
+        cache_btn.setFixedHeight(40)
+        cache_btn.setStyleSheet("""
+            QPushButton { background-color: #f3f4f6; border: 1px solid #d1d5db; color: #374151; border-radius: 6px; font-weight: bold; }
+            QPushButton:hover { background-color: #e5e7eb; }
+        """)
+        cache_btn.clicked.connect(self.on_clear_cache_clicked)
+        maint_layout.addWidget(cache_btn)
+
+        cache_help = QLabel("Deletes identified metadata and posters. Preserves your API keys and settings.")
+        cache_help.setStyleSheet("color: #9ca3af; font-size: 10px;")
+        maint_layout.addWidget(cache_help)
+
+        maint_layout.addSpacing(20)
+
+        # Factory Reset Button
+        factory_btn = QPushButton("⚠️ FACTORY RESET (Wipe Everything)")
+        factory_btn.setFixedHeight(40)
+        factory_btn.setStyleSheet("""
+            QPushButton { background-color: #fef2f2; border: 1px solid #fecaca; color: #dc2626; border-radius: 6px; font-weight: bold; }
+            QPushButton:hover { background-color: #fee2e2; border-color: #f87171; }
+        """)
+        factory_btn.clicked.connect(self.on_factory_reset_clicked)
+        maint_layout.addWidget(factory_btn)
+
+        factory_help = QLabel("DANGER: This will delete ALL data, including API keys, templates, and history. The app will return to its original state.")
+        factory_help.setStyleSheet("color: #ef4444; font-size: 10px;")
+        maint_layout.addWidget(factory_help)
+
+        maint_layout.addStretch()
+        self.tabs.addTab(maint_tab, "Maintenance")
+        
         layout.addWidget(self.tabs)
         
         # Bottom Buttons
@@ -210,6 +328,17 @@ class SettingsDialog(QDialog):
         self.cfg.settings.video_extensions = self.ext_input.text()
         self.cfg.settings.vid_size = self.size_input.value()
 
+        # Extras
+        self.cfg.settings.extra_action = self.extra_action_combo.currentText()
+        self.cfg.settings.movie_extra_template = self.movie_extra_tmpl.text()
+        self.cfg.settings.episode_extra_template = self.episode_extra_tmpl.text()
+
+        # Multi-part
+        self.cfg.settings.multi_part_position = self.mp_pos_combo.currentText()
+        self.cfg.settings.multi_part_keyword = self.mp_keyword_input.text()
+        self.cfg.settings.multi_part_style = self.mp_style_combo.currentText()
+        self.cfg.settings.multi_part_separator = self.mp_sep_combo.currentText()
+
         self.cfg.save()
         self.accept()
 
@@ -241,3 +370,24 @@ class SettingsDialog(QDialog):
         target.setText(new_text)
         target.setFocus()
         target.setCursorPosition(cursor_pos + len(var_text))
+
+    def on_clear_cache_clicked(self):
+        from utils.cache import DataStore
+        from PySide6.QtWidgets import QMessageBox
+        reply = QMessageBox.question(self, "Clear Cache?", "This will remove all cached metadata and posters. Your settings will be kept. Proceed?", 
+                                     QMessageBox.Yes | QMessageBox.No)
+        if reply == QMessageBox.Yes:
+            DataStore.clear_transient_data()
+            QMessageBox.information(self, "Done", "Cache cleared successfully.")
+
+    def on_factory_reset_clicked(self):
+        from utils.cache import DataStore
+        from PySide6.QtWidgets import QMessageBox
+        reply = QMessageBox.critical(self, "FACTORY RESET?", "WARNING: This will delete ALL settings, API keys, and cached data.\n\nThis cannot be undone. Are you absolutely sure?", 
+                                     QMessageBox.Yes | QMessageBox.No)
+        if reply == QMessageBox.Yes:
+            DataStore.wipe_all_data()
+            # Also reset ConfigManager defaults if possible, but wipe_all_data kills the DB settings
+            self.cfg.reset_to_defaults() 
+            QMessageBox.warning(self, "Reset Complete", "The application has been reset. It is recommended to restart the app now.")
+            self.accept()

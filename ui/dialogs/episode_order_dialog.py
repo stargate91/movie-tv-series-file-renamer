@@ -7,8 +7,9 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt
 
 class EpisodeOrderDialog(QDialog):
-    def __init__(self, parent, paths, default_start=1):
+    def __init__(self, parent, paths, default_start=1, ep_titles=None):
         super().__init__(parent)
+        self.ep_titles = ep_titles or {}
         self.setWindowTitle("🪄 Sequence Episodes Wizard")
         self.setMinimumWidth(500)
         self.setMinimumHeight(400)
@@ -97,7 +98,10 @@ class EpisodeOrderDialog(QDialog):
         for i in range(self.list_widget.count()):
             item = self.list_widget.item(i)
             basename = item.data(Qt.UserRole)
-            item.setText(f"⠿  E{start_num + i:02d}  →  {basename}")
+            ep_num = start_num + i
+            title = self.ep_titles.get(ep_num, "")
+            title_part = f" - {title}" if title else ""
+            item.setText(f"⠿  E{ep_num:02d}{title_part}  ←  {basename}")
 
     def get_results(self):
         ordered = []

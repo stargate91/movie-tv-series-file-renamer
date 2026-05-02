@@ -127,8 +127,11 @@ def enricher(standardized_files, api_client, ui=None, language="hu-HU", fallback
             return item
         except Exception as e:
             logger.error(f"Error enriching {item.file_path}: {e}")
+            # Attach error info but still return the item so it doesn't get lost
+            item.enrichment_error = str(e)
+            item.status = 'no_match' # Force it back to no_match so user can fix the broken ID
             with progress_lock: processed_count += 1
-            return None
+            return item
 
     with ThreadPoolExecutor(max_workers=8) as executor:
         futures = [executor.submit(process_item, it) for it in standardized_files]

@@ -1,10 +1,13 @@
+import os
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, 
     QLineEdit, QFrame, QScrollArea, QComboBox, QListWidget, QListWidgetItem
 )
 from PySide6.QtCore import Qt, Signal
-from ui.components.image_widgets import ImageLoader
-import os
+from ui.widgets.image_widgets import ImageLoader
+from ui.widgets.buttons import PrimaryButton, SecondaryButton, DangerButton
+from core.renamer import format_filename
+from ui.styles import UIStyles
 
 class InspectorPanel(QWidget):
     """
@@ -13,365 +16,231 @@ class InspectorPanel(QWidget):
     apply_metadata = Signal(list, dict) # [file_paths], metadata_details
     remove_requested = Signal(list)     # [file_paths]
     type_change_requested = Signal(list, str) # [file_paths], new_type
+    extra_type_change_requested = Signal(list, str) # [file_paths], new_extra_type
     season_change_requested = Signal(list, str) # [file_paths], season_num
     episode_change_requested = Signal(list, str) # [file_paths], episode_start
+    link_parent_requested = Signal(list)       # [file_paths]
     sequence_requested = Signal() # Trigger order wizard
 
-    def __init__(self, parent, pipeline):
+    def __init__(self, parent, pipeline=None):
         super().__init__(parent)
         self.pipeline = pipeline
         self.selected_paths = []
         self.search_results = []
         
-        self.setFixedWidth(320)
+        self.setFixedWidth(400)
         self.setObjectName("InspectorPanel")
-        self.setStyleSheet("""
-            #InspectorPanel {
-                background-color: #f5f7fa;
-                border-left: 1px solid #d6dce5;
-            }
-            QLabel { color: #1a1a2e; }
-            QLabel#Title { font-size: 15px; font-weight: bold; color: #0066cc; }
-            QLabel#SubTitle { color: #5a6a7a; font-size: 10px; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px; }
-            
-            QLineEdit {
-                background-color: #ffffff;
-                border: 1px solid #c8d1dc;
-                border-radius: 4px;
-                padding: 7px 10px;
-                color: #1a1a2e;
-                selection-background-color: #0078d4;
-                selection-color: #ffffff;
-            }
-            QLineEdit:focus { border-color: #0078d4; border-width: 2px; }
-            QLineEdit::placeholder { color: #9aa5b4; }
-            
-            QPushButton#ActionBtn {
-                background-color: #0078d4;
-                color: #ffffff;
-                border: none;
-                border-radius: 4px;
-                padding: 10px 16px;
-                font-weight: bold;
-                font-size: 13px;
-            }
-            QPushButton#ActionBtn:hover { background-color: #106ebe; }
-            QPushButton#ActionBtn:pressed { background-color: #005a9e; }
-            QPushButton#ActionBtn:disabled { background-color: #c8d1dc; color: #9aa5b4; }
-
-            QPushButton#SecondaryBtn {
-                background-color: #ffffff;
-                border: 1px solid #c8d1dc;
-                color: #1a1a2e;
-                border-radius: 4px;
-                padding: 6px 12px;
-            }
-            QPushButton#SecondaryBtn:hover { background-color: #e8edf2; border-color: #0078d4; }
-            QPushButton#SecondaryBtn:pressed { background-color: #d6dce5; }
-            
-            QListWidget {
-                background-color: #ffffff;
-                border: 1px solid #c8d1dc;
-                border-radius: 4px;
-                outline: none;
-            }
-            QListWidget::item {
-                border-bottom: 1px solid #e8edf2;
-                padding: 5px;
-                color: #1a1a2e;
-            }
-            QListWidget::item:selected {
-                background-color: #e5f1fb;
-                border-left: 3px solid #0078d4;
-            }
-            QListWidget::item:hover {
-                background-color: #f0f4f8;
-            }
-            
-            QComboBox {
-                background-color: #ffffff;
-                border: 1px solid #c8d1dc;
-                border-radius: 4px;
-                padding: 5px 8px;
-                color: #1a1a2e;
-            }
-            QComboBox:hover { border-color: #0078d4; }
-            QComboBox::drop-down { border: none; width: 24px; }
-            QComboBox QAbstractItemView {
-                background-color: #ffffff;
-                border: 1px solid #c8d1dc;
-                selection-background-color: #e5f1fb;
-                selection-color: #1a1a2e;
-            }
-            
-            QScrollArea { border: none; background: transparent; }
-            
-            QFrame[frameShape="4"] { background-color: #d6dce5; max-height: 1px; }
-        """)
-        
-        main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(0, 0, 0, 0)
-        
-        self.scroll = QScrollArea()
-        self.scroll.setWidgetResizable(True)
-        self.content_widget = QWidget()
-        self.layout = QVBoxLayout(self.content_widget)
-        self.layout.setContentsMargins(20, 20, 20, 20)
-        self.layout.setSpacing(15)
+        self.setStyleSheet(UIStyles.INSPECTOR_PANEL)
         
         self.init_ui()
-        
-        self.scroll.setWidget(self.content_widget)
-        main_layout.addWidget(self.scroll)
 
     def init_ui(self):
-        title = QLabel("Selection Inspector")
-        title.setObjectName("Title")
-        self.layout.addWidget(title)
-        
-        self.count_lbl = QLabel("0 items selected")
-        self.count_lbl.setObjectName("SubTitle")
-        self.layout.addWidget(self.count_lbl)
-        
-        # --- Batch Actions ---
-        actions_frame = QFrame()
-        actions_layout = QHBoxLayout(actions_frame)
-        actions_layout.setContentsMargins(0, 0, 0, 0)
-        
-        self.clear_btn = QPushButton("Clear")
-        self.clear_btn.setObjectName("SecondaryBtn")
-        actions_layout.addWidget(self.clear_btn)
-        
-        self.remove_btn = QPushButton("🗑️ Remove")
-        self.remove_btn.setObjectName("SecondaryBtn")
-        self.remove_btn.setStyleSheet("color: #d13438; border-color: #d13438;")
-        self.remove_btn.clicked.connect(self.on_remove_clicked)
-        actions_layout.addWidget(self.remove_btn)
-        
-        self.layout.addWidget(actions_frame)
-        
-        line = QFrame()
-        line.setFrameShape(QFrame.HLine)
-        line.setStyleSheet("background-color: #30363d;")
-        self.layout.addWidget(line)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(15, 20, 15, 20)
+        layout.setSpacing(15)
 
-        # --- Resolution Controls Container ---
-        self.res_container = QWidget()
-        res_layout = QVBoxLayout(self.res_container)
-        res_layout.setContentsMargins(0, 0, 0, 0)
-        res_layout.setSpacing(10)
+        # Header
+        title_lbl = QLabel("Inspector")
+        title_lbl.setObjectName("Title")
+        layout.addWidget(title_lbl)
+
+        # Selection Management
+        self.selection_header = QHBoxLayout()
+        self.summary_lbl = QLabel("0 files selected")
+        self.summary_lbl.setStyleSheet("color: #6b7280; font-size: 12px;")
+        self.selection_header.addWidget(self.summary_lbl)
         
-        res_layout.addWidget(QLabel("BATCH RESOLVE", objectName="SubTitle"))
+        self.view_list_btn = SecondaryButton("View List")
+        self.view_list_btn.setFixedWidth(80)
+        self.view_list_btn.clicked.connect(self.toggle_selection_list)
+        self.selection_header.addWidget(self.view_list_btn)
         
-        # Type Toggle
-        res_layout.addWidget(QLabel("TYPE", objectName="SubTitle"))
-        type_box = QWidget()
-        t_layout = QHBoxLayout(type_box)
-        t_layout.setContentsMargins(0,0,0,0)
+        self.deselect_btn = DangerButton("Deselect")
+        self.deselect_btn.setFixedWidth(80)
+        self.deselect_btn.clicked.connect(self.on_deselect_clicked)
+        self.selection_header.addWidget(self.deselect_btn)
         
-        self.type_combo = QComboBox()
-        self.type_combo.addItems(["Movie", "TV Show"])
-        t_layout.addWidget(self.type_combo, 1)
+        layout.addLayout(self.selection_header)
+
+        # Selection List (Hidden by default)
+        self.selection_list = QListWidget()
+        self.selection_list.setFixedHeight(120)
+        self.selection_list.setVisible(False)
+        self.selection_list.setStyleSheet("""
+            QListWidget {
+                background: #f9fafb;
+                border: 1px solid #e5e7eb;
+                border-radius: 6px;
+                font-size: 10px;
+                color: #4b5563;
+            }
+        """)
+        layout.addWidget(self.selection_list)
+
+        # Action Tabs / Sections
+        self.scroll = QScrollArea()
+        self.scroll.setWidgetResizable(True)
+        self.scroll.setStyleSheet(UIStyles.SCROLL_AREA)
         
-        self.set_type_btn = QPushButton("Set Type")
-        self.set_type_btn.setObjectName("SecondaryBtn")
-        self.set_type_btn.clicked.connect(self.on_set_type_clicked)
-        t_layout.addWidget(self.set_type_btn)
-        res_layout.addWidget(type_box)
+        container = QWidget()
+        self.container_layout = QVBoxLayout(container)
+        self.container_layout.setSpacing(20)
         
-        # Search Box
-        res_layout.addWidget(QLabel("SEARCH & MATCH", objectName="SubTitle"))
-        search_box = QWidget()
-        s_layout = QHBoxLayout(search_box)
-        s_layout.setContentsMargins(0,0,0,0)
+        # --- Metadata Search Section ---
+        search_section = QWidget()
+        s_layout = QVBoxLayout(search_section)
+        s_layout.setContentsMargins(0, 0, 0, 0)
+        s_layout.setSpacing(10)
         
-        self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("Search for title...")
-        self.search_input.returnPressed.connect(self.perform_search)
-        s_layout.addWidget(self.search_input)
+        s_layout.addWidget(QLabel("METADATA RESOLVER", objectName="SubTitle"))
         
-        self.search_btn = QPushButton("🔍")
-        self.search_btn.setFixedSize(35, 35)
-        self.search_btn.setObjectName("SecondaryBtn")
-        self.search_btn.clicked.connect(self.perform_search)
-        s_layout.addWidget(self.search_btn)
-        res_layout.addWidget(search_box)
+        self.tank_btn = PrimaryButton("🎯 Tank Search (Identify)")
+        self.tank_btn.setMinimumHeight(45)
+        self.tank_btn.setToolTip("Open the hierarchical search to resolve all selected files at once.")
+        self.tank_btn.clicked.connect(self.on_open_tank_search)
+        s_layout.addWidget(self.tank_btn)
         
-        # Season & Episode Override
-        self.tv_overrides_frame = QWidget()
-        tv_layout = QVBoxLayout(self.tv_overrides_frame)
-        tv_layout.setContentsMargins(0, 0, 0, 0)
+        self.container_layout.addWidget(search_section)
+
+        # --- Quick Actions Section ---
+        actions_section = QWidget()
+        a_layout = QVBoxLayout(actions_section)
+        a_layout.setContentsMargins(0, 0, 0, 0)
         
-        s_box = QWidget()
-        s_lay = QHBoxLayout(s_box)
-        s_lay.setContentsMargins(0, 0, 0, 0)
-        self.season_input = QLineEdit()
-        self.season_input.setPlaceholderText("Season Override")
-        self.set_season_btn = QPushButton("Set")
-        self.set_season_btn.setObjectName("SecondaryBtn")
-        self.set_season_btn.clicked.connect(self.on_set_season_clicked)
-        s_lay.addWidget(self.season_input, 1)
-        s_lay.addWidget(self.set_season_btn)
-        tv_layout.addWidget(s_box)
+        a_layout.addWidget(QLabel("QUICK ACTIONS", objectName="SubTitle"))
         
-        self.e_box = QWidget()
-        e_lay = QHBoxLayout(self.e_box)
-        e_lay.setContentsMargins(0, 0, 0, 0)
-        self.episode_input = QLineEdit()
-        self.episode_input.setPlaceholderText("Episode Override")
-        self.set_episode_btn = QPushButton("Set")
-        self.set_episode_btn.setObjectName("SecondaryBtn")
-        self.set_episode_btn.clicked.connect(self.on_set_episode_clicked)
-        e_lay.addWidget(self.episode_input, 1)
-        e_lay.addWidget(self.set_episode_btn)
-        tv_layout.addWidget(self.e_box)
+        # Type Override
+        type_row = QHBoxLayout()
+        self.bulk_type_combo = QComboBox()
+        self.bulk_type_combo.addItems(["movie", "episode", "extra"])
+        type_row.addWidget(self.bulk_type_combo)
         
-        self.sequence_btn = QPushButton("🪄 Sequence Episodes Wizard")
-        self.sequence_btn.setObjectName("PrimaryBtn")
-        self.sequence_btn.clicked.connect(self.sequence_requested.emit)
-        self.sequence_btn.setVisible(False)
-        tv_layout.addWidget(self.sequence_btn)
+        apply_type_btn = SecondaryButton("Set Type")
+        apply_type_btn.clicked.connect(self.on_bulk_type_clicked)
+        type_row.addWidget(apply_type_btn)
+        a_layout.addLayout(type_row)
+
+        # Season/Episode Manual
+        se_row = QHBoxLayout()
+        self.bulk_season_input = QLineEdit()
+        self.bulk_season_input.setPlaceholderText("S")
+        self.bulk_season_input.setFixedWidth(50)
+        se_row.addWidget(self.bulk_season_input)
         
-        res_layout.addWidget(self.tv_overrides_frame)
-        self.type_combo.currentTextChanged.connect(lambda t: self.tv_overrides_frame.setVisible(t == "TV Show"))
-        self.tv_overrides_frame.setVisible(False)
+        apply_s_btn = SecondaryButton("Set S")
+        apply_s_btn.clicked.connect(self.on_bulk_season_clicked)
+        se_row.addWidget(apply_s_btn)
         
-        res_layout.addWidget(QLabel("RESULTS", objectName="SubTitle"))
-        self.results_list = QListWidget()
-        self.results_list.setFixedHeight(280)
-        res_layout.addWidget(self.results_list)
+        self.bulk_episode_input = QLineEdit()
+        self.bulk_episode_input.setPlaceholderText("E")
+        self.bulk_episode_input.setFixedWidth(50)
+        se_row.addWidget(self.bulk_episode_input)
         
-        self.apply_btn = QPushButton("✅ Apply to Selection")
-        self.apply_btn.setObjectName("ActionBtn")
-        self.apply_btn.setEnabled(False)
-        self.apply_btn.clicked.connect(self.on_apply_clicked)
-        res_layout.addWidget(self.apply_btn)
+        apply_e_btn = SecondaryButton("Set E")
+        apply_e_btn.clicked.connect(self.on_bulk_episode_clicked)
+        se_row.addWidget(apply_e_btn)
+        a_layout.addLayout(se_row)
         
-        self.layout.addWidget(self.res_container)
-        self.layout.addStretch()
+        self.seq_btn = SecondaryButton("Sequence Order Wizard")
+        self.seq_btn.clicked.connect(self.sequence_requested.emit)
+        a_layout.addWidget(self.seq_btn)
+
+        # Extras Actions
+        self.extras_section = QWidget()
+        ex_layout = QVBoxLayout(self.extras_section)
+        ex_layout.setContentsMargins(0, 0, 0, 0)
+        ex_layout.addWidget(QLabel("EXTRAS MANAGEMENT", objectName="SubTitle"))
         
-        self.results_list.itemSelectionChanged.connect(lambda: self.apply_btn.setEnabled(True))
+        ex_type_row = QHBoxLayout()
+        self.bulk_extra_type_combo = QComboBox()
+        from metadata.classifier import EXTRA_TYPE_MAP
+        self.bulk_extra_type_combo.addItems(list(EXTRA_TYPE_MAP.values()))
+        ex_type_row.addWidget(self.bulk_extra_type_combo)
         
+        apply_ex_type_btn = SecondaryButton("Set Sub-type")
+        apply_ex_type_btn.clicked.connect(self.on_bulk_extra_type_clicked)
+        ex_type_row.addWidget(apply_ex_type_btn)
+        ex_layout.addLayout(ex_type_row)
+        
+        self.link_parent_btn = SecondaryButton("🔗 Link to Parent...")
+        self.link_parent_btn.clicked.connect(self.on_link_parent_clicked)
+        ex_layout.addWidget(self.link_parent_btn)
+        
+        a_layout.addWidget(self.extras_section)
+
+        self.remove_btn = DangerButton("Remove from List")
+        self.remove_btn.clicked.connect(lambda: self.remove_requested.emit(self.selected_paths))
+        a_layout.addWidget(self.remove_btn)
+        
+        self.container_layout.addWidget(actions_section)
+        self.container_layout.addStretch()
+        
+        self.scroll.setWidget(container)
+        layout.addWidget(self.scroll)
+
     def set_minimal_mode(self, minimal):
-        self.res_container.setVisible(not minimal)
-        
-    def on_remove_clicked(self):
-        if self.selected_paths:
-            self.remove_requested.emit(self.selected_paths)
+        """Show/hide sections based on selection context."""
+        # For now, we show everything but could refine this
+        pass
 
     def update_selection(self, paths):
         self.selected_paths = paths
         count = len(paths)
-        self.count_lbl.setText(f"{count} items selected")
-        self.setVisible(count > 0)
+        self.summary_lbl.setText(f"{count} file{'s' if count != 1 else ''} selected")
         
-        if count > 0:
-            first_meta = self.pipeline.metadata_map.get(paths[0], {})
-            if not isinstance(first_meta, dict): first_meta = {}
-            guessed_title = first_meta.get('extras', {}).get('title', '')
-            if guessed_title and not self.search_input.text():
-                self.search_input.setText(guessed_title)
-            
-            f_type = first_meta.get('file_type', 'movie')
-            self.type_combo.setCurrentText("Movie" if f_type == 'movie' else "TV Show")
-            
-            # Toggle Single vs Bulk Episode inputs
-            if count > 1:
-                self.e_box.setVisible(False)
-                self.sequence_btn.setVisible(True)
-            else:
-                self.e_box.setVisible(True)
-                self.sequence_btn.setVisible(False)
-            
-            # Auto-search on selection if results are empty
-            if guessed_title and self.results_list.count() == 0:
-                self.perform_search()
+        # Update Selection List (Show filenames)
+        self.selection_list.clear()
+        for p in paths:
+            self.selection_list.addItem(os.path.basename(p))
 
-    def perform_search(self):
-        query = self.search_input.text().strip()
-        if not query: return
-        
-        self.search_btn.setText("⏳")
-        self.search_btn.setEnabled(False)
-        
-        search_type = self.type_combo.currentText()
-        try:
-            if search_type == "Movie":
-                res = self.pipeline.api.get_from_tmdb_movie(query, None)
-            else:
-                res = self.pipeline.api.get_from_tmdb_tv(query, None)
-            
-            self.display_results(res.get('results', []) if res else [])
-        except Exception as e:
-            self.results_list.clear()
-            self.results_list.addItem(f"Error: {e}")
-        finally:
-            self.search_btn.setText("🔍")
-            self.search_btn.setEnabled(True)
+        # Toggle Extras section
+        has_extras = any(self.pipeline.metadata_map.get(p, {}).get('file_type') == 'extra' for p in paths)
+        self.extras_section.setVisible(has_extras or count > 1)
 
-    def display_results(self, results):
-        self.results_list.clear()
-        self.search_results = results
-        
-        for res in results:
-            title = res.get('title') or res.get('name', 'Unknown')
-            date = res.get('release_date') or res.get('first_air_date', '')
-            year = f"({date[:4]})" if date else ""
-            
-            item_widget = QWidget()
-            item_layout = QHBoxLayout(item_widget)
-            item_layout.setContentsMargins(5, 5, 5, 5)
-            
-            p_path = res.get('poster_path')
-            url = f"https://image.tmdb.org/t/p/w92{p_path}" if p_path else None
-            poster = ImageLoader(url, 30, 45)
-            item_layout.addWidget(poster)
-            
-            lbl = QLabel(f"<b>{title}</b> {year}")
-            lbl.setStyleSheet("font-size: 11px; color: #1a1a2e;")
-            lbl.setWordWrap(True)
-            item_layout.addWidget(lbl, 1)
-            
-            list_item = QListWidgetItem(self.results_list)
-            list_item.setData(Qt.UserRole, res)
-            list_item.setSizeHint(item_widget.sizeHint())
-            self.results_list.addItem(list_item)
-            self.results_list.setItemWidget(list_item, item_widget)
+        # (Removed old quick search title auto-fill)
 
-    def on_set_type_clicked(self):
-        new_type = 'episode' if self.type_combo.currentText() == 'TV Show' else 'movie'
+    def on_open_tank_search(self):
+        if not self.selected_paths: return
+        
+        # Use first file's meta as context
+        path = self.selected_paths[0]
+        meta = self.pipeline.metadata_map.get(path)
+        if not meta: return
+        
+        from ui.dialogs.selection_dialog import SelectionDialog
+        dialog = SelectionDialog(self.window(), self.pipeline, meta)
+        if dialog.exec():
+            selected = dialog.selected_item
+            if selected:
+                self.apply_metadata.emit(self.selected_paths, selected)
+
+    def on_bulk_type_clicked(self):
+        new_type = self.bulk_type_combo.currentText()
         self.type_change_requested.emit(self.selected_paths, new_type)
 
-    def on_set_season_clicked(self):
-        val = self.season_input.text().strip()
-        if val:
-            self.season_change_requested.emit(self.selected_paths, val)
-            self.season_input.clear()
+    def on_bulk_extra_type_clicked(self):
+        new_extra_type = self.bulk_extra_type_combo.currentText()
+        self.extra_type_change_requested.emit(self.selected_paths, new_extra_type)
 
-    def on_set_episode_clicked(self):
-        val = self.episode_input.text().strip()
-        if val:
-            self.episode_change_requested.emit(self.selected_paths, val)
-            self.episode_input.clear()
+    def on_bulk_season_clicked(self):
+        s = self.bulk_season_input.text()
+        if s: self.season_change_requested.emit(self.selected_paths, s)
 
-    def on_apply_clicked(self):
-        curr = self.results_list.currentItem()
-        if not curr: return
-        
-        selected_meta = curr.data(Qt.UserRole)
-        # Add season override if provided
-        season_override = self.season_input.text().strip()
-        if season_override:
-            selected_meta['season_override'] = season_override
-        
-        # Add episode start override if provided
-        episode_override = self.episode_input.text().strip()
-        if episode_override:
-            selected_meta['episode_override'] = episode_override
-            
-        self.apply_metadata.emit(self.selected_paths, selected_meta)
-        self.results_list.clear()
-        self.search_input.clear()
-        self.season_input.clear()
-        self.episode_input.clear()
-        self.apply_btn.setEnabled(False)
+    def on_bulk_episode_clicked(self):
+        e = self.bulk_episode_input.text()
+        if e: self.episode_change_requested.emit(self.selected_paths, e)
+
+    def toggle_selection_list(self):
+        is_visible = self.selection_list.isVisible()
+        self.selection_list.setVisible(not is_visible)
+        self.view_list_btn.setText("Hide List" if not is_visible else "View List")
+
+    def on_deselect_clicked(self):
+        # We need to tell the main window to clear selection
+        # or emit a signal. For now, since we have self.parent()...
+        # Better: trigger clear_selection on the window
+        if hasattr(self.window(), 'clear_selection'):
+            self.window().clear_selection()
+
+    def on_link_parent_clicked(self):
+        self.link_parent_requested.emit(self.selected_paths)

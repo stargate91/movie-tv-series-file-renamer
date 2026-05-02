@@ -33,7 +33,7 @@ class APIClient:
         self.tmdb_episode_cache = DataStore(tmdb_episode_cache_file)
         self.tmdb_season_cache = DataStore(tmdb_season_cache_file)
 
-    def _get_from_api(self, api_url, cache_key, cache_handler, headers=None):
+    def _get_from_api(self, api_url, cache_key, cache_handler, headers=None, params=None):
 
         cached_data = cache_handler.get(cache_key)
         if cached_data:
@@ -41,7 +41,7 @@ class APIClient:
             return cached_data
 
         try:
-            response = requests.get(api_url, headers=headers, timeout=10)
+            response = requests.get(api_url, headers=headers, params=params, timeout=10)
             
             if response.status_code in (401, 403):
                 raise APIAuthError(f"API Authentication failed (Status: {response.status_code}). Please check your API keys.")
@@ -97,12 +97,17 @@ class APIClient:
 
     def get_from_tmdb_movie(self, title, year, language="hu-HU"):
         cache_key = f"movie-{title}-{year}-{language}"
-        if year == "unknown" or not year:
-            api_url = f"https://api.themoviedb.org/3/search/movie?api_key={self.tmdb_key}&query={title}&language={language}"
-        else:
-            api_url = f"https://api.themoviedb.org/3/search/movie?api_key={self.tmdb_key}&query={title}&year={year}&language={language}"
+        api_url = "https://api.themoviedb.org/3/search/movie"
+        params = {
+            "api_key": self.tmdb_key,
+            "query": title,
+            "language": language
+        }
+        if year and year != "unknown":
+            params["year"] = year
+            
         headers = {"Authorization": f"Bearer {self.tmdb_bearer_token}"}
-        return self._get_from_api(api_url, cache_key, self.tmdb_movie_cache, headers)
+        return self._get_from_api(api_url, cache_key, self.tmdb_movie_cache, headers, params=params)
 
     def get_from_tmdb_movie_detail(self, id, language="hu-HU"):
         cache_key = f"movie-detail-{id}-{language}"
@@ -112,12 +117,17 @@ class APIClient:
 
     def get_from_tmdb_tv(self, title, year, language="hu-HU"):
         cache_key = f"tv-{title}-{year}-{language}"
-        if year == "unknown" or not year:
-            api_url = f"https://api.themoviedb.org/3/search/tv?api_key={self.tmdb_key}&query={title}&language={language}"
-        else:
-            api_url = f"https://api.themoviedb.org/3/search/tv?api_key={self.tmdb_key}&query={title}&first_air_date_year={year}&language={language}"
+        api_url = "https://api.themoviedb.org/3/search/tv"
+        params = {
+            "api_key": self.tmdb_key,
+            "query": title,
+            "language": language
+        }
+        if year and year != "unknown":
+            params["first_air_date_year"] = year
+            
         headers = {"Authorization": f"Bearer {self.tmdb_bearer_token}"}
-        return self._get_from_api(api_url, cache_key, self.tmdb_tv_cache, headers)
+        return self._get_from_api(api_url, cache_key, self.tmdb_tv_cache, headers, params=params)
 
     def get_from_tmdb_tv_external(self, id):
         cache_key = f"tv-external-{id}"
@@ -132,8 +142,12 @@ class APIClient:
         return self._get_from_api(api_url, cache_key, self.tmdb_tv_detail_cache, headers)
 
     def get_from_tmdb_episode(self, id, season_number, episode_number, language="hu-HU"):
-        cache_key = f"episode-{id}-{season_number}-{episode_number}-{language}"
-        api_url = f"https://api.themoviedb.org/3/tv/{id}/season/{season_number}/episode/{episode_number}?api_key={self.tmdb_key}&language={language}"
+        # Handle multi-episode files (lists) by taking the first episode for metadata retrieval
+        s_num = season_number[0] if isinstance(season_number, list) else season_number
+        e_num = episode_number[0] if isinstance(episode_number, list) else episode_number
+        
+        cache_key = f"episode-{id}-{s_num}-{e_num}-{language}"
+        api_url = f"https://api.themoviedb.org/3/tv/{id}/season/{s_num}/episode/{e_num}?api_key={self.tmdb_key}&language={language}"
         headers = {"Authorization": f"Bearer {self.tmdb_bearer_token}"}
         return self._get_from_api(api_url, cache_key, self.tmdb_episode_cache, headers)
 
