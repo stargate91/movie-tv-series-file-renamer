@@ -1,6 +1,13 @@
-from ui.qt_ui import start_qt_ui
-from core.v3.logger_setup import setup_logger
+import sys
+from utils.logger import setup_logger
+from ui.v3.views.main_window import start_v3_ui
+
+def main():
+    # 1. Initialize Global Logging
+    setup_logger()
+    
+    # 2. Launch V3 Modern UI
+    start_v3_ui()
 
 if __name__ == "__main__":
-    setup_logger()
-    start_qt_ui()
+    main()

@@ -2,48 +2,70 @@
 __pycache__/
 *.py[cod]
 *$py.class
-pycache/
 
-# Virtual environments
-venv/
-.venv/
-env/
-bin/
-include/
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
 lib/
-share/
-pyvenv.cfg
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
 
-# IDEs
-.vscode/
-.idea/
-*.swp
-*.swo
+# PyInstaller
+#  Usually these files are written by a python script from a template
+#  before PyInstaller builds the exe, so as to inject date/other infos into it.
+*.manifest
+*.spec
 
-# Project specific caches and data
-data/
-assets_cache/
-logs/
-builds/
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
 .pytest_cache/
-rename_history/
-*.log
+pytestdebug.log
 
-# Environment variables
+# Environments
 .env
-
-# Assistant
-.gemini/
-
-# Misc
-Thumbs.db
-.DS_Store
-test.py
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
 
 # V3 Testing & Temp
-test_v3_engine.py
-test_v3_scan.py
+tests/test_v3_engine.py
+tests/test_v3_scan.py
+logs/
+data/
 v3_test_env/
 v3_target_env/
 *.db
-scratch/
+*.log
