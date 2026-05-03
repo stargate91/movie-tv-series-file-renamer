@@ -175,9 +175,18 @@ class LibraryDB:
                     -- Match result
                     match_status TEXT DEFAULT 'pending',
                     
+                    -- User Overrides / Editions
+                    edition TEXT,
+                    
                     FOREIGN KEY(parent_file_id) REFERENCES media_files(id)
                 )
             """)
+            
+            # Migration for edition
+            try:
+                cursor.execute("ALTER TABLE media_files ADD COLUMN edition TEXT")
+            except:
+                pass
 
             # 2.5 Many-to-Many Links (File -> Media / Episodes)
             cursor.execute("""

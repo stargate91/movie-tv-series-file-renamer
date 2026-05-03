@@ -20,8 +20,30 @@ class SmartScanner:
         self.img_exts = clean_exts(self.s.image_extensions)
         self.meta_exts = clean_exts(self.s.metadata_extensions)
 
+    def cleanup_missing_files(self):
+        """Removes files from the database that no longer exist on disk."""
+        existing = self.db.get_all_files()
+        missing_ids = []
+        for f in existing:
+            if not os.path.exists(f['current_path']):
+                missing_ids.append(f['id'])
+                
+        if missing_ids:
+            with self.db._get_connection() as conn:
+                # SQLite has a limit on the number of variables in an IN clause (usually 999),
+                # so we delete in chunks.
+                for i in range(0, len(missing_ids), 500):
+                    chunk = missing_ids[i:i+500]
+                    placeholders = ','.join(['?'] * len(chunk))
+                    conn.execute(f"DELETE FROM media_files WHERE id IN ({placeholders})", chunk)
+                    # Note: We do NOT delete from media_items, so TMDB cache is preserved!
+                conn.commit()
+
     def scan_directory(self, root_path, progress_callback=None):
         """Recursively scans a directory and populates the database."""
+        # 0. Clean up missing files first to prevent ghosts
+        self.cleanup_missing_files()
+        
         # 1. First Pass: Collect all files and identify main videos
         all_files = []
         for root, dirs, files in os.walk(root_path):

@@ -341,7 +341,7 @@ class SettingsPage(QWidget):
         # --- Movie Naming ---
         layout.addWidget(self._create_section_header("MOVIE NAMING"))
         
-        basic_movie_tags = ["Title", "Year", "Resolution"]
+        basic_movie_tags = ["Title", "Year", "Resolution", "Edition"]
         adv_movie_tags = ["OriginalTitle", "ReleaseDate", "RatingImdb", "Director", "VideoCodec", "VideoBitrate", "Framerate", "BitDepth", "HDR", "AudioCodec", "AudioChannels", "Custom", "TMDB_ID", "IMDB_ID"]
         
         self.movie_tpl = self._create_input_group("Movie Name Template", self.engine.config.settings.movie_template, "{Title} ({Year}) - {Resolution}")
@@ -655,7 +655,7 @@ class SettingsPage(QWidget):
         layout.addLayout(self.movie_folder_tpl['layout'])
         
         # Tags - Basic
-        layout.addLayout(self._create_tag_chips(["Title", "Year", "Resolution"], self.movie_folder_tpl['edit']))
+        layout.addLayout(self._create_tag_chips(["Title", "Year", "Resolution", "Edition"], self.movie_folder_tpl['edit']))
         
         # Tags - Advanced Toggle
         adv_tags = ["ReleaseDate", "IMDbRating", "Director", "OriginalTitle", "VideoCodec", "VideoBitrate", 

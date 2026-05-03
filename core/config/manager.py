@@ -105,6 +105,23 @@ class AppSettings:
 import json
 from core.db.database import LibraryDB
 
+# Common Movie Editions
+COMMON_EDITIONS = [
+    "Director's Cut",
+    "Extended Cut",
+    "Extended Edition",
+    "Unrated",
+    "Unrated Edition",
+    "Theatrical Cut",
+    "Remastered",
+    "Special Edition",
+    "Ultimate Edition",
+    "Collector's Edition",
+    "Final Cut",
+    "IMAX Edition",
+    "Criterion Collection"
+]
+
 class ConfigManager:
     """Centralized configuration loader/saver using the v3 LibraryDB."""
 

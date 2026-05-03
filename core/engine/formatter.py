@@ -153,6 +153,7 @@ class Formatter:
             "Custom": custom_variable,
             "VideoBitrate": f"{file_data['video_bitrate'] // 1000}kbps" if file_data.get('video_bitrate') else "",
             "ReleaseDate": "", # Will be filled from media item
+            "Edition": file_data.get("edition", ""),
         }
 
         titles = []

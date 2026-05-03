@@ -258,6 +258,18 @@ class PreviewDialog(QDialog):
                 new_lbl.setWordWrap(True)
                 new_lbl.setStyleSheet(f"color: {color}; font-family: monospace; font-size: 13px; font-weight: 700;")
                 item_layout.addWidget(new_lbl, 6)
+                
+            # Add a global Remove button to the far right for EVERY item
+            btn_remove = QPushButton("🗑")
+            btn_remove.setCursor(Qt.PointingHandCursor)
+            btn_remove.setFixedSize(28, 28)
+            btn_remove.setToolTip("Remove this file from the renaming plan (Skip)")
+            btn_remove.setStyleSheet(f"""
+                QPushButton {{ background: transparent; color: {Theme.ERROR}; font-size: 16px; border-radius: 4px; }}
+                QPushButton:hover {{ background: rgba(239, 68, 68, 0.1); }}
+            """)
+            btn_remove.clicked.connect(lambda checked=False, p_item=item: self._remove_item(p_item))
+            item_layout.addWidget(btn_remove)
             
             container_layout.addWidget(item_frame)
             self.item_widgets.append((item_frame, item, old_name.lower(), new_name.lower()))
@@ -364,6 +376,15 @@ class PreviewDialog(QDialog):
             resolver = self.parent().engine.collision_resolver
             resolver.force_resolve_group(group)
             self._recheck_collisions()
+
+    def _remove_item(self, item):
+        """Removes an item completely from the plan. Also acts as a way to resolve collisions."""
+        try:
+            self.plan.remove(item)
+            # Recheck collisions because removing an item might make another colliding item safe!
+            self._recheck_collisions()
+        except ValueError:
+            pass
 
     def _recheck_collisions(self):
         # Build path map to find duplicates
