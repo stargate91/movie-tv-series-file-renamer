@@ -29,9 +29,13 @@ class SmartScanner:
                 abs_path = os.path.abspath(os.path.join(root, f))
                 all_files.append(abs_path)
 
+        # Pre-load existing files to avoid N+1 queries (massively speeds up scanning)
+        existing_files_list = self.db.get_all_files()
+        existing_files = {f['current_path']: f for f in existing_files_list}
+
         # 2. Categorize and Add to DB
         video_ids = {} # path -> db_id
-        asset_ids = [] # list of (path, category, size, db_id)
+        asset_ids = [] # list of (path, category, db_id)
         total_files = len(all_files)
 
         for i, path in enumerate(all_files):
@@ -39,8 +43,8 @@ class SmartScanner:
                 progress_callback(f"Scanning: {os.path.basename(path)}", i + 1, total_files)
             
             ext = os.path.splitext(path)[1].lower()
-            ext = os.path.splitext(path)[1].lower()
-            size_mb = os.path.getsize(path) / (1024 * 1024)
+            size_bytes = os.path.getsize(path)
+            size_mb = size_bytes / (1024 * 1024)
             
             category = 'unknown'
             if ext in self.video_exts:
@@ -69,12 +73,14 @@ class SmartScanner:
             
             if category != 'unknown':
                 # Check if file already exists in DB
-                existing = self.db.get_file_by_path(path)
-                if existing:
-                    # File already in DB, skip adding but still record it for linking
+                if path in existing_files:
+                    existing = existing_files[path]
                     db_id = existing['id']
+                    # Only update if size or category changed
+                    if existing['size_bytes'] != size_bytes or existing['category'] != category:
+                        self.db.add_file(path, category, size_bytes, sub_category=sub_category)
                 else:
-                    db_id = self.db.add_file(path, category, os.path.getsize(path), sub_category=sub_category)
+                    db_id = self.db.add_file(path, category, size_bytes, sub_category=sub_category)
                 
                 if category == 'video':
                     video_ids[path] = db_id

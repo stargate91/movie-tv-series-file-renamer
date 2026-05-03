@@ -43,13 +43,17 @@ class Executor:
                 }
                 action = action_map.get(cat, 'rename')
                 
+            media_type = file_data.get('fn_media_type') or file_data.get('fd_media_type') or 'unknown'
+
             if action == 'skip':
                 plan.append({
                     'file_id': fid,
                     'original_path': file_data['current_path'],
                     'proposed_path': file_data['current_path'],
                     'action': 'skip',
-                    'status': 'safe'
+                    'status': 'safe',
+                    'category': cat,
+                    'media_type': media_type
                 })
                 continue
                 
@@ -59,7 +63,9 @@ class Executor:
                     'original_path': file_data['current_path'],
                     'proposed_path': None,
                     'action': 'delete',
-                    'status': 'safe'
+                    'status': 'safe',
+                    'category': cat,
+                    'media_type': media_type
                 })
                 continue
                 
@@ -71,7 +77,9 @@ class Executor:
                     'original_path': file_data['current_path'],
                     'proposed_path': None,
                     'action': 'error',
-                    'status': 'missing_data'
+                    'status': 'missing_data',
+                    'category': cat,
+                    'media_type': media_type
                 })
                 continue
                 
@@ -82,7 +90,9 @@ class Executor:
                     'original_path': file_data['current_path'],
                     'proposed_path': proposed_path,
                     'action': 'skip',
-                    'status': 'safe' # No change needed
+                    'status': 'safe', # No change needed
+                    'category': cat,
+                    'media_type': media_type
                 })
                 continue
                 
@@ -91,7 +101,9 @@ class Executor:
                 'original_path': file_data['current_path'],
                 'proposed_path': proposed_path,
                 'action': 'rename',
-                'status': 'pending'
+                'status': 'pending',
+                'category': cat,
+                'media_type': media_type
             })
             
         # Run Collision Detection on 'rename' actions

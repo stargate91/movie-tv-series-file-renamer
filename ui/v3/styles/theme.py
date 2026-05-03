@@ -9,6 +9,7 @@ class Theme:
     SURFACE = "#1E293B"       # Dark Slate (Slate 800)
     SURFACE_DARK = "#020617"  # Almost Black
     SURFACE_LIGHT = "#334155" # Lighter Slate (Slate 700)
+    SURFACE_LIGHTER = "#475569" # Even Lighter Slate (Slate 600)
     
     BORDER = "#334155"        # Slate 700
     BORDER_LIGHT = "#475569"  # Slate 600
@@ -31,6 +32,8 @@ class Theme:
         'NO_MATCH':  '#F87171',
         'UNCERTAIN': '#A78BFA',
         'PENDING':   '#64748B',
+        'LINKED':    '#3B82F6',
+        'ORPHANED':  '#F59E0B',
     }
     
     @staticmethod
@@ -326,6 +329,37 @@ class Theme:
         """
 
     @staticmethod
+    def get_discovery_table_style():
+        return f"""
+            QTableWidget {{
+                background-color: transparent;
+                gridline-color: transparent;
+                selection-background-color: transparent;
+                outline: 0;
+                border: none;
+            }}
+            QHeaderView::section {{
+                background-color: transparent;
+                border: none;
+                border-bottom: 2px solid {Theme.BORDER};
+                padding: 12px;
+                font-weight: 800;
+                color: {Theme.TEXT_DIM};
+                text-transform: uppercase;
+                letter-spacing: 1px;
+            }}
+            QTableWidget::item {{
+                border-bottom: 1px solid {Theme.SURFACE};
+                padding: 12px;
+                color: {Theme.TEXT_MAIN};
+            }}
+            QTableWidget::item:selected {{
+                color: white;
+                font-weight: 700;
+            }}
+        """
+
+    @staticmethod
     def get_action_button_style():
         return f"""
             QPushButton {{
@@ -379,6 +413,115 @@ class Theme:
             QPushButton:hover {{
                 background-color: #EF4444;
                 color: white;
+            }}
+        """
+
+    @staticmethod
+    def get_h1_style():
+        return f"font-size: 32px; font-weight: 700; color: {Theme.TEXT_MAIN};"
+
+    @staticmethod
+    def get_h2_style():
+        return f"font-size: 24px; font-weight: 300; color: {Theme.TEXT_MUTED};"
+
+    @staticmethod
+    def get_card_style():
+        return f"background-color: {Theme.SURFACE}; border: 1px solid {Theme.BORDER}; border-radius: 12px;"
+
+    @staticmethod
+    def get_sidebar_title_style():
+        return f"font-weight: 900; font-size: 24px; color: {Theme.PRIMARY}; margin-bottom: 2px;"
+
+    @staticmethod
+    def get_sidebar_subtitle_style():
+        return f"font-size: 10px; font-weight: 600; color: {Theme.TEXT_MUTED}; margin-bottom: 25px; text-transform: uppercase; letter-spacing: 1px;"
+
+    @staticmethod
+    def get_page_header_style():
+        return f"font-size: 28px; font-weight: 800; color: {Theme.TEXT_MAIN};"
+
+    @staticmethod
+    def get_description_style():
+        return f"color: {Theme.TEXT_MUTED}; font-size: 14px; line-height: 1.4;"
+
+    @staticmethod
+    def get_input_label_style():
+        return f"font-weight: 600; font-size: 13px; color: {Theme.TEXT_MAIN}; background: transparent; border: none;"
+
+    @staticmethod
+    def get_section_header_style():
+        return f"color: {Theme.PRIMARY}; font-weight: 800; font-size: 11px; letter-spacing: 1.5px; background: transparent; border: none;"
+
+    @staticmethod
+    def get_setting_title_style():
+        return f"font-weight: 700; font-size: 14px; color: {Theme.TEXT_MAIN}; background: transparent; border: none;"
+
+    @staticmethod
+    def get_setting_desc_style():
+        return f"color: {Theme.TEXT_MUTED}; font-size: 13px; background: transparent; border: none;"
+
+    @staticmethod
+    def get_hint_style():
+        return f"color: {Theme.TEXT_DIM}; font-size: 11px; font-style: italic; background: transparent; border: none;"
+
+    @staticmethod
+    def get_danger_title_style():
+        return f"font-weight: 700; font-size: 18px; color: {Theme.ERROR};"
+
+    @staticmethod
+    def get_danger_card_style():
+        return f"""
+            QFrame {{
+                background-color: rgba(239, 68, 68, 0.05); 
+                border: 1px solid rgba(239, 68, 68, 0.2); 
+                border-radius: 12px;
+            }}
+            QLabel {{ border: none; background: transparent; }}
+        """
+
+    @staticmethod
+    def get_save_button_style():
+        return f"""
+            QPushButton {{
+                background-color: {Theme.PRIMARY}; 
+                color: white; 
+                font-weight: 800; 
+                font-size: 15px;
+                border-radius: 12px;
+            }}
+            QPushButton:hover {{
+                background-color: {Theme.PRIMARY_HOVER};
+            }}
+            QPushButton:disabled {{
+                background-color: {Theme.SURFACE_LIGHT};
+                color: {Theme.TEXT_DIM};
+            }}
+        """
+
+    @staticmethod
+    def get_link_button_style():
+        return f"color: {Theme.TEXT_MUTED}; font-size: 11px; text-decoration: underline; border: none; background: transparent; text-align: left;"
+
+    @staticmethod
+    def get_filter_chip_style():
+        return f"""
+            QPushButton {{
+                background-color: {Theme.SURFACE_LIGHT};
+                color: {Theme.TEXT_MUTED};
+                border: 1px solid {Theme.BORDER};
+                border-radius: 16px;
+                padding: 0 16px;
+                font-weight: 600;
+                font-size: 12px;
+            }}
+            QPushButton:hover {{
+                background-color: {Theme.SURFACE_LIGHTER};
+                color: {Theme.TEXT_MAIN};
+            }}
+            QPushButton:checked {{
+                background-color: {Theme.PRIMARY}20;
+                color: {Theme.PRIMARY};
+                border: 1px solid {Theme.PRIMARY};
             }}
         """
 

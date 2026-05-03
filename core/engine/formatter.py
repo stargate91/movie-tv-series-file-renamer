@@ -51,7 +51,7 @@ class Formatter:
     def __init__(self, db):
         self.db = db
 
-    def generate_name(self, file_id, template, casing="Original", separator=" ", custom_variable=""):
+    def generate_name(self, file_id, settings):
         """
         Generates the final formatted file name for a given file_id.
         Handles multi-episode and multi-match files by merging metadata.
@@ -62,37 +62,76 @@ class Formatter:
             return None
         file_data = dict(row)
             
-        # If it's a child file (extra/sub/audio), use the parent's API data
+        # Get target ID for fetching metadata (parent if extra)
         target_file_id = file_data.get('parent_file_id') or file_id
             
         links = self.db.get_links_for_file(target_file_id)
         if not links:
             return None # Not matched yet
+            
+        # Determine media_type from the DB
+        with self.db._get_connection() as conn:
+            m_row = conn.execute("SELECT media_type FROM media_items WHERE id = ?", (links[0]['media_item_id'],)).fetchone()
+            
+        if not m_row: return None
+        media_type = m_row['media_type']
+
+        # Determine the correct template for THIS specific file
+        category = file_data.get('category')
+        is_extra = category != 'video'
+        
+        if is_extra:
+            if category == 'extra': template = settings.template_extra_video
+            elif category == 'subtitle': template = settings.template_extra_subtitle
+            elif category == 'audio': template = settings.template_extra_audio
+            elif category == 'image': template = settings.template_extra_image
+            elif category == 'metadata': template = settings.template_extra_metadata
+            else: template = "{ParentName} - {ExtraCategory}"
+        else:
+            template = settings.movie_template if media_type == 'movie' else settings.episode_template
 
         # Build context dictionary for tags (handles multiple links)
-        context = self._build_context(file_data, links, custom_variable)
+        context = self._build_context(file_data, links, settings.custom_variable)
         
         # Add ParentName if this is a child file
         if file_data.get('parent_file_id'):
-            # Generate the parent's name using the same base template
-            parent_name = self.generate_name(file_data['parent_file_id'], template, casing, separator, custom_variable)
+            # Generate the parent's name using its correct template recursively
+            parent_name = self.generate_name(file_data['parent_file_id'], settings)
             context['ParentName'] = parent_name if parent_name else ""
         else:
             context['ParentName'] = ""
             
         # Replace tags in template
         formatted_name = template
+        c_low = settings.filename_case.lower() if settings.filename_case else "none"
+        
+        # Tags that should be protected from Title Case mangling
+        protected_tags = {"Language", "Resolution", "VideoCodec", "AudioCodec", 
+                          "ParentName", "HDR", "BitDepth", "TMDB_ID", "IMDB_ID",
+                          "SeriesResolution", "SeasonResolution", "Original"}
+                          
         for tag, value in context.items():
-            # Only replace if the value exists
-            if value:
-                formatted_name = formatted_name.replace(f"{{{tag}}}", str(value))
-            else:
+            if not value:
                 formatted_name = formatted_name.replace(f"{{{tag}}}", "")
+                continue
+                
+            val_str = str(value)
+            
+            if c_low == "title" and tag not in protected_tags:
+                val_str = val_str.title()
+                
+            formatted_name = formatted_name.replace(f"{{{tag}}}", val_str)
 
         # Clean up empty brackets and double spaces
         formatted_name = self._cleanup_empty_tags(formatted_name)
-        formatted_name = self._apply_casing(formatted_name, casing)
-        formatted_name = self._apply_separator(formatted_name, separator)
+        
+        # Apply global casing for lower/upper (Title case is handled per-tag)
+        if c_low == "lower":
+            formatted_name = formatted_name.lower()
+        elif c_low == "upper":
+            formatted_name = formatted_name.upper()
+            
+        formatted_name = self._apply_separator(formatted_name, settings.separator)
         formatted_name = self._sanitize_filename(formatted_name)
 
         return formatted_name
@@ -184,7 +223,7 @@ class Formatter:
                         context["YearRange"] = ""
                         
                     # Series Level Resolution (Mixed / Range / Single)
-                    context["Resolution"] = self._get_series_resolution(media['id'])
+                    context["SeriesResolution"] = self._get_series_resolution(media['id'])
 
                 # 2. Fetch Episode if applicable
                 if media['media_type'] == 'tv' and link['tv_episode_id']:
@@ -334,12 +373,7 @@ class Formatter:
         media_type = media_item['media_type']
         
         # 1. Generate the base file name
-        if is_extra:
-            template = settings.movie_extra_template if media_type == 'movie' else settings.episode_extra_template
-        else:
-            template = settings.movie_template if media_type == 'movie' else settings.episode_template
-            
-        file_name = self.generate_name(file_id, template, settings.filename_case, settings.separator, settings.custom_variable)
+        file_name = self.generate_name(file_id, settings)
         if not file_name:
             return None
             
@@ -347,52 +381,70 @@ class Formatter:
         ext = file_data.get('extension', '')
         
         # 2. Build Directory Structure
-        base_dir = ""
-        if media_type == 'movie':
-            base_dir = settings.target_dir_movies or os.path.dirname(file_data['current_path'])
-            if settings.auto_organize_by_type and settings.movies_subfolder_name:
-                base_dir = os.path.join(base_dir, settings.movies_subfolder_name)
-        else:
-            base_dir = settings.target_dir_shows or os.path.dirname(file_data['current_path'])
-            if settings.auto_organize_by_type and settings.shows_subfolder_name:
-                base_dir = os.path.join(base_dir, settings.shows_subfolder_name)
+        if is_extra and file_data.get('parent_file_id'):
+            # If it's an extra, we inherit the exact target directory of its parent video!
+            parent_full_path = self.generate_full_path(file_data['parent_file_id'], settings)
+            if not parent_full_path: return None
             
-        # Prepare context for folder templates (Using ALL links)
-        context = self._build_context(file_data, links, settings.custom_variable)
-        
-        folders = []
-        
-        if media_type == 'movie':
-            if settings.create_movie_folder:
-                folder_name = settings.movie_folder_template
-                for tag, val in context.items():
-                    folder_name = folder_name.replace(f"{{{tag}}}", str(val))
-                folders.append(self._cleanup_empty_tags(folder_name))
-        elif media_type == 'tv':
-            if settings.create_show_folder:
-                folder_name = settings.show_folder_template
-                for tag, val in context.items():
-                    folder_name = folder_name.replace(f"{{{tag}}}", str(val))
-                folders.append(self._cleanup_empty_tags(folder_name))
+            base_dir = os.path.dirname(parent_full_path)
+            folders = []
+            
+            # Prepare context for the Extra Category (Using ALL links)
+            context = self._build_context(file_data, links, settings.custom_variable)
+            
+            # Extras Subfolder
+            if settings.extras_folder_mode != "none":
+                if settings.extras_folder_mode == "single":
+                    folders.append(settings.extras_folder_name)
+                elif settings.extras_folder_mode == "categorized":
+                    folders.append(context.get("ExtraCategory", "Extras"))
+                    
+        else:
+            # It's a video file, generate its directory structure
+            base_dir = ""
+            if settings.move_files and settings.base_target_path:
+                base_dir = settings.base_target_path
+                if settings.auto_organize_by_type:
+                    sub = settings.movies_subfolder_name if media_type == 'movie' else settings.shows_subfolder_name
+                    if sub:
+                        base_dir = os.path.join(base_dir, sub)
+            else:
+                base_dir = os.path.dirname(file_data['current_path'])
                 
-            if settings.create_season_folder:
-                folder_name = settings.season_folder_template
-                for tag, val in context.items():
-                    folder_name = folder_name.replace(f"{{{tag}}}", str(val))
-                folders.append(self._cleanup_empty_tags(folder_name))
-                
-            if settings.create_episode_folder:
-                folder_name = settings.episode_folder_template
-                for tag, val in context.items():
-                    folder_name = folder_name.replace(f"{{{tag}}}", str(val))
-                folders.append(self._cleanup_empty_tags(folder_name))
-                
-        # 3. Extras Subfolder
-        if is_extra and settings.extras_folder_mode != "none":
-            if settings.extras_folder_mode == "single":
-                folders.append(settings.extras_folder_name)
-            elif settings.extras_folder_mode == "categorized":
-                folders.append(context.get("ExtraCategory", "Extras"))
+            # Prepare context for folder templates (Using ALL links)
+            context = self._build_context(file_data, links, settings.custom_variable)
+            
+            folders = []
+            
+            if media_type == 'movie':
+                if settings.create_movie_folder:
+                    folder_name = settings.movie_folder_template
+                    for tag, val in context.items():
+                        # Protect against None values
+                        val_str = str(val) if val is not None else ""
+                        folder_name = folder_name.replace(f"{{{tag}}}", val_str)
+                    folders.append(self._cleanup_empty_tags(folder_name))
+            elif media_type == 'tv':
+                if settings.create_show_folder:
+                    folder_name = settings.show_folder_template
+                    for tag, val in context.items():
+                        val_str = str(val) if val is not None else ""
+                        folder_name = folder_name.replace(f"{{{tag}}}", val_str)
+                    folders.append(self._cleanup_empty_tags(folder_name))
+                    
+                if settings.create_season_folder:
+                    folder_name = settings.season_folder_template
+                    for tag, val in context.items():
+                        val_str = str(val) if val is not None else ""
+                        folder_name = folder_name.replace(f"{{{tag}}}", val_str)
+                    folders.append(self._cleanup_empty_tags(folder_name))
+                    
+                if settings.create_episode_folder:
+                    folder_name = settings.episode_folder_template
+                    for tag, val in context.items():
+                        val_str = str(val) if val is not None else ""
+                        folder_name = folder_name.replace(f"{{{tag}}}", val_str)
+                    folders.append(self._cleanup_empty_tags(folder_name))
         
         # 3b. Sanitize all folder names (remove illegal characters)
         folders = [self._sanitize_filename(f) for f in folders]

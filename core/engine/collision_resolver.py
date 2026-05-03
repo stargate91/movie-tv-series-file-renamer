@@ -74,6 +74,20 @@ class CollisionResolver:
         if len(found_parts) != len(collision_group):
             return None
             
+        return self._apply_part_formatting(collision_group)
+
+    def force_resolve_group(self, collision_group):
+        """
+        Forces a group of items into multi-part formatting (Part 1, Part 2, etc.)
+        regardless of their original filenames. Uses the order provided.
+        """
+        for i, item in enumerate(collision_group):
+            item['_detected_part'] = str(i + 1)
+            
+        return self._apply_part_formatting(collision_group)
+
+    def _apply_part_formatting(self, collision_group):
+        resolved_items = []
         # Apply the settings to format the part string
         for item in collision_group:
             part_val = item.pop('_detected_part')
@@ -112,7 +126,8 @@ class CollisionResolver:
                 # Suffix: "Movie Title - CD1"
                 item['proposed_path'] = f"{base}{part_str}{ext}"
                 
-            item['collision_status'] = 'auto_resolved'
+            item['status'] = 'manual_resolved'
+            item['collision_status'] = 'manual_resolved'
             resolved_items.append(item)
             
         return resolved_items

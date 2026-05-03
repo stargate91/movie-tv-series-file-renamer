@@ -56,7 +56,7 @@ class DataLoader(QThread):
 
     def run(self):
         try:
-            videos = self.engine.db.get_files_by_category('video')
+            videos = self.engine.db.get_files_by_category('video', 'extra', 'subtitle', 'audio', 'image', 'metadata', 'unknown')
             status_priority = {'multiple': 0, 'no_match': 1, 'uncertain': 2, 'matched': 3, 'pending': 4}
             videos.sort(key=lambda v: status_priority.get(v.get('match_status', 'pending'), 99))
 
@@ -131,6 +131,7 @@ class DiscoveryPage(QWidget):
         self.loader = None
         self.poster_worker = None
         self.active_workers = [] # Keep references to prevent GC crashes
+        self.current_filter = "all" # 'all', 'review', 'movies', 'shows'
         self._init_ui()
 
     def _init_ui(self):
@@ -140,12 +141,13 @@ class DiscoveryPage(QWidget):
 
         # Header Area
         header_layout = QHBoxLayout()
-        self.title_label = QLabel("Discovery Results")
+        self.title_label = QLabel("Discovery")
         self.title_label.setStyleSheet("font-size: 24px; font-weight: 700;")
         
         self.stats_label = QLabel("0 files found")
         self.stats_label.setStyleSheet(f"color: {Theme.TEXT_MUTED}; font-weight: 600;")
-        
+        # Action Buttons Area
+        actions_layout = QHBoxLayout()
         self.scan_new_btn = QPushButton("Scan New Directory")
         self.scan_new_btn.setObjectName("SecondaryButton")
         self.scan_new_btn.setFixedWidth(180)
@@ -157,23 +159,65 @@ class DiscoveryPage(QWidget):
         self.rename_all_btn.setStyleSheet(Theme.get_primary_button_style())
         self.rename_all_btn.hide() # Only show if we have matched items
         
-        header_layout.addWidget(self.title_label)
-        header_layout.addSpacing(40)
+        actions_layout.addWidget(self.stats_label)
+        actions_layout.addSpacing(20)
+        actions_layout.addWidget(self.scan_new_btn)
+        actions_layout.addWidget(self.rename_all_btn)
         
-        # Search / Filter Bar
-        self.filter_input = QLineEdit()
-        self.filter_input.setPlaceholderText("Filter results...")
-        self.filter_input.setFixedWidth(300)
-        self.filter_input.setFixedHeight(35)
-        self.filter_input.textChanged.connect(self._on_filter_changed)
-        header_layout.addWidget(self.filter_input)
-
+        header_layout.addWidget(self.title_label)
         header_layout.addStretch()
-        header_layout.addWidget(self.stats_label)
-        header_layout.addSpacing(20)
-        header_layout.addWidget(self.scan_new_btn)
-        header_layout.addWidget(self.rename_all_btn)
+        header_layout.addLayout(actions_layout)
         layout.addLayout(header_layout)
+
+        # Filters Area
+        filters_layout = QHBoxLayout()
+        filters_layout.setSpacing(10)
+        
+        # Filter Buttons
+        self.filter_btns = []
+        
+        btn_all = QPushButton("All Files")
+        btn_all.setCheckable(True)
+        btn_all.setChecked(True)
+        btn_all.setProperty("filter_val", "all")
+        
+        btn_review = QPushButton("Needs Review")
+        btn_review.setCheckable(True)
+        btn_review.setProperty("filter_val", "review")
+        
+        btn_movies = QPushButton("Matched Movies")
+        btn_movies.setCheckable(True)
+        btn_movies.setProperty("filter_val", "movies")
+        
+        btn_shows = QPushButton("Matched Shows")
+        btn_shows.setCheckable(True)
+        btn_shows.setProperty("filter_val", "shows")
+        
+        btn_extras = QPushButton("Extras")
+        btn_extras.setCheckable(True)
+        btn_extras.setProperty("filter_val", "extras")
+        
+        self.filter_btns.extend([btn_all, btn_review, btn_movies, btn_shows, btn_extras])
+        
+        for btn in self.filter_btns:
+            btn.setCursor(Qt.PointingHandCursor)
+            btn.setFixedHeight(32)
+            btn.setStyleSheet(Theme.get_filter_chip_style())
+            btn.clicked.connect(lambda checked, b=btn: self._on_filter_btn_clicked(b))
+            filters_layout.addWidget(btn)
+        
+        filters_layout.addStretch()
+        
+        # Search Box
+        self.filter_input = QLineEdit()
+        self.filter_input.setPlaceholderText("Search titles...")
+        self.filter_input.setFixedWidth(250)
+        self.filter_input.setFixedHeight(32)
+        self.filter_input.textChanged.connect(self._apply_filters)
+        filters_layout.addWidget(self.filter_input)
+        
+        layout.addLayout(filters_layout)
+        layout.addSpacing(10)
 
         # Progress Section
         self.progress_bar = QProgressBar()
@@ -215,24 +259,8 @@ class DiscoveryPage(QWidget):
         # Install custom delegate for premium selection painting
         self.table.setItemDelegate(PremiumDelegate(self.table))
 
-        # Simplified premium styling (Delegate handles the selection background)
-        self.table.setStyleSheet(f"""
-            QTableWidget {{
-                background-color: transparent;
-                gridline-color: transparent;
-                selection-background-color: transparent;
-                outline: 0;
-            }}
-            QTableWidget::item {{
-                border-bottom: 1px solid {Theme.SURFACE};
-                padding: 12px;
-                color: {Theme.TEXT_MAIN};
-            }}
-            QTableWidget::item:selected {{
-                color: white;
-                font-weight: 700;
-            }}
-        """)
+        # Use centralized premium styling (Delegate handles the selection background)
+        self.table.setStyleSheet(Theme.get_discovery_table_style())
         
         # Header styling
         header = self.table.horizontalHeader()
@@ -248,8 +276,6 @@ class DiscoveryPage(QWidget):
         
         # Ensure row height is enough for buttons
         self.table.verticalHeader().setDefaultSectionSize(45)
-        
-        self.table.setStyleSheet(Theme.get_table_style())
         
         content_layout.addWidget(self.table)
 
@@ -366,24 +392,68 @@ class DiscoveryPage(QWidget):
                 opener = "open" if sys.platform == "darwin" else "xdg-open"
                 subprocess.call([opener, folder])
 
-    def _on_filter_changed(self, text):
-        """Filters the table rows based on the search text."""
-        search_text = text.lower()
+    def _on_filter_btn_clicked(self, clicked_btn):
+        # Enforce single selection style logic manually
+        for btn in self.filter_btns:
+            if btn != clicked_btn:
+                btn.blockSignals(True)
+                btn.setChecked(False)
+                btn.blockSignals(False)
+            else:
+                btn.setChecked(True) # Prevent unchecking the active one
+                self.current_filter = btn.property("filter_val")
+                
+        self._apply_filters()
+
+    def _apply_filters(self):
+        """Filters the table rows based on the search text and button filter."""
+        search_text = self.filter_input.text().lower()
+        
         for row in range(self.table.rowCount()):
-            match = False
-            for col in range(4):
-                item = self.table.item(row, col)
-                if item:
-                    # Check visible text
-                    if search_text in item.text().lower():
-                        match = True
-                        break
-                    # Check hidden UserRole data (used by status column)
-                    role_data = item.data(Qt.UserRole)
-                    if isinstance(role_data, str) and search_text in role_data.lower():
-                        match = True
-                        break
-            self.table.setRowHidden(row, not match)
+            # 1. Evaluate Text Search Match
+            text_match = False
+            if not search_text:
+                text_match = True
+            else:
+                for col in range(4):
+                    item = self.table.item(row, col)
+                    if item:
+                        if search_text in item.text().lower():
+                            text_match = True
+                            break
+                        role_data = item.data(Qt.UserRole)
+                        if isinstance(role_data, str) and search_text in role_data.lower():
+                            text_match = True
+                            break
+                            
+            # 2. Evaluate Button Filter Match
+            btn_match = False
+            status_item = self.table.item(row, 0)
+            type_item = self.table.item(row, 2)
+            
+            if status_item and type_item:
+                status = status_item.data(Qt.UserRole)
+                media_type = type_item.text()
+                
+                if self.current_filter == "all":
+                    btn_match = True
+                elif self.current_filter == "review":
+                    # Pending, multiple, uncertain, no_match
+                    if status in ('PENDING', 'MULTIPLE', 'UNCERTAIN', 'NO_MATCH'):
+                        btn_match = True
+                elif self.current_filter == "movies":
+                    if status == 'MATCHED' and media_type == "Movie":
+                        btn_match = True
+                elif self.current_filter == "shows":
+                    if status == 'MATCHED' and media_type == "TV Show":
+                        btn_match = True
+                elif self.current_filter == "extras":
+                    raw_cat = type_item.data(Qt.UserRole)
+                    if raw_cat != 'video':
+                        btn_match = True
+
+            # Show row only if BOTH match
+            self.table.setRowHidden(row, not (text_match and btn_match))
 
     def _on_selection_changed(self):
         selected_items = self.table.selectedItems()
@@ -449,8 +519,19 @@ class DiscoveryPage(QWidget):
             btn_style = Theme.get_action_button_style()
 
             for i, vid in enumerate(videos):
+                # 3. Type
+                raw_cat = vid.get('category') or 'video'
+                if raw_cat == 'video':
+                    sub_cat = vid.get('sub_category') or vid.get('fn_media_type') or 'movie'
+                    cat_display = "TV Show" if sub_cat in ('tv', 'episode') else "Movie"
+                else:
+                    cat_display = raw_cat.capitalize()
+                    
                 # 1. Status (colored text)
                 status = vid.get('match_status', 'pending').upper()
+                if raw_cat != 'video':
+                    status = 'LINKED' if vid.get('parent_file_id') else 'ORPHANED'
+
                 sc = status_colors.get(status, '#64748B')
 
                 status_label = QLabel(status)
@@ -466,15 +547,20 @@ class DiscoveryPage(QWidget):
                 name_item = QTableWidgetItem(vid['file_name'])
                 name_item.setData(Qt.UserRole, vid['id'])
                 self.table.setItem(i, 1, name_item)
-
-                # 3. Type
-                raw_cat = vid.get('sub_category') or vid.get('fn_media_type') or 'movie'
-                cat_display = "TV Show" if raw_cat in ('tv', 'episode') else "Movie"
-                self.table.setItem(i, 2, QTableWidgetItem(cat_display))
+                
+                type_item = QTableWidgetItem(cat_display)
+                type_item.setData(Qt.UserRole, raw_cat)
+                self.table.setItem(i, 2, type_item)
 
                 # 4. Identified As
                 ident_text = "-"
-                if status == 'MATCHED':
+                if raw_cat != 'video':
+                    parent_id = vid.get('parent_file_id')
+                    if parent_id:
+                        parent_file = self.engine.db.get_file_by_id(parent_id)
+                        if parent_file:
+                            ident_text = f"Parent: {parent_file.get('file_name', 'Unknown')}"
+                elif status == 'MATCHED':
                     ident_text = f"{vid.get('fn_title') or 'Identified'} ({vid.get('fn_year') or ''})"
                 self.table.setItem(i, 3, QTableWidgetItem(ident_text))
 

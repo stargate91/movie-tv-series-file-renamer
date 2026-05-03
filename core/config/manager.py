@@ -21,6 +21,9 @@ class AppSettings:
     folder_path: str = ""
     default_scan_path: str = ""
     
+    # Personalization
+    user_name: str = ""
+    
     # Global Organization
     move_files: bool = False
     base_target_path: str = ""
@@ -38,9 +41,11 @@ class AppSettings:
     action_extra_image: str = "rename"     # Posters, fanart
     action_extra_metadata: str = "rename"  # NFO, XML
     
-    extra_template: str = "{Original} - {ExtraCategory}"
-    movie_extra_template: str = "{Title} ({Year}) - {ExtraCategory}"
-    episode_extra_template: str = "{ShowTitle} - {Season}{Episode} - {ExtraCategory}"
+    template_extra_video: str = "{ParentName}-trailer"
+    template_extra_subtitle: str = "{ParentName}.{Language}"
+    template_extra_audio: str = "{ParentName}.{Language}"
+    template_extra_image: str = "poster"
+    template_extra_metadata: str = "{ParentName}"
 
     # Sample detection
     sample: bool = False

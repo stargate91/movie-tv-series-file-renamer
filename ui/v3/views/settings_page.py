@@ -45,6 +45,7 @@ class SettingsPage(QWidget):
         self.folders_root.setExpanded(True)
         self.folders_root.setFlags(self.folders_root.flags() & ~Qt.ItemIsSelectable) # Make category non-selectable?
         
+        self.extras_item = QTreeWidgetItem(self.tabs_tree, ["Extras"])
         self.api_item = QTreeWidgetItem(self.tabs_tree, ["API Keys"])
         self.adv_item = QTreeWidgetItem(self.tabs_tree, ["Advanced"])
         
@@ -62,18 +63,20 @@ class SettingsPage(QWidget):
             self.folders_org: 3,
             self.folders_movies: 4,
             self.folders_tv: 5,
-            self.api_item: 6,
-            self.adv_item: 7
+            self.extras_item: 6,
+            self.api_item: 7,
+            self.adv_item: 8
         }
         
         self.stack.addWidget(self._create_general_tab())          # 0
         self.stack.addWidget(self._create_naming_styles_tab())   # 1
         self.stack.addWidget(self._create_file_naming_tab())     # 2
-        self.stack.addWidget(self._create_folder_org_tab())       # 3 (New)
-        self.stack.addWidget(self._create_movie_folders_tab())   # 4 (Split)
-        self.stack.addWidget(self._create_tv_folders_tab())      # 5 (Split)
-        self.stack.addWidget(self._create_api_tab())              # 6
-        self.stack.addWidget(self._create_advanced_tab())        # 7
+        self.stack.addWidget(self._create_folder_org_tab())       # 3
+        self.stack.addWidget(self._create_movie_folders_tab())   # 4
+        self.stack.addWidget(self._create_tv_folders_tab())      # 5
+        self.stack.addWidget(self._create_extras_tab())           # 6 (New)
+        self.stack.addWidget(self._create_api_tab())              # 7
+        self.stack.addWidget(self._create_advanced_tab())        # 8
         
         layout.addWidget(self.stack)
 
@@ -97,23 +100,45 @@ class SettingsPage(QWidget):
         layout.setSpacing(30)
 
         header = QLabel("General Settings")
-        header.setStyleSheet(f"font-size: 28px; font-weight: 800; color: {Theme.TEXT_MAIN};")
+        header.setStyleSheet(Theme.get_page_header_style())
         layout.addWidget(header)
+        layout.addSpacing(10)
+
+        # --- Section: Personalization ---
+        section_pers = QLabel("PERSONALIZATION")
+        section_pers.setStyleSheet(Theme.get_section_header_style())
+        layout.addWidget(section_pers)
+
+        name_group = QVBoxLayout()
+        name_label = QLabel("What's your name? (Used for greeting)")
+        name_label.setStyleSheet(Theme.get_setting_title_style())
+        name_group.addWidget(name_label)
+
+        self.name_input = QLineEdit()
+        self.name_input.setText(self.engine.config.settings.user_name)
+        self.name_input.setPlaceholderText("e.g. Levi")
+        self.name_input.setFixedHeight(40)
+        self.name_input.setStyleSheet(f"background: {Theme.SURFACE_DARK}; border: 1px solid {Theme.BORDER}; border-radius: 6px; padding: 0 10px;")
+        name_group.addWidget(self.name_input)
+        layout.addLayout(name_group)
+
+        layout.addSpacing(10)
+        layout.addWidget(Theme.create_hline())
         layout.addSpacing(10)
 
         # --- Section: Library ---
         section_lib = QLabel("LIBRARY & SCANNING")
-        section_lib.setStyleSheet(f"color: {Theme.PRIMARY}; font-weight: 800; font-size: 11px; letter-spacing: 1.5px;")
+        section_lib.setStyleSheet(Theme.get_section_header_style())
         layout.addWidget(section_lib)
         
         # Default Scan Directory
         dir_group = QVBoxLayout()
         dir_label = QLabel("Default Scan Directory")
-        dir_label.setStyleSheet(f"font-weight: 700; font-size: 14px; color: {Theme.TEXT_MAIN};")
+        dir_label.setStyleSheet(Theme.get_setting_title_style())
         dir_group.addWidget(dir_label)
 
         dir_desc = QLabel("This folder will open automatically when you start a new scan.")
-        dir_desc.setStyleSheet(f"color: {Theme.TEXT_MUTED}; font-size: 13px;")
+        dir_desc.setStyleSheet(Theme.get_setting_desc_style())
         dir_group.addWidget(dir_desc)
 
         path_row = QHBoxLayout()
@@ -151,7 +176,7 @@ class SettingsPage(QWidget):
 
         # --- Section: Metadata ---
         section_meta = QLabel("METADATA & API")
-        section_meta.setStyleSheet(f"color: {Theme.PRIMARY}; font-weight: 800; font-size: 11px; letter-spacing: 1.5px;")
+        section_meta.setStyleSheet(Theme.get_section_header_style())
         layout.addWidget(section_meta)
 
         self.languages = {
@@ -215,18 +240,7 @@ class SettingsPage(QWidget):
         self.save_btn = QPushButton("Save All Changes")
         self.save_btn.setFixedSize(220, 50)
         self.save_btn.setCursor(Qt.PointingHandCursor)
-        self.save_btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {Theme.PRIMARY}; 
-                color: white; 
-                font-weight: 800; 
-                font-size: 15px;
-                border-radius: 12px;
-            }}
-            QPushButton:hover {{
-                background-color: {Theme.PRIMARY_HOVER};
-            }}
-        """)
+        self.save_btn.setStyleSheet(Theme.get_save_button_style())
         self.save_btn.clicked.connect(self._on_save)
         save_container.addWidget(self.save_btn)
         save_container.addStretch()
@@ -243,7 +257,7 @@ class SettingsPage(QWidget):
         layout.setSpacing(30)
 
         header = QLabel("Advanced Tools")
-        header.setStyleSheet(f"font-size: 28px; font-weight: 800; color: {Theme.TEXT_MAIN};")
+        header.setStyleSheet(Theme.get_page_header_style())
         layout.addWidget(header)
         layout.addWidget(header)
         layout.addSpacing(10)
@@ -261,29 +275,21 @@ class SettingsPage(QWidget):
 
         # --- Section: Danger Zone ---
         section_danger = QLabel("DANGER ZONE")
-        section_danger.setStyleSheet(f"color: {Theme.ERROR}; font-weight: 800; font-size: 11px; letter-spacing: 1.5px;")
+        section_danger.setStyleSheet(Theme.get_danger_title_style())
         layout.addWidget(section_danger)
 
         danger_card = QFrame()
-        # Semi-transparent red background for the card
-        danger_card.setStyleSheet(f"""
-            QFrame {{
-                background-color: rgba(239, 68, 68, 0.05); 
-                border: 1px solid rgba(239, 68, 68, 0.2); 
-                border-radius: 12px;
-            }}
-            QLabel {{ border: none; background: transparent; }}
-        """)
+        danger_card.setStyleSheet(Theme.get_danger_card_style())
         danger_layout = QVBoxLayout(danger_card)
         danger_layout.setContentsMargins(25, 25, 25, 25)
         danger_layout.setSpacing(15)
         
         wipe_title = QLabel("Wipe Library Data")
-        wipe_title.setStyleSheet(f"font-weight: 700; font-size: 18px; color: {Theme.ERROR};")
+        wipe_title.setStyleSheet(Theme.get_danger_title_style())
         danger_layout.addWidget(wipe_title)
         
         wipe_desc = QLabel("This will delete all indexed files, API results, posters, and history.\nYour settings (API keys, paths, formats) will be preserved.")
-        wipe_desc.setStyleSheet(f"color: {Theme.TEXT_MUTED}; font-size: 14px; line-height: 1.4;")
+        wipe_desc.setStyleSheet(Theme.get_description_style())
         danger_layout.addWidget(wipe_desc)
         
         danger_layout.addSpacing(10)
@@ -324,7 +330,7 @@ class SettingsPage(QWidget):
         layout.setSpacing(25)
 
         header = QLabel("File Naming Settings")
-        header.setStyleSheet(f"font-size: 28px; font-weight: 800; color: {Theme.TEXT_MAIN};")
+        header.setStyleSheet(Theme.get_page_header_style())
         layout.addWidget(header)
         
         # --- Custom Tag Value ---
@@ -354,7 +360,7 @@ class SettingsPage(QWidget):
         toggle_btn = QPushButton("Show Advanced Tags")
         toggle_btn.setCheckable(True)
         toggle_btn.setFixedWidth(150)
-        toggle_btn.setStyleSheet(f"color: {Theme.TEXT_MUTED}; font-size: 11px; text-decoration: underline; border: none; background: transparent; text-align: left;")
+        toggle_btn.setStyleSheet(Theme.get_link_button_style())
         toggle_btn.setCursor(Qt.PointingHandCursor)
         toggle_btn.toggled.connect(lambda checked: self.adv_movie_container.setVisible(checked))
         toggle_btn.toggled.connect(lambda checked: toggle_btn.setText("Hide Advanced Tags" if checked else "Show Advanced Tags"))
@@ -388,7 +394,7 @@ class SettingsPage(QWidget):
         tv_toggle_btn = QPushButton("Show Advanced Tags")
         tv_toggle_btn.setCheckable(True)
         tv_toggle_btn.setFixedWidth(150)
-        tv_toggle_btn.setStyleSheet(f"color: {Theme.TEXT_MUTED}; font-size: 11px; text-decoration: underline; border: none; background: transparent; text-align: left;")
+        tv_toggle_btn.setStyleSheet(Theme.get_link_button_style())
         tv_toggle_btn.setCursor(Qt.PointingHandCursor)
         tv_toggle_btn.toggled.connect(lambda checked: self.adv_tv_container.setVisible(checked))
         tv_toggle_btn.toggled.connect(lambda checked: tv_toggle_btn.setText("Hide Advanced Tags" if checked else "Show Advanced Tags"))
@@ -407,7 +413,7 @@ class SettingsPage(QWidget):
         layout.setSpacing(30)
 
         header = QLabel("Naming Styles")
-        header.setStyleSheet(f"font-size: 28px; font-weight: 800; color: {Theme.TEXT_MAIN};")
+        header.setStyleSheet(Theme.get_page_header_style())
         layout.addWidget(header)
         layout.addSpacing(10)
 
@@ -416,11 +422,11 @@ class SettingsPage(QWidget):
         
         casing_group = QVBoxLayout()
         casing_label = QLabel("Rename Casing")
-        casing_label.setStyleSheet(f"font-weight: 700; font-size: 14px; color: {Theme.TEXT_MAIN};")
+        casing_label.setStyleSheet(Theme.get_setting_title_style())
         casing_group.addWidget(casing_label)
 
         casing_desc = QLabel("Change the capitalization of the generated file names.")
-        casing_desc.setStyleSheet(f"color: {Theme.TEXT_MUTED}; font-size: 13px;")
+        casing_desc.setStyleSheet(Theme.get_setting_desc_style())
         casing_group.addWidget(casing_desc)
 
         self.casing_combo = QComboBox()
@@ -445,11 +451,11 @@ class SettingsPage(QWidget):
         
         sep_group = QVBoxLayout()
         sep_label = QLabel("Separator Character")
-        sep_label.setStyleSheet(f"font-weight: 700; font-size: 14px; color: {Theme.TEXT_MAIN};")
+        sep_label.setStyleSheet(Theme.get_setting_title_style())
         sep_group.addWidget(sep_label)
 
         sep_desc = QLabel("Replace spaces with a custom character (dots, dashes, or underscores).")
-        sep_desc.setStyleSheet(f"color: {Theme.TEXT_MUTED}; font-size: 13px;")
+        sep_desc.setStyleSheet(Theme.get_setting_desc_style())
         sep_group.addWidget(sep_desc)
 
         self.sep_combo = QComboBox()
@@ -473,14 +479,13 @@ class SettingsPage(QWidget):
         layout.addWidget(self._create_section_header("NUMBER FORMATTING"))
         self.zero_pad_cb = QCheckBox("Use Zero Padding (e.g. S01E01 instead of S1E1)")
         self.zero_pad_cb.setChecked(self.engine.config.settings.zero_padding)
-        self.zero_pad_cb.setStyleSheet("font-weight: 600;")
         layout.addWidget(self.zero_pad_cb)
 
         # --- Section: Multi-Part (Collisions) ---
         layout.addWidget(self._create_section_header("MULTI-PART HANDLING"))
         
         multi_desc = QLabel("How to handle files that belong together (e.g. CD1, CD2) when a naming collision occurs.")
-        multi_desc.setStyleSheet(f"color: {Theme.TEXT_MUTED}; font-size: 13px;")
+        multi_desc.setStyleSheet(Theme.get_setting_desc_style())
         layout.addWidget(multi_desc)
 
         multi_row1 = QHBoxLayout()
@@ -550,7 +555,7 @@ class SettingsPage(QWidget):
         layout.setSpacing(30)
 
         header = QLabel("Folder Organization")
-        header.setStyleSheet(f"font-size: 28px; font-weight: 800; color: {Theme.TEXT_MAIN};")
+        header.setStyleSheet(Theme.get_page_header_style())
         layout.addWidget(header)
         layout.addSpacing(10)
 
@@ -559,11 +564,10 @@ class SettingsPage(QWidget):
         
         self.move_files_cb = QCheckBox("Enable file moving / copying to target folders")
         self.move_files_cb.setChecked(self.engine.config.settings.move_files)
-        self.move_files_cb.setStyleSheet("font-weight: 700; font-size: 14px;")
         layout.addWidget(self.move_files_cb)
         
         move_desc = QLabel("If disabled, files will be renamed in their original location.")
-        move_desc.setStyleSheet(f"color: {Theme.TEXT_MUTED}; font-size: 13px; margin-left: 30px;")
+        move_desc.setStyleSheet(Theme.get_setting_desc_style() + " margin-left: 30px;")
         layout.addWidget(move_desc)
 
         layout.addSpacing(15)
@@ -643,7 +647,6 @@ class SettingsPage(QWidget):
         layout.addWidget(self._create_section_header("MOVIE FOLDERS"))
         self.movie_folder_cb = QCheckBox("Organize each Movie into its own subfolder")
         self.movie_folder_cb.setChecked(self.engine.config.settings.create_movie_folder)
-        self.movie_folder_cb.setStyleSheet("font-weight: 600;")
         layout.addWidget(self.movie_folder_cb)
         
         self.movie_folder_tpl = self._create_input_group("Folder Name Template", self.engine.config.settings.movie_folder_template, "{Title} ({Year})")
@@ -667,7 +670,7 @@ class SettingsPage(QWidget):
         mf_toggle_btn = QPushButton("Show Advanced Tags")
         mf_toggle_btn.setCheckable(True)
         mf_toggle_btn.setFixedWidth(150)
-        mf_toggle_btn.setStyleSheet(f"color: {Theme.TEXT_MUTED}; font-size: 11px; text-decoration: underline; border: none; background: transparent; text-align: left;")
+        mf_toggle_btn.setStyleSheet(Theme.get_link_button_style())
         mf_toggle_btn.setCursor(Qt.PointingHandCursor)
         mf_toggle_btn.toggled.connect(lambda checked: self.adv_movie_folder_container.setVisible(checked))
         mf_toggle_btn.toggled.connect(lambda checked: mf_toggle_btn.setText("Hide Advanced Tags" if checked else "Show Advanced Tags"))
@@ -705,7 +708,6 @@ class SettingsPage(QWidget):
         layout.addWidget(self._create_section_header("TV SHOWS ORGANIZATION"))
         self.show_folder_cb = QCheckBox("Create Folder for TV Shows")
         self.show_folder_cb.setChecked(self.engine.config.settings.create_show_folder)
-        self.show_folder_cb.setStyleSheet("font-weight: 600;")
         layout.addWidget(self.show_folder_cb)
 
         self.show_folder_tpl = self._create_input_group("Show Folder Template", self.engine.config.settings.show_folder_template, "{ShowTitle}")
@@ -729,7 +731,7 @@ class SettingsPage(QWidget):
         sf_toggle_btn = QPushButton("Show Advanced Tags")
         sf_toggle_btn.setCheckable(True)
         sf_toggle_btn.setFixedWidth(150)
-        sf_toggle_btn.setStyleSheet(f"color: {Theme.TEXT_MUTED}; font-size: 11px; text-decoration: underline; border: none; background: transparent; text-align: left;")
+        sf_toggle_btn.setStyleSheet(Theme.get_link_button_style())
         sf_toggle_btn.setCursor(Qt.PointingHandCursor)
         sf_toggle_btn.toggled.connect(lambda checked: self.adv_show_folder_container.setVisible(checked))
         sf_toggle_btn.toggled.connect(lambda checked: sf_toggle_btn.setText("Hide Advanced Tags" if checked else "Show Advanced Tags"))
@@ -760,7 +762,7 @@ class SettingsPage(QWidget):
         s_toggle_btn = QPushButton("Show Advanced Tags")
         s_toggle_btn.setCheckable(True)
         s_toggle_btn.setFixedWidth(150)
-        s_toggle_btn.setStyleSheet(f"color: {Theme.TEXT_MUTED}; font-size: 11px; text-decoration: underline; border: none; background: transparent; text-align: left;")
+        s_toggle_btn.setStyleSheet(Theme.get_link_button_style())
         s_toggle_btn.setCursor(Qt.PointingHandCursor)
         s_toggle_btn.toggled.connect(lambda checked: self.adv_season_container.setVisible(checked))
         s_toggle_btn.toggled.connect(lambda checked: s_toggle_btn.setText("Hide Advanced Tags" if checked else "Show Advanced Tags"))
@@ -800,7 +802,7 @@ class SettingsPage(QWidget):
         e_toggle_btn = QPushButton("Show Advanced Tags")
         e_toggle_btn.setCheckable(True)
         e_toggle_btn.setFixedWidth(150)
-        e_toggle_btn.setStyleSheet(f"color: {Theme.TEXT_MUTED}; font-size: 11px; text-decoration: underline; border: none; background: transparent; text-align: left;")
+        e_toggle_btn.setStyleSheet(Theme.get_link_button_style())
         e_toggle_btn.setCursor(Qt.PointingHandCursor)
         e_toggle_btn.toggled.connect(lambda checked: self.adv_episode_folder_container.setVisible(checked))
         e_toggle_btn.toggled.connect(lambda checked: e_toggle_btn.setText("Hide Advanced Tags" if checked else "Show Advanced Tags"))
@@ -819,7 +821,7 @@ class SettingsPage(QWidget):
         layout.setSpacing(25)
 
         header = QLabel("API Configuration")
-        header.setStyleSheet(f"font-size: 28px; font-weight: 800; color: {Theme.TEXT_MAIN};")
+        header.setStyleSheet(Theme.get_page_header_style())
         layout.addWidget(header)
         
         layout.addWidget(self._create_section_header("TMDB (THE MOVIE DATABASE)"))
@@ -840,7 +842,7 @@ class SettingsPage(QWidget):
     def _create_path_input(self, label_text, value, category):
         group = QVBoxLayout()
         lbl = QLabel(label_text)
-        lbl.setStyleSheet(f"font-weight: 600; font-size: 13px; color: {Theme.TEXT_MAIN};")
+        lbl.setStyleSheet(Theme.get_input_label_style())
         group.addWidget(lbl)
         
         row = QHBoxLayout()
@@ -896,13 +898,13 @@ class SettingsPage(QWidget):
 
     def _create_section_header(self, text):
         lbl = QLabel(text)
-        lbl.setStyleSheet(f"color: {Theme.PRIMARY}; font-weight: 800; font-size: 11px; letter-spacing: 1.5px;")
+        lbl.setStyleSheet(Theme.get_section_header_style())
         return lbl
 
     def _create_input_group(self, label_text, value, placeholder=""):
         group = QVBoxLayout()
         lbl = QLabel(label_text)
-        lbl.setStyleSheet(f"font-weight: 600; font-size: 13px; color: {Theme.TEXT_MAIN};")
+        lbl.setStyleSheet(Theme.get_input_label_style())
         group.addWidget(lbl)
         
         edit = QLineEdit()
@@ -934,21 +936,121 @@ class SettingsPage(QWidget):
         return widget
 
     def _on_browse_path(self):
+        import os
         current = self.path_input.text()
+        if not current or not os.path.exists(current):
+            current = os.path.expanduser("~")
         folder = QFileDialog.getExistingDirectory(self, "Select Default Scan Directory", current)
         if folder:
             self.path_input.setText(folder)
 
     def _on_browse_target(self, category, target_input):
+        import os
         current = target_input.text()
+        if not current or not os.path.exists(current):
+            current = os.path.expanduser("~")
         title = "Root Target" if category == 'root' else category.title()
         folder = QFileDialog.getExistingDirectory(self, f"Select Target Folder for {title}", current)
         if folder:
             target_input.setText(folder)
 
+    def _create_extras_tab(self):
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        layout.setAlignment(Qt.AlignTop)
+        layout.setContentsMargins(40, 40, 40, 40)
+        layout.setSpacing(30)
+
+        header = QLabel("Extras Settings")
+        header.setStyleSheet(Theme.get_page_header_style())
+        layout.addWidget(header)
+        layout.addSpacing(10)
+
+        # --- Section: Types ---
+        layout.addWidget(self._create_section_header("EXTRAS HANDLING"))
+        
+        self.extra_combos = {}
+        self.extra_templates = {}
+        types = [
+            ("Video Clips", "action_extra_video", "template_extra_video"),
+            ("Subtitles", "action_extra_subtitle", "template_extra_subtitle"),
+            ("Audio Tracks", "action_extra_audio", "template_extra_audio"),
+            ("Images / Posters", "action_extra_image", "template_extra_image"),
+            ("Metadata / NFO", "action_extra_metadata", "template_extra_metadata")
+        ]
+        
+        for label_text, setting_key, tpl_key in types:
+            row = QHBoxLayout()
+            lbl = QLabel(label_text)
+            lbl.setStyleSheet("font-weight: 600;")
+            lbl.setFixedWidth(150)
+            
+            combo = QComboBox()
+            combo.setFixedWidth(120)
+            combo.addItems(["rename", "skip", "delete"])
+            
+            current_val = getattr(self.engine.config.settings, setting_key, "rename")
+            idx = combo.findText(current_val)
+            if idx >= 0: combo.setCurrentIndex(idx)
+                
+            self.extra_combos[setting_key] = combo
+            
+            tpl_input = QLineEdit(getattr(self.engine.config.settings, tpl_key, ""))
+            tpl_input.setStyleSheet(f"background: {Theme.SURFACE_DARK}; border: 1px solid {Theme.BORDER}; padding: 5px;")
+            tpl_input.setEnabled(current_val == "rename")
+            
+            self.extra_templates[tpl_key] = tpl_input
+            
+            combo.currentTextChanged.connect(lambda text, t=tpl_input: t.setEnabled(text == "rename"))
+            
+            row.addWidget(lbl)
+            row.addWidget(combo)
+            row.addWidget(tpl_input)
+            layout.addLayout(row)
+
+        layout.addSpacing(15)
+        layout.addWidget(Theme.create_hline())
+        layout.addSpacing(10)
+
+        # --- Section: Folder Placement ---
+        layout.addWidget(self._create_section_header("EXTRAS FOLDER PLACEMENT"))
+        
+        mode_row = QHBoxLayout()
+        mode_lbl = QLabel("Folder Mode:")
+        mode_lbl.setStyleSheet("font-weight: 600;")
+        self.extras_mode_combo = QComboBox()
+        self.extras_mode_combo.setFixedWidth(200)
+        self.extras_mode_combo.addItem("Next to Parent (No extra folder)", "none")
+        self.extras_mode_combo.addItem("Single 'Extras' folder", "single")
+        self.extras_mode_combo.addItem("Categorized subfolders", "categorized")
+        
+        idx = self.extras_mode_combo.findData(self.engine.config.settings.extras_folder_mode)
+        if idx >= 0: self.extras_mode_combo.setCurrentIndex(idx)
+        
+        mode_row.addWidget(mode_lbl)
+        mode_row.addWidget(self.extras_mode_combo)
+        mode_row.addStretch()
+        layout.addLayout(mode_row)
+        
+        name_row = QHBoxLayout()
+        self.extras_name_input = self._create_input_group("Extras Folder Name", self.engine.config.settings.extras_folder_name, "Extras")
+        name_row.addLayout(self.extras_name_input['layout'])
+        layout.addLayout(name_row)
+        
+        def update_name_state():
+            self.extras_name_input['edit'].setEnabled(self.extras_mode_combo.currentData() == "single")
+        
+        self.extras_mode_combo.currentIndexChanged.connect(update_name_state)
+        update_name_state()
+
+        return widget
+
     def _on_save(self):
         # Update settings object
         s = self.engine.config.settings
+        
+        s.user_name = self.name_input.text().strip()
+        
         s.default_scan_path = self.path_input.text()
         s.target_dir_movies = self.movie_target_input['edit'].text()
         s.target_dir_shows = self.show_target_input.text()
@@ -993,7 +1095,15 @@ class SettingsPage(QWidget):
         # API
         s.tmdb_key = self.tmdb_key_input['edit'].text()
         s.tmdb_bearer_token = self.tmdb_token_input['edit'].text()
-        s.omdb_key = self.omdb_key_input['edit'].text()
+        # Extras Handling
+        for key, combo in self.extra_combos.items():
+            setattr(s, key, combo.currentText())
+            
+        for key, input_field in self.extra_templates.items():
+            setattr(s, key, input_field.text())
+            
+        s.extras_folder_mode = self.extras_mode_combo.currentData()
+        s.extras_folder_name = self.extras_name_input['edit'].text()
 
         self.save_btn.setEnabled(False)
         self.save_btn.setText("Saving...")

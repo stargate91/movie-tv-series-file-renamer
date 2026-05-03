@@ -111,8 +111,12 @@ class MainWindowV3(QMainWindow):
         self.discovery_page.refresh_data()
 
     def _on_scan_clicked(self):
-        # Use default path from settings if available
-        start_dir = self.engine.config.settings.default_scan_path or ""
+        import os
+        # Use default path from settings if available, else user's home directory
+        start_dir = self.engine.config.settings.default_scan_path
+        if not start_dir or not os.path.exists(start_dir):
+            start_dir = os.path.expanduser("~")
+            
         folder = QFileDialog.getExistingDirectory(self, "Select Media Directory", start_dir)
         if folder:
             self._start_scan(folder)
@@ -158,10 +162,10 @@ class MainWindowV3(QMainWindow):
 
         # Logo / App Name
         title = QLabel("RENDA")
-        title.setStyleSheet(f"font-weight: 900; font-size: 24px; color: {Theme.PRIMARY}; margin-bottom: 2px;")
+        title.setStyleSheet(Theme.get_sidebar_title_style())
         
         subtitle = QLabel("Smart Media Organizer")
-        subtitle.setStyleSheet(f"font-size: 10px; font-weight: 600; color: {Theme.TEXT_MUTED}; margin-bottom: 25px; text-transform: uppercase; letter-spacing: 1px;")
+        subtitle.setStyleSheet(Theme.get_sidebar_subtitle_style())
         
         layout.addWidget(title)
         layout.addWidget(subtitle)
@@ -212,12 +216,29 @@ class MainWindowV3(QMainWindow):
         layout = QVBoxLayout(view)
         layout.setContentsMargins(40, 40, 40, 40)
         
+        import datetime
+        current_hour = datetime.datetime.now().hour
+        if 5 <= current_hour < 12:
+            greeting_time = "Good morning"
+        elif 12 <= current_hour < 18:
+            greeting_time = "Good afternoon"
+        elif 18 <= current_hour < 22:
+            greeting_time = "Good evening"
+        else:
+            greeting_time = "Good night"
+
+        user_name = self.engine.config.settings.user_name
+        if user_name:
+            greeting = f"{greeting_time}, {user_name}!"
+        else:
+            greeting = f"{greeting_time},"
+
         # Welcome Header
-        header = QLabel("Welcome back,")
-        header.setStyleSheet(f"font-size: 24px; font-weight: 300; color: {Theme.TEXT_MUTED};")
+        header = QLabel(greeting)
+        header.setStyleSheet(Theme.get_h2_style())
         
         sub_header = QLabel("Ready to organize your library?")
-        sub_header.setStyleSheet(f"font-size: 32px; font-weight: 700; color: {Theme.TEXT_MAIN};")
+        sub_header.setStyleSheet(Theme.get_h1_style())
         
         layout.addWidget(header)
         layout.addWidget(sub_header)
@@ -225,7 +246,7 @@ class MainWindowV3(QMainWindow):
         
         # Action Card (The Big Scan Button)
         scan_card = QFrame()
-        scan_card.setStyleSheet(f"background-color: {Theme.SURFACE}; border: 1px solid {Theme.BORDER}; border-radius: 12px;")
+        scan_card.setStyleSheet(Theme.get_card_style())
         scan_card.setFixedHeight(200)
         
         card_layout = QVBoxLayout(scan_card)

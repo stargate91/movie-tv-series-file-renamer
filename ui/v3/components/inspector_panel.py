@@ -105,13 +105,14 @@ class InspectorPanel(QFrame):
         if not file_data: return
         
         # Use database column 'resolution'
-        self.labels['RES'].setText(file_data.get('resolution', '-'))
+        self.labels['RES'].setText(str(file_data.get('resolution') or '-'))
         
-        self.labels['CODEC'].setText(file_data.get('video_codec', '-').upper())
+        codec = file_data.get('video_codec') or '-'
+        self.labels['CODEC'].setText(str(codec).upper())
         
-        audio = file_data.get('audio_codec', '-')
-        channels = file_data.get('audio_channels', '')
-        audio_text = f"{audio.upper()} {channels}" if channels else audio.upper()
+        audio = file_data.get('audio_codec') or '-'
+        channels = file_data.get('audio_channels') or ''
+        audio_text = f"{str(audio).upper()} {channels}".strip()
         self.labels['AUDIO'].setText(audio_text)
         
         # Use database column 'size_bytes'
