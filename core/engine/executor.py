@@ -210,7 +210,7 @@ class Executor:
 
         # Cleanup empty folders
         if self.s.cleanup_empty_folders:
-            self._cleanup_dirs(dirs_to_check)
+            results['leftovers'] = self._cleanup_dirs(dirs_to_check)
             
         return results
 
@@ -289,19 +289,40 @@ class Executor:
         return success, failed, errors
         
     def _cleanup_dirs(self, dirs):
-        """Iterates over directories and removes them if they are completely empty."""
+        """Iterates over directories and removes them if they are completely empty. Returns leftovers."""
+        leftovers = {}
+        # Define protected root paths to never delete
+        roots = {os.path.normpath(p).lower() for p in [
+            self.s.default_scan_path, 
+            self.s.folder_path, 
+            self.s.base_target_path, 
+            self.s.target_dir_movies, 
+            self.s.target_dir_shows
+        ] if p}
+        
         for d in dirs:
-            self._remove_empty_dir(d)
+            self._remove_empty_dir(d, roots, leftovers)
+        return leftovers
             
-    def _remove_empty_dir(self, dir_path):
-        """Recursively removes empty directories moving upwards."""
+    def _remove_empty_dir(self, dir_path, roots, leftovers):
+        """Recursively removes empty directories moving upwards. Records leftovers."""
         if not dir_path or not os.path.exists(dir_path):
             return
+            
+        norm_dir = os.path.normpath(dir_path).lower()
+        if norm_dir in roots:
+            return
+            
         try:
-            if not os.listdir(dir_path): # Empty check
+            items = os.listdir(dir_path)
+            if not items: # Empty check
                 os.rmdir(dir_path)
                 logger.info(f"Cleaned up empty folder: {dir_path}")
                 # Check parent recursively
-                self._remove_empty_dir(os.path.dirname(dir_path))
+                self._remove_empty_dir(os.path.dirname(dir_path), roots, leftovers)
+            else:
+                # Not empty. Gather leftovers.
+                if dir_path not in leftovers:
+                    leftovers[dir_path] = items
         except OSError:
             pass # Directory not empty, or permission denied

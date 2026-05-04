@@ -127,6 +127,10 @@ class DropProcessor(QThread):
                 self.finished.emit()
                 return
 
+            # Sort by size descending: ensures main videos are processed BEFORE extras/subtitles,
+            # so that parent linking finds the video already in the database.
+            all_files.sort(key=lambda x: os.path.getsize(x) if os.path.exists(x) else 0, reverse=True)
+
             total = len(all_files)
             for i, file_path in enumerate(all_files):
                 abs_path = os.path.abspath(file_path)

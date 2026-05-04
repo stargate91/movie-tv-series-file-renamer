@@ -484,8 +484,13 @@ class DiscoveryPage(QWidget):
     def _on_ignore_requested(self, file_id):
         f_data = self.engine.db.get_file_by_id(file_id)
         if f_data:
-            curr_status = f_data.get('match_status', 'PENDING')
-            self.engine.db.update_file(file_id, match_status='IGNORED', previous_match_status=curr_status)
+            if f_data.get('is_manual') == 1:
+                with self.engine.db._get_connection() as conn:
+                    conn.execute("DELETE FROM media_files WHERE id = ?", (file_id,))
+                    conn.execute("DELETE FROM file_media_links WHERE file_id = ?", (file_id,))
+            else:
+                curr_status = f_data.get('match_status', 'PENDING')
+                self.engine.db.update_file(file_id, match_status='IGNORED', previous_match_status=curr_status)
         self.refresh_data()
 
     def _on_restore_requested(self, file_id, row_idx):
@@ -554,10 +559,16 @@ class DiscoveryPage(QWidget):
         self.progress_bar.hide()
         self.status_info.hide()
         
-        if results['success'] > 0:
+        leftovers = results.get('leftovers', {})
+        if leftovers:
+            from ui.v3.components.cleanup_dialog import CleanupDialog
+            dialog = CleanupDialog(self, leftovers, self.engine)
+            dialog.exec()
+            
+        if results.get('success', 0) > 0:
             msg = f"✅ {results['success']} files renamed successfully."
             self.notif_bar.show_message(msg, batch_id=results.get('batch_id'))
-        elif results['failed'] > 0:
+        elif results.get('failed', 0) > 0:
             QMessageBox.critical(self, "Error", f"Renaming failed for {results['failed']} files.")
             
         self.refresh_data()

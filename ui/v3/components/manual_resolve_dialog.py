@@ -131,9 +131,30 @@ class ManualResolveDialog(QDialog):
         else:
             self.type_combo.setCurrentText("Movie")
 
-        # Initial search only if we have a title
-        if self.search_input.text():
-            self._on_search()
+        # 4. Check for existing candidates (if file was MULTIPLE)
+        candidates = self.engine.db.get_candidates(self.file_id)
+        if candidates:
+            self.nav_label.setText(f"Found {len(candidates)} Possible Matches")
+            self.results_list.clear()
+            for cand in candidates:
+                icon = "📺" if cand['media_type'] == 'tv' else "🎬"
+                label = f"{icon} {cand['title']}"
+                if cand.get('year'): label += f" ({cand['year']})"
+                
+                item = QListWidgetItem(label)
+                res_dict = {
+                    'tmdb_id': cand['tmdb_id'],
+                    'title': cand['title'],
+                    'year': cand['year'],
+                    'media_type': cand['media_type'],
+                    'poster_path': cand['poster_path']
+                }
+                item.setData(Qt.UserRole, res_dict)
+                self.results_list.addItem(item)
+        else:
+            # Initial search only if we have a title
+            if self.search_input.text():
+                self._on_search()
 
     def _init_ui(self):
         layout = QVBoxLayout(self)
