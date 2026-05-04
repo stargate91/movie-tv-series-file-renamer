@@ -161,3 +161,59 @@ class SmartScanner:
             current_lookup = new_dir
             
         return None
+
+    def scan_single_file(self, path):
+        """Scans a single file, adds to DB and attempts linking."""
+        if not os.path.exists(path): return None
+        
+        ext = os.path.splitext(path)[1].lower()
+        size_bytes = os.path.getsize(path)
+        size_mb = size_bytes / (1024 * 1024)
+        
+        category = 'unknown'
+        if ext in self.video_exts:
+            category = 'video' if size_mb >= self.s.vid_size else 'extra'
+        elif ext in self.sub_exts:
+            category = 'subtitle'
+        elif ext in self.audio_exts:
+            category = 'audio'
+        elif ext in self.img_exts:
+            category = 'image'
+        elif ext in self.meta_exts:
+            category = 'metadata'
+            
+        if category == 'unknown': return None
+        
+        sub_category = None
+        if category in ('video', 'extra'):
+            name_lower = os.path.basename(path).lower()
+            keywords = [k.strip().lower() for k in self.s.sample_keywords.split(',')]
+            for k in keywords:
+                if k in name_lower:
+                    if any(x in k for x in ('sample', 'minta')):
+                        sub_category = 'sample'
+                    else:
+                        sub_category = 'trailer'
+                    break
+        
+        db_id = self.db.add_file(path, category, size_bytes, sub_category=sub_category)
+        
+        # Ensure we return the ID even if it was a duplicate/update
+        if not db_id:
+            existing = self.db.get_file_by_path(path)
+            if existing: db_id = existing['id']
+        
+        if not db_id: return None
+
+        # Attempt linking if it's an asset
+        if category != 'video':
+            # Get candidate videos (all videos in DB for now, _find_best_parent will filter them)
+            nearby_vids = [f['current_path'] for f in self.db.get_all_files('video')]
+            
+            parent_path = self._find_best_parent(path, nearby_vids)
+            if parent_path:
+                parent_data = self.db.get_file_by_path(parent_path)
+                if parent_data:
+                    self.db.link_parent(db_id, parent_data['id'])
+                    
+        return db_id

@@ -13,6 +13,7 @@ import re
 import json
 import subprocess
 import logging
+from guessit import guessit
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +32,23 @@ class Collector:
         self._phase_ffmpeg(progress_callback)
         # Phase 3: GuessIt parsing
         self._phase_guessit(progress_callback)
+
+    def collect_single_file(self, file_id):
+        """Enriches a single file with all local metadata (FFmpeg + GuessIt)."""
+        vid = self.db.get_file_by_id(file_id)
+        if not vid:
+            return
+            
+        # 1. FFmpeg (if video/audio)
+        if vid.get('category') in ('video', 'audio'):
+            probe_data = self._probe_file(vid['current_path'])
+            if probe_data:
+                self.db.update_file(file_id, **probe_data)
+        
+        # 2. GuessIt
+        guess_data = self._guess_file(vid)
+        if guess_data:
+            self.db.update_file(file_id, **guess_data)
 
     # ── Phase 1: NFO ────────────────────────────────────────────
 
@@ -124,7 +142,7 @@ class Collector:
         
         updates = []
         
-        def _probe_and_update(vid):
+        def _probe_worker(vid):
             probe_data = self._probe_file(vid['current_path'])
             if probe_data:
                 probe_data['id'] = vid['id']
@@ -132,7 +150,7 @@ class Collector:
             return None
         
         with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
-            futures = {executor.submit(_probe_and_update, vid): vid for vid in media_files}
+            futures = {executor.submit(_probe_worker, vid): vid for vid in media_files}
             for future in concurrent.futures.as_completed(futures):
                 vid = futures[future]
                 try:
@@ -315,7 +333,6 @@ class Collector:
 
     def _phase_guessit(self, cb=None):
         """Parses filename and foldername with GuessIt (incremental)."""
-        from guessit import guessit
         import concurrent.futures
         import threading
         
@@ -333,54 +350,83 @@ class Collector:
         folder_cache = {}
         folder_cache_lock = threading.Lock()
         
-        def _guess_and_update(vid):
-            update = {}
-            file_path = vid['current_path']
-            
-            # --- Filename GuessIt ---
-            filename = os.path.splitext(os.path.basename(file_path))[0]
-            fn_guess = guessit(filename)
-            
-            fn_title = fn_guess.get('title')
-            if fn_title:
-                update['fn_title'] = fn_title
-            
-            fn_year = fn_guess.get('year')
-            if fn_year:
-                update['fn_year'] = fn_year
-            
-            fn_season = fn_guess.get('season')
-            if fn_season is not None:
-                update['fn_season'] = fn_season
-            
-            fn_episode = fn_guess.get('episode')
-            if fn_episode is not None:
-                update['fn_episode'] = str(fn_episode)
-            
-            fn_type = fn_guess.get('type', 'movie')
-            update['fn_media_type'] = fn_type
-            update['sub_category'] = 'tv' if fn_type == 'episode' else fn_type
-            
-            # Extract language from filename (useful for subtitles and audio)
-            fn_lang = fn_guess.get('language')
-            if fn_lang:
-                # GuessIt can return a list of languages or a single language object
-                if isinstance(fn_lang, list):
-                    update['language'] = str(fn_lang[0])
-                else:
-                    update['language'] = str(fn_lang)
-            
-            # --- Foldername GuessIt ---
-            parent_dir = os.path.basename(os.path.dirname(file_path))
-            if parent_dir:
-                # Thread-safe caching for folder names
-                with folder_cache_lock:
+        def _guess_worker(vid):
+            update = self._guess_file(vid, folder_cache, folder_cache_lock)
+            if update:
+                update['id'] = vid['id']
+                return update
+            return None
+                
+        updates = []
+        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+            futures = {executor.submit(_guess_worker, vid): vid for vid in media_files}
+            for future in concurrent.futures.as_completed(futures):
+                vid = futures[future]
+                try:
+                    res = future.result()
+                    if res:
+                        updates.append(res)
+                except Exception as e:
+                    logger.error(f"GuessIt error for {vid['file_name']}: {e}")
+                
+                completed += 1
+                if cb: cb(f"GuessIt: {vid['file_name']}", completed, total)
+
+        if updates:
+            self.db.bulk_update_files(updates)
+
+    def _guess_file(self, vid, folder_cache=None, lock=None):
+        """Internal helper to guess metadata for a single file dict."""
+        update = {}
+        file_path = vid['current_path']
+        
+        # --- Filename GuessIt ---
+        filename = os.path.splitext(os.path.basename(file_path))[0]
+        fn_guess = guessit(filename)
+        
+        fn_title = fn_guess.get('title')
+        if fn_title:
+            update['fn_title'] = fn_title
+        
+        fn_year = fn_guess.get('year')
+        if fn_year:
+            update['fn_year'] = fn_year
+        
+        fn_season = fn_guess.get('season')
+        if fn_season is not None:
+            update['fn_season'] = fn_season
+        
+        fn_episode = fn_guess.get('episode')
+        if fn_episode is not None:
+            update['fn_episode'] = str(fn_episode)
+        
+        fn_type = fn_guess.get('type', 'movie')
+        update['fn_media_type'] = fn_type
+        update['sub_category'] = 'tv' if fn_type == 'episode' else fn_type
+        
+        # Extract language
+        fn_lang = fn_guess.get('language')
+        if fn_lang:
+            if isinstance(fn_lang, list):
+                update['language'] = str(fn_lang[0])
+            else:
+                update['language'] = str(fn_lang)
+        
+        # --- Foldername GuessIt ---
+        parent_dir = os.path.basename(os.path.dirname(file_path))
+        if parent_dir:
+            fd_guess = None
+            if folder_cache is not None and lock is not None:
+                with lock:
                     if parent_dir in folder_cache:
                         fd_guess = folder_cache[parent_dir]
                     else:
                         fd_guess = guessit(parent_dir)
                         folder_cache[parent_dir] = fd_guess
-                
+            else:
+                fd_guess = guessit(parent_dir)
+            
+            if fd_guess:
                 fd_title = fd_guess.get('title')
                 if fd_title:
                     update['fd_title'] = fd_title
@@ -401,26 +447,5 @@ class Collector:
                 update['fd_media_type'] = fd_type
                 if 'sub_category' not in update:
                     update['sub_category'] = 'tv' if fd_type == 'episode' else fd_type
-            
-            if update:
-                update['id'] = vid['id']
-                return update
-            return None
-                
-        updates = []
-        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
-            futures = {executor.submit(_guess_and_update, vid): vid for vid in media_files}
-            for future in concurrent.futures.as_completed(futures):
-                vid = futures[future]
-                try:
-                    res = future.result()
-                    if res:
-                        updates.append(res)
-                except Exception as e:
-                    logger.error(f"GuessIt error for {vid['file_name']}: {e}")
-                
-                completed += 1
-                if cb: cb(f"GuessIt: {vid['file_name']}", completed, total)
-
-        if updates:
-            self.db.bulk_update_files(updates)
+        
+        return update

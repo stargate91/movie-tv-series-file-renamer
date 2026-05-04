@@ -14,6 +14,7 @@ class SaveWorker(QThread):
         self.finished.emit()
 
 class SettingsPage(QWidget):
+    database_wiped = Signal()
     def __init__(self, engine, parent=None):
         super().__init__(parent)
         self.engine = engine
@@ -318,9 +319,8 @@ class SettingsPage(QWidget):
         
         if reply == QMessageBox.Yes:
             self.engine.db.clear_all()
+            self.database_wiped.emit()
             QMessageBox.information(self, "Wiped", "All library data has been cleared.")
-            # Trigger a refresh on discovery page if it exists
-            # (In a real app we'd use a signal, but for now we just clear the DB)
 
     def _create_file_naming_tab(self):
         widget = QWidget()

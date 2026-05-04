@@ -174,6 +174,7 @@ class LibraryDB:
                     
                     -- Match result
                     match_status TEXT DEFAULT 'pending',
+                    previous_match_status TEXT,
                     
                     -- User Overrides / Editions
                     edition TEXT,
@@ -187,6 +188,25 @@ class LibraryDB:
                 cursor.execute("ALTER TABLE media_files ADD COLUMN edition TEXT")
             except:
                 pass
+            
+            # Migration for is_manual
+            try:
+                cursor.execute("ALTER TABLE media_files ADD COLUMN is_manual INTEGER DEFAULT 0")
+            except:
+                pass
+
+            # Migration for previous_match_status
+            try:
+                cursor.execute("ALTER TABLE media_files ADD COLUMN previous_match_status TEXT")
+            except:
+                pass
+
+            # Performance Indexes
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_files_manual ON media_files(is_manual)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_files_status ON media_files(match_status)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_files_category ON media_files(category)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_links_file ON file_media_links(file_id)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_candidates_file ON match_candidates(file_id)")
 
             # 2.5 Many-to-Many Links (File -> Media / Episodes)
             cursor.execute("""
@@ -295,6 +315,7 @@ class LibraryDB:
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS rename_history (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    batch_id TEXT,
                     file_id INTEGER,
                     old_path TEXT,
                     new_path TEXT,
@@ -302,6 +323,12 @@ class LibraryDB:
                     FOREIGN KEY(file_id) REFERENCES media_files(id)
                 )
             """)
+            
+            # Migration for batch_id
+            try:
+                cursor.execute("ALTER TABLE rename_history ADD COLUMN batch_id TEXT")
+            except:
+                pass
 
             # 7. User Settings
             cursor.execute("""
@@ -735,3 +762,20 @@ class LibraryDB:
                 "SELECT * FROM media_files WHERE parent_file_id = ?", (parent_file_id,)
             ).fetchall()
             return [dict(r) for r in rows]
+
+    # ── Undo Helpers ─────────────────────────────────────────────
+
+    def get_batch_history(self, batch_id):
+        """Returns all rename entries for a specific batch."""
+        with self._get_connection() as conn:
+            rows = conn.execute("SELECT * FROM rename_history WHERE batch_id = ?", (batch_id,)).fetchall()
+            return [dict(r) for r in rows]
+
+    def delete_batch_history(self, batch_id):
+        """Removes history entries after a successful undo."""
+        conn = self._get_connection()
+        try:
+            conn.execute("DELETE FROM rename_history WHERE batch_id = ?", (batch_id,))
+            conn.commit()
+        finally:
+            conn.close()

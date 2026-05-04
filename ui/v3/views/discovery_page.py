@@ -1,143 +1,19 @@
 import os
-from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QTableWidget, QLineEdit, QApplication,
-                             QTableWidgetItem, QHeaderView, QLabel, QFrame, QPushButton, QProgressBar, QMessageBox, QDialog, QStyledItemDelegate, QStyle)
-from PySide6.QtGui import QColor, QPixmap, QLinearGradient, QPainter, QPalette
-from PySide6.QtCore import Qt, QThread, Signal, QTimer, QRect
+import logging
+from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLineEdit, QApplication,
+                             QLabel, QFrame, QPushButton, QProgressBar, QMessageBox, QTabWidget)
+from PySide6.QtGui import QPixmap
+from PySide6.QtCore import Qt, Signal, QTimer
+
 from ui.v3.styles.theme import Theme
 from ui.v3.components.inspector_panel import InspectorPanel
 from ui.v3.components.manual_resolve_dialog import ManualResolveDialog
 from ui.v3.components.preview_dialog import PreviewDialog
+from ui.v3.components.discovery_table import DiscoveryTable
+from ui.v3.components.notification_bar import NotificationBar
+from ui.v3.workers.discovery_workers import DataLoader, PosterPrefetcher, RenameWorker, PlanWorker, DropProcessor, UndoWorker
 
-class PremiumDelegate(QStyledItemDelegate):
-    """Custom delegate to draw premium row selection with a left accent bar."""
-    def paint(self, painter, option, index):
-        # Default drawing for non-selected items (or if it's a cell widget column)
-        # Note: cellWidgets are handled separately by Qt, but we still paint the background
-        
-        painter.save()
-        painter.setRenderHint(QPainter.Antialiasing)
-
-        # Draw Row Background
-        if option.state & QStyle.State_Selected:
-            # Draw the indigo gradient background
-            grad = QLinearGradient(option.rect.topLeft(), option.rect.topRight())
-            grad.setColorAt(0, QColor(Theme.PRIMARY))
-            grad.setColorAt(0.005, QColor(Theme.PRIMARY))
-            grad.setColorAt(0.007, QColor(Theme.SURFACE_LIGHT))
-            grad.setColorAt(1.0, QColor(Theme.SURFACE_DARK))
-            
-            painter.fillRect(option.rect, grad)
-            
-            # Draw left accent bar (3px)
-            accent_rect = QRect(option.rect.left(), option.rect.top(), 4, option.rect.height())
-            painter.fillRect(accent_rect, QColor(Theme.PRIMARY))
-        else:
-            # Normal background
-            if option.state & QStyle.State_MouseOver:
-                painter.fillRect(option.rect, QColor(Theme.SURFACE_LIGHT + "40"))
-            else:
-                # We let the table's background show through
-                pass
-
-        painter.restore()
-
-        # Draw the actual text/content
-        # If there's a cell widget (Col 0 and 4), we don't draw text here
-        if index.column() not in (0, 4):
-            super().paint(painter, option, index)
-
-class DataLoader(QThread):
-    """Background thread for loading data and collecting poster paths."""
-    data_ready = Signal(list, list)  # videos, poster_paths
-
-    def __init__(self, engine):
-        super().__init__()
-        self.engine = engine
-
-    def run(self):
-        try:
-            raw_videos = self.engine.db.get_files_by_category('video', 'extra', 'subtitle', 'audio', 'image', 'metadata', 'unknown')
-            # Filter out files that are already completed (renamed) or deleted
-            videos = [v for v in raw_videos if v.get('status') not in ('renamed', 'deleted')]
-            
-            status_priority = {'multiple': 0, 'no_match': 1, 'uncertain': 2, 'matched': 3, 'pending': 4}
-            videos.sort(key=lambda v: status_priority.get(v.get('match_status', 'pending'), 99))
-
-            # Collect poster paths and generate preview names here (off main thread)
-            poster_paths = []
-            for vid in videos:
-                try:
-                    # Pre-generate the new name for the preview column
-                    new_name = self.engine.formatter.generate_name(vid['id'], self.engine.config.settings)
-                    if new_name:
-                        import os
-                        ext = os.path.splitext(vid.get('file_name', ''))[1]
-                        vid['_new_name'] = f"{new_name}{ext}"
-                        
-                    # Fetch links (use parent_id if extra)
-                    target_id = vid.get('parent_file_id') or vid['id']
-                    links = self.engine.db.get_links_for_file(target_id)
-                    if links:
-                        media = self.engine.db.get_media_item_by_id(links[0]['media_item_id'])
-                        if media:
-                            vid['_media_type_from_db'] = media.get('media_type')
-                            if media.get('poster_path'):
-                                poster_paths.append(media['poster_path'])
-                except:
-                    pass
-
-            self.data_ready.emit(videos, poster_paths)
-        except Exception as e:
-            import logging
-            logging.getLogger(__name__).error(f"DataLoader Error: {e}")
-            self.data_ready.emit([], [])
-
-class PosterPrefetcher(QThread):
-    """Prefetches poster images in the background."""
-    def __init__(self, engine, poster_paths):
-        super().__init__()
-        self.engine = engine
-        self.poster_paths = poster_paths
-
-    def run(self):
-        for path in self.poster_paths:
-            if not path: continue
-            try:
-                self.engine.db.api_cache.get_poster(path)
-            except:
-                pass
-
-class RenameWorker(QThread):
-    """Handles the physical renaming process in the background."""
-    finished = Signal(dict)
-
-    def __init__(self, engine, plan):
-        super().__init__()
-        self.engine = engine
-        self.plan = plan
-
-    def run(self):
-        try:
-            results = self.engine.apply_plan(self.plan)
-            self.finished.emit(results)
-        except Exception as e:
-            self.finished.emit({'success': 0, 'failed': 1, 'skipped': 0, 'deleted': 0, 'errors': [str(e)]})
-
-class PlanWorker(QThread):
-    """Handles the heavy lifting of generating the rename plan."""
-    plan_ready = Signal(list)
-    error = Signal(str)
-
-    def __init__(self, engine):
-        super().__init__()
-        self.engine = engine
-
-    def run(self):
-        try:
-            plan = self.engine.get_rename_plan()
-            self.plan_ready.emit(plan)
-        except Exception as e:
-            self.error.emit(str(e))
+logger = logging.getLogger(__name__)
 
 class DiscoveryPage(QWidget):
     def __init__(self, engine, parent=None):
@@ -145,1069 +21,564 @@ class DiscoveryPage(QWidget):
         self.engine = engine
         self.loader = None
         self.poster_worker = None
-        self.active_workers = [] # Keep references to prevent GC crashes
-        self.current_filter = "all" # 'all', 'review', 'movies', 'shows'
+        self.active_workers = [] 
         self._init_ui()
+        QTimer.singleShot(100, self.refresh_data)
 
     def _init_ui(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(30, 30, 30, 30)
         layout.setSpacing(20)
 
-        # Header Area
-        header_layout = QHBoxLayout()
-        self.title_label = QLabel("Discovery")
-        self.title_label.setStyleSheet("font-size: 24px; font-weight: 700;")
+        # Header Row
+        header = QHBoxLayout()
+        title = QLabel("Discovery Console")
+        title.setStyleSheet(f"font-size: 28px; font-weight: 800; color: {Theme.TEXT_MAIN};")
         
-        self.stats_label = QLabel("0 files found")
-        self.stats_label.setStyleSheet(f"color: {Theme.TEXT_MUTED}; font-weight: 600;")
-        # Action Buttons Area
-        actions_layout = QHBoxLayout()
-        self.scan_new_btn = QPushButton("Scan New Directory")
-        self.scan_new_btn.setObjectName("SecondaryButton")
-        self.scan_new_btn.setFixedWidth(180)
-        self.scan_new_btn.setCursor(Qt.PointingHandCursor)
+        self.search_box = QLineEdit()
+        self.search_box.setPlaceholderText("Search files...")
+        self.search_box.setFixedWidth(300)
+        self.search_box.setStyleSheet(Theme.get_input_style())
+        self.search_box.textChanged.connect(self._on_search_changed)
 
-        self.rename_all_btn = QPushButton("Apply Renames")
-        self.rename_all_btn.setFixedWidth(180)
-        self.rename_all_btn.setCursor(Qt.PointingHandCursor)
-        self.rename_all_btn.setStyleSheet(Theme.get_primary_button_style())
-        self.rename_all_btn.hide() # Only show if we have matched items
-        
-        actions_layout.addWidget(self.stats_label)
-        actions_layout.addSpacing(20)
-        actions_layout.addWidget(self.scan_new_btn)
-        actions_layout.addWidget(self.rename_all_btn)
-        
-        header_layout.addWidget(self.title_label)
-        header_layout.addStretch()
-        header_layout.addLayout(actions_layout)
-        layout.addLayout(header_layout)
+        self.scan_new_btn = QPushButton("Scan Directory")
+        self.scan_new_btn.setFixedWidth(140)
+        self.scan_new_btn.setStyleSheet(Theme.get_secondary_button_style())
 
-        # Filters Area
-        filters_layout = QHBoxLayout()
-        filters_layout.setSpacing(10)
-        
-        # Filter Buttons
-        self.filter_btns = []
-        
-        btn_all = QPushButton("All Files")
-        btn_all.setCheckable(True)
-        btn_all.setChecked(True)
-        btn_all.setProperty("filter_val", "all")
-        
-        btn_review = QPushButton("Needs Review")
-        btn_review.setCheckable(True)
-        btn_review.setProperty("filter_val", "review")
-        
-        btn_movies = QPushButton("Matched Movies")
-        btn_movies.setCheckable(True)
-        btn_movies.setProperty("filter_val", "movies")
-        
-        btn_shows = QPushButton("Matched Shows")
-        btn_shows.setCheckable(True)
-        btn_shows.setProperty("filter_val", "shows")
-        
-        btn_extras = QPushButton("Extras")
-        btn_extras.setCheckable(True)
-        btn_extras.setProperty("filter_val", "extras")
-        
-        btn_ignored = QPushButton("Trash")
-        btn_ignored.setCheckable(True)
-        btn_ignored.setProperty("filter_val", "ignored")
-        btn_ignored.setStyleSheet("color: #EF4444;")
-        
-        self.filter_btns.extend([btn_all, btn_review, btn_movies, btn_shows, btn_extras, btn_ignored])
-        
-        for btn in self.filter_btns:
-            btn.setCursor(Qt.PointingHandCursor)
-            btn.setFixedHeight(32)
-            btn.setStyleSheet(Theme.get_filter_chip_style())
-            btn.clicked.connect(lambda checked, b=btn: self._on_filter_btn_clicked(b))
-            filters_layout.addWidget(btn)
-        
-        filters_layout.addStretch()
-        
-        # Search Box
-        self.filter_input = QLineEdit()
-        self.filter_input.setPlaceholderText("Search titles...")
-        self.filter_input.setFixedWidth(250)
-        self.filter_input.setFixedHeight(32)
-        self.filter_input.textChanged.connect(self._apply_filters)
-        filters_layout.addWidget(self.filter_input)
-        
-        layout.addLayout(filters_layout)
-        layout.addSpacing(10)
+        refresh_btn = QPushButton("Refresh List")
+        refresh_btn.setFixedWidth(120)
+        refresh_btn.setStyleSheet(Theme.get_secondary_button_style())
+        refresh_btn.clicked.connect(self.refresh_data)
 
-        # Progress Section
+        header.addWidget(title)
+        header.addStretch()
+        header.addWidget(self.search_box)
+        header.addWidget(self.scan_new_btn)
+        header.addWidget(refresh_btn)
+        layout.addLayout(header)
+
+        # Tab Widget
+        self.tabs = QTabWidget()
+        self.tabs.setStyleSheet(f"""
+            QTabWidget::pane {{ border: 1px solid {Theme.BORDER}; border-radius: 8px; background: {Theme.SURFACE_DARK}; }}
+            QTabBar::tab {{ background: {Theme.SURFACE}; color: {Theme.TEXT_MUTED}; padding: 12px 24px; border: 1px solid {Theme.BORDER}; border-bottom: none; border-radius: 8px 8px 0 0; font-weight: 700; font-size: 13px; margin-right: 4px; }}
+            QTabBar::tab:selected {{ background: {Theme.SURFACE_DARK}; color: {Theme.PRIMARY}; border-bottom: 2px solid {Theme.PRIMARY}; }}
+            QTabBar::tab:hover {{ background: {Theme.SURFACE_LIGHT}; color: {Theme.TEXT_MAIN}; }}
+        """)
+        
+        # Create Tables for each tab
+        self.tables = {
+            "review": DiscoveryTable(),
+            "movies": DiscoveryTable(),
+            "shows": DiscoveryTable(),
+            "extras": DiscoveryTable(),
+            "dropped": DiscoveryTable(),
+            "trash": DiscoveryTable()
+        }
+
+        for key, table in self.tables.items():
+            self._setup_table_signals(table)
+
+        self.tabs.addTab(self.tables["review"], "📥 Review")
+        self.tabs.addTab(self.tables["movies"], "🎬 Movies")
+        self.tabs.addTab(self.tables["shows"], "📺 TV Shows")
+        
+        # Extras Tab with Sub-filters
+        extras_container = QWidget()
+        extras_layout = QVBoxLayout(extras_container)
+        extras_layout.setContentsMargins(10, 10, 10, 10)
+        extras_layout.setSpacing(10)
+        
+        sub_filter_layout = QHBoxLayout()
+        sub_filter_layout.setSpacing(8)
+        self.extra_filters = {}
+        for label, val in [("All", "all"), ("Bonus Videos", "extra"), ("Images", "image"), ("Metadatas", "metadata"), ("Subtitles", "subtitle")]:
+            btn = QPushButton(label)
+            btn.setCheckable(True)
+            btn.setAutoExclusive(True)
+            if val == "all": btn.setChecked(True)
+            btn.setStyleSheet(Theme.get_sub_chip_style())
+            btn.clicked.connect(lambda checked=False, v=val: self._on_extra_subfilter_changed(v))
+            sub_filter_layout.addWidget(btn)
+            self.extra_filters[val] = btn
+        sub_filter_layout.addStretch()
+        
+        extras_layout.addLayout(sub_filter_layout)
+        extras_layout.addWidget(self.tables["extras"], 1)
+        
+        # Dropped Tab (Zsilip)
+        self.dropped_container = QWidget()
+        dropped_layout = QVBoxLayout(self.dropped_container)
+        dropped_layout.setContentsMargins(10, 10, 10, 10)
+        dropped_layout.setSpacing(10)
+        
+        dropped_actions = QHBoxLayout()
+        self.import_all_btn = QPushButton("🚀 Import All to Library")
+        self.import_all_btn.setStyleSheet(Theme.get_primary_button_style())
+        self.import_all_btn.clicked.connect(self._on_import_all)
+        
+        self.import_sel_btn = QPushButton("📥 Import Selected")
+        self.import_sel_btn.setStyleSheet(Theme.get_secondary_button_style())
+        self.import_sel_btn.clicked.connect(self._on_import_selected)
+        
+        self.clear_dropped_btn = QPushButton("🧹 Clear List")
+        self.clear_dropped_btn.setStyleSheet(Theme.get_danger_button_style())
+        self.clear_dropped_btn.clicked.connect(self._on_clear_dropped)
+        
+        dropped_actions.addWidget(self.import_all_btn)
+        dropped_actions.addWidget(self.import_sel_btn)
+        dropped_actions.addStretch()
+        dropped_actions.addWidget(self.clear_dropped_btn)
+        
+        dropped_layout.addLayout(dropped_actions)
+        dropped_layout.addWidget(self.tables["dropped"], 1)
+        
+        self.tabs.addTab(self.tables["review"], "📥 Review")
+        self.tabs.addTab(self.tables["movies"], "🎬 Movies")
+        self.tabs.addTab(self.tables["shows"], "📺 TV Shows")
+        self.tabs.addTab(extras_container, "📎 Extras")
+        self.tabs.addTab(self.dropped_container, "📦 Dropped")
+        self.tabs.addTab(self.tables["trash"], "🗑️ Trash")
+        
+        # Main content split
+        content_layout = QHBoxLayout()
+        content_layout.setSpacing(0)
+        content_layout.addWidget(self.tabs, 7)
+        
+        self.inspector = InspectorPanel()
+        content_layout.addWidget(self.inspector, 3)
+        layout.addLayout(content_layout)
+
+        # Drop Overlay
+        self.drop_overlay = QFrame(self)
+        self.drop_overlay.setObjectName("DropOverlay")
+        self.drop_overlay.setStyleSheet(f"""
+            #DropOverlay {{
+                background-color: {Theme.PRIMARY}cc;
+                border: 3px dashed white;
+                border-radius: 20px;
+            }}
+        """)
+        self.drop_overlay.hide()
+        overlay_layout = QVBoxLayout(self.drop_overlay)
+        overlay_label = QLabel("🚀 Drop files to Ingest into Library")
+        overlay_label.setStyleSheet("color: white; font-size: 24px; font-weight: 800;")
+        overlay_label.setAlignment(Qt.AlignCenter)
+        overlay_layout.addWidget(overlay_label)
+        
+        self.setAcceptDrops(True)
+
+        # Progress bar
         self.progress_bar = QProgressBar()
         self.progress_bar.setFixedHeight(4)
         self.progress_bar.setTextVisible(False)
-        self.progress_bar.setStyleSheet(Theme.get_progress_bar_style())
+        self.progress_bar.setStyleSheet(f"QProgressBar {{ background: transparent; border: none; }} QProgressBar::chunk {{ background: {Theme.PRIMARY}; }}")
         self.progress_bar.hide()
         
         self.status_info = QLabel("")
-        self.status_info.setStyleSheet(f"color: {Theme.PRIMARY}; font-weight: 600; font-size: 11px;")
+        self.status_info.setStyleSheet(f"color: {Theme.TEXT_MUTED}; font-size: 11px; font-weight: 600;")
+        self.status_info.setAlignment(Qt.AlignCenter)
         self.status_info.hide()
-
+        
         layout.addWidget(self.status_info)
         layout.addWidget(self.progress_bar)
-        
+
         # Batch Action Bar
         self.batch_bar = QFrame()
-        self.batch_bar.setStyleSheet(f"""
-            QFrame {{
-                background-color: rgba(99, 102, 241, 0.1); /* Primary color with transparency */
-                border: 1px solid {Theme.PRIMARY};
-                border-radius: 8px;
-            }}
-        """)
-        self.batch_bar.setFixedHeight(50)
+        self.batch_bar.setFixedHeight(60)
+        self.batch_bar.setStyleSheet(f"background: {Theme.PRIMARY}; border-radius: 12px;")
+        bb_layout = QHBoxLayout(self.batch_bar)
+        bb_layout.setContentsMargins(20, 0, 20, 0)
+        
+        self.batch_label = QLabel("0 items selected")
+        self.batch_label.setStyleSheet("color: white; font-weight: 700; font-size: 14px; border: none;")
+        
+        clear_batch_btn = QPushButton("🧹 Clear Match")
+        clear_batch_btn.setFixedWidth(130)
+        clear_batch_btn.setStyleSheet("background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.4); padding: 8px 12px; font-weight: 700; border-radius: 6px;")
+        clear_batch_btn.clicked.connect(self._on_batch_clear)
+
+        bb_layout.addWidget(self.batch_label)
+        bb_layout.addStretch()
+        bb_layout.addWidget(clear_batch_btn)
         self.batch_bar.hide()
-        
-        batch_layout = QHBoxLayout(self.batch_bar)
-        
-        self.batch_count_lbl = QLabel("0 files selected")
-        self.batch_count_lbl.setStyleSheet(f"color: {Theme.PRIMARY}; font-weight: bold; font-size: 14px; border: none; background: transparent;")
-        
-        btn_deselect = QPushButton("✖ Deselect All")
-        btn_deselect.setCursor(Qt.PointingHandCursor)
-        btn_deselect.setStyleSheet(f"""
-            QPushButton {{ background: transparent; color: {Theme.TEXT_MAIN}; border: none; font-weight: bold; }}
-            QPushButton:hover {{ color: white; }}
-        """)
-        btn_deselect.clicked.connect(self._deselect_all)
-        
-        self.batch_confirm_btn = QPushButton("✅ Confirm Selected")
-        self.batch_confirm_btn.setCursor(Qt.PointingHandCursor)
-        self.batch_confirm_btn.setStyleSheet(f"""
-            QPushButton {{ background: {Theme.SUCCESS}; color: white; border-radius: 4px; padding: 6px 12px; font-weight: bold; border: none; }}
-            QPushButton:hover {{ background: #059669; }}
-        """)
-        self.batch_confirm_btn.clicked.connect(self._confirm_selected)
-        self.batch_confirm_btn.hide()
-        
-        self.batch_ignore_btn = QPushButton("🗑 Ignore Selected")
-        self.batch_ignore_btn.setCursor(Qt.PointingHandCursor)
-        self.batch_ignore_btn.setStyleSheet(f"""
-            QPushButton {{ background: {Theme.ERROR}; color: white; border-radius: 4px; padding: 6px 12px; font-weight: bold; border: none; }}
-            QPushButton:hover {{ background: #DC2626; }}
-        """)
-        self.batch_ignore_btn.clicked.connect(self._ignore_selected)
-        
-        self.batch_clear_btn = QPushButton("🧹 Clear Match")
-        self.batch_clear_btn.setCursor(Qt.PointingHandCursor)
-        self.batch_clear_btn.setStyleSheet(f"""
-            QPushButton {{ background: {Theme.WARNING}; color: {Theme.BACKGROUND}; border-radius: 4px; padding: 6px 12px; font-weight: bold; border: none; }}
-            QPushButton:hover {{ background: #F59E0B; }}
-        """)
-        self.batch_clear_btn.clicked.connect(self._clear_match_selected)
-        
-        batch_layout.addWidget(self.batch_count_lbl)
-        batch_layout.addStretch()
-        batch_layout.addWidget(btn_deselect)
-        batch_layout.addWidget(self.batch_confirm_btn)
-        batch_layout.addWidget(self.batch_clear_btn)
-        batch_layout.addWidget(self.batch_ignore_btn)
-        
         layout.addWidget(self.batch_bar)
-        layout.addSpacing(10)
-        
-        content_layout = QHBoxLayout()
-        content_layout.setSpacing(0) # No gap between them for a seamless look
 
-        self.table = QTableWidget()
-        self.table.setColumnCount(5)
-        self.table.setHorizontalHeaderLabels(["Status", "Original Name", "Type", "New Name Preview", "Actions"])
-        self.table.setEditTriggers(QTableWidget.NoEditTriggers) # Disable inline editing
-        self.table.setSelectionBehavior(QTableWidget.SelectRows)
-        
-        # Style the table
-        self.table.setShowGrid(False)
-        self.table.setFocusPolicy(Qt.NoFocus)
-        self.table.setSelectionMode(QTableWidget.ExtendedSelection) # Enable Shift+Click / Ctrl+Click
-        self.table.setSelectionBehavior(QTableWidget.SelectRows)
-        self.table.verticalHeader().setVisible(False)
-        
-        # Aggressive palette override for Windows native selection
-        from PySide6.QtGui import QPalette, QColor
-        pal = self.table.palette()
-        pal.setColor(QPalette.Highlight, QColor(0, 0, 0, 0)) # Fully transparent highlight
-        pal.setColor(QPalette.HighlightedText, QColor(255, 255, 255))
-        self.table.setPalette(pal)
+        # Final rename button
+        self.apply_btn = QPushButton("Apply Renames")
+        self.apply_btn.setFixedHeight(50)
+        self.apply_btn.setStyleSheet(Theme.get_primary_button_style())
+        self.apply_btn.clicked.connect(self._on_apply_clicked)
+        layout.addWidget(self.apply_btn)
 
-        # Install custom delegate for premium selection painting
-        self.table.setItemDelegate(PremiumDelegate(self.table))
+        # Notification Bar (Snackbar)
+        self.notif_bar = NotificationBar(self)
+        self.notif_bar.undo_requested.connect(self._on_undo_requested)
 
-        # Use centralized premium styling (Delegate handles the selection background)
-        self.table.setStyleSheet(Theme.get_discovery_table_style())
-        
-        # Header styling
-        header = self.table.horizontalHeader()
-        
-        header.setSectionResizeMode(0, QHeaderView.Fixed)
-        self.table.setColumnWidth(0, 100) # Status
-        
-        header.setSectionResizeMode(1, QHeaderView.Stretch) # Original Name
-        
-        header.setSectionResizeMode(2, QHeaderView.Fixed)
-        self.table.setColumnWidth(2, 100) # Type
-        
-        header.setSectionResizeMode(3, QHeaderView.Stretch) # Identified As
-        
-        header.setSectionResizeMode(4, QHeaderView.Fixed)
-        self.table.setColumnWidth(4, 220) # Actions (Fix + Open + Clear + Ignore)
-        
-        header.setDefaultAlignment(Qt.AlignLeft)
-        
-        # Ensure row height is enough for buttons
-        self.table.verticalHeader().setDefaultSectionSize(48)
-        
-        content_layout.addWidget(self.table)
-
-
-        # 2. Inspector Panel
-        self.inspector = InspectorPanel()
-        content_layout.addWidget(self.inspector)
-
-        layout.addLayout(content_layout)
-
-        # Signals
-        self.table.itemSelectionChanged.connect(self._on_selection_changed)
-        self.table.itemDoubleClicked.connect(self._on_item_double_clicked)
-        self.rename_all_btn.clicked.connect(self._on_rename_all_clicked)
-        
-        # Explicit Ctrl+A support
+        # Shortcuts
         from PySide6.QtGui import QShortcut, QKeySequence
-        self.shortcut_select_all = QShortcut(QKeySequence("Ctrl+A"), self)
-        self.shortcut_select_all.activated.connect(self.table.selectAll)
+        QShortcut(QKeySequence("Ctrl+A"), self).activated.connect(self._on_select_all)
+        QShortcut(QKeySequence.Delete, self).activated.connect(self._on_delete_pressed)
+
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasUrls():
+            self.drop_overlay.show()
+            event.acceptProposedAction()
+
+    def dragLeaveEvent(self, event):
+        self.drop_overlay.hide()
+
+    def dropEvent(self, event):
+        self.drop_overlay.hide()
+        urls = event.mimeData().urls()
+        paths = [u.toLocalFile() for u in urls if u.isLocalFile()]
         
-        # Delete key support
-        self.shortcut_delete = QShortcut(QKeySequence.Delete, self)
-        self.shortcut_delete.activated.connect(self._ignore_selected)
+        if paths:
+            self.progress_bar.show()
+            self.progress_bar.setRange(0, 0)
+            
+            # Switch to Dropped tab immediately
+            self.tabs.setCurrentIndex(4) # Dropped tab
+            
+            self.drop_worker = DropProcessor(self.engine, paths)
+            self.drop_worker.progress.connect(lambda p, t: self.progress_bar.setValue(p))
+            self.drop_worker.finished.connect(self.refresh_data)
+            self.drop_worker.start()
 
-    def _update_rows_natively(self, parent_file_id):
-        """Instantly updates the UI for a file and its children without rebuilding the whole table."""
-        file_ids_to_update = [parent_file_id]
-        with self.engine.db._get_connection() as conn:
-            children = conn.execute("SELECT id FROM media_files WHERE parent_file_id = ?", (parent_file_id,)).fetchall()
-            file_ids_to_update.extend([c['id'] for c in children])
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self.drop_overlay.setGeometry(self.rect())
 
-        self.table.setUpdatesEnabled(False)
-        for fid in file_ids_to_update:
-            row_idx = -1
-            for row in range(self.table.rowCount()):
-                item = self.table.item(row, 1)
-                if item and item.data(Qt.UserRole) == fid:
-                    row_idx = row
-                    break
-            if row_idx != -1:
-                file_data = self.engine.db.get_file_by_id(fid)
-                if not file_data: continue
+    def _on_select_all(self):
+        table = self._get_active_table()
+        if not table: return
+        
+        # Select ONLY visible rows
+        table.clearSelection()
+        for row in range(table.rowCount()):
+            if not table.isRowHidden(row):
+                table.selectRow(row)
 
-                # 1. Update Status Column
-                status = file_data.get('match_status', 'pending').upper()
-                if file_data.get('category') != 'video':
-                    status = 'LINKED' if file_data.get('parent_file_id') else 'ORPHANED'
-                
-                status_item = self.table.item(row_idx, 0)
-                if status_item:
-                    status_item.setData(Qt.UserRole, status)
-                    status_item.setText(status)
-                    widget = self.table.cellWidget(row_idx, 0)
-                    if widget:
-                        sc = Theme.STATUS_COLORS.get(status, '#64748B')
-                        widget.setText(status)
-                        widget.setStyleSheet(f"color: {sc}; background: transparent; font-weight: 700; font-size: 11px;")
+    def _on_delete_pressed(self):
+        table = self._get_active_table()
+        if not table: return
+        selected = table.selectedItems()
+        if not selected: return
+        
+        idx = self.tabs.currentIndex()
+        is_dropped_tab = (idx == 4) # 4 is the Dropped tab index
+        
+        unique_ids = set()
+        for item in selected:
+            id_item = table.item(item.row(), 1)
+            if id_item: unique_ids.add(id_item.data(Qt.UserRole))
+            
+        if not unique_ids: return
+        
+        # Confirm for batch action
+        action_name = "Remove" if is_dropped_tab else "Ignore"
+        if len(unique_ids) > 5:
+            res = QMessageBox.question(self, action_name, f"{action_name} {len(unique_ids)} files?")
+            if res != QMessageBox.Yes: return
 
-                # 2. Update New Name Preview Column
-                new_name = self.engine.formatter.generate_name(fid, self.engine.config.settings)
-                if new_name:
-                    import os
-                    ext = os.path.splitext(file_data.get('file_name', ''))[1]
-                    preview = f"{new_name}{ext}"
+        if is_dropped_tab:
+            # Physical delete from DB for dropped items
+            with self.engine.db._get_connection() as conn:
+                for fid in unique_ids:
+                    conn.execute("DELETE FROM media_files WHERE id = ?", (fid,))
+                    conn.execute("DELETE FROM file_media_links WHERE file_id = ?", (fid,))
+        else:
+            # Normal ignore for library items
+            for fid in unique_ids:
+                f_data = self.engine.db.get_file_by_id(fid)
+                if f_data:
+                    curr_status = f_data.get('match_status', 'PENDING')
+                    self.engine.db.update_file(fid, match_status='IGNORED', previous_match_status=curr_status)
+        
+        self.refresh_data()
+
+    def _setup_table_signals(self, table):
+        table.itemSelectionChanged.connect(self._on_selection_changed)
+        table.fix_requested.connect(self._on_fix_requested)
+        table.open_folder_requested.connect(self._on_open_folder_requested)
+        table.ignore_requested.connect(self._on_ignore_requested)
+        table.clear_match_requested.connect(self._on_clear_match_requested)
+        table.restore_requested.connect(self._on_restore_requested)
+
+    def refresh_data(self):
+        if self.loader and self.loader.isRunning(): return
+        self.progress_bar.show()
+        self.progress_bar.setRange(0, 0)
+        self.loader = DataLoader(self.engine)
+        self.loader.data_ready.connect(self._on_data_ready)
+        self.loader.start()
+
+    def _on_data_ready(self, videos, poster_paths):
+        self.progress_bar.hide()
+        
+        # Split data by categories
+        split_data = {
+            "review": [],
+            "movies": [],
+            "shows": [],
+            "extras": [],
+            "dropped": [],
+            "trash": []
+        }
+        
+        for v in videos:
+            status = v.get('match_status', 'pending').upper()
+            mtype = v.get('_media_type_from_db') or v.get('fn_media_type')
+            cat = v.get('category', 'video')
+            is_manual = v.get('is_manual', 0)
+            
+            if status == 'IGNORED':
+                split_data["trash"].append(v)
+            elif is_manual:
+                split_data["dropped"].append(v)
+            elif cat != 'video':
+                split_data["extras"].append(v)
+            elif status == 'MATCHED':
+                if mtype == 'movie':
+                    split_data["movies"].append(v)
                 else:
-                    preview = "-"
-                self.table.setItem(row_idx, 3, QTableWidgetItem(preview))
-                
-        self.table.setUpdatesEnabled(True)
+                    split_data["shows"].append(v)
+            else:
+                # PENDING, MULTIPLE, UNCERTAIN, NO_MATCH
+                split_data["review"].append(v)
+        
+        # Fill each table
+        for key, data in split_data.items():
+            self.tables[key].fill_data(data)
+            
+        # Prefetch posters
+        if poster_paths:
+            self.poster_worker = PosterPrefetcher(self.engine, poster_paths)
+            self.poster_worker.start()
 
-    def _on_item_double_clicked(self, item):
-        row = item.row()
-        item_with_id = self.table.item(row, 1)
-        if not item_with_id: return
-        file_id = item_with_id.data(Qt.UserRole)
+    def _on_import_all(self):
+        """Move all dropped files to the permanent library."""
+        with self.engine.db._get_connection() as conn:
+            conn.execute("UPDATE media_files SET is_manual = 0 WHERE is_manual = 1")
+        self.refresh_data()
+        self.tabs.setCurrentIndex(0) # Back to Review
+
+    def _on_import_selected(self):
+        """Move only selected dropped files to the permanent library."""
+        table = self.tables["dropped"]
+        selected = table.selectedItems()
+        unique_ids = set(table.item(item.row(), 1).data(Qt.UserRole) for item in selected)
+        
+        for fid in unique_ids:
+            self.engine.db.update_file(fid, is_manual=0)
+        
+        self.refresh_data()
+
+    def _on_clear_dropped(self):
+        """Delete dropped files from the DB (but not from disk)."""
+        res = QMessageBox.question(self, "Clear List", "Clear all items from the Dropped list?\n(Files will remain on your computer)")
+        if res == QMessageBox.Yes:
+            with self.engine.db._get_connection() as conn:
+                # 1. Clear candidates for these files
+                conn.execute("DELETE FROM match_candidates WHERE file_id IN (SELECT id FROM media_files WHERE is_manual = 1)")
+                # 2. Clear links for these files
+                conn.execute("DELETE FROM file_media_links WHERE file_id IN (SELECT id FROM media_files WHERE is_manual = 1)")
+                # 3. Finally delete the files
+                conn.execute("DELETE FROM media_files WHERE is_manual = 1")
+                conn.commit()
+            self.refresh_data()
+
+    def _on_extra_subfilter_changed(self, val):
+        self.tables["extras"].apply_filters(val, self.search_box.text())
+
+    def _on_search_changed(self, text):
+        for table in self.tables.values():
+            # Note: apply_filters in DiscoveryTable doesn't know about our tab mode,
+            # but it will still filter the items IT has.
+            # We pass 'all' because the data is already pre-split.
+            table.apply_filters("all", text)
+
+    def _get_active_table(self):
+        idx = self.tabs.currentIndex()
+        mapping = {
+            0: "review",
+            1: "movies",
+            2: "shows",
+            3: "extras",
+            4: "dropped",
+            5: "trash"
+        }
+        key = mapping.get(idx)
+        return self.tables.get(key)
+
+    def _on_selection_changed(self):
+        table = self._get_active_table()
+        if not table: return
+        
+        selected = table.selectedItems()
+        if not selected:
+            self.inspector.set_empty()
+            self.batch_bar.hide()
+            return
+
+        # Use the first selected row for the inspector
+        row = selected[0].row()
+        file_id = table.item(row, 1).data(Qt.UserRole)
         file_data = self.engine.db.get_file_by_id(file_id)
         
-        if not file_data: return
+        if file_data:
+            self.inspector.update_tech_info(file_data)
+            self.inspector.update_status(file_data.get('match_status', 'pending').upper())
+            
+            links = self.engine.db.get_links_for_file(file_id)
+            if links:
+                media = self.engine.db.get_media_item_by_id(links[0]['media_item_id'])
+                if media:
+                    self.inspector.update_from_data(media)
+                    # Load posters
+                    self._load_tv_posters(
+                        series_path=media.get('poster_path'),
+                        season_path=None, # TODO: fetch season if available
+                        episode_path=None
+                    )
+            else:
+                self.inspector.title_label.setText(file_data['file_name'])
+                self.inspector.poster_carousel.clear()
 
-        dialog = ManualResolveDialog(self.engine, file_data, self)
+        # Batch Bar
+        unique_rows = set(item.row() for item in selected)
+        count = len(unique_rows)
+        if count > 1:
+            self.batch_label.setText(f"{count} items selected")
+            self.batch_bar.show()
+        else:
+            self.batch_bar.hide()
+
+    def _load_tv_posters(self, series_path=None, season_path=None, episode_path=None):
+        pixmaps = []
+        root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+        cache_dir = os.path.join(root, 'data', 'cache', 'posters')
+        for path in [series_path, season_path, episode_path]:
+            if not path:
+                pixmaps.append(None)
+                continue
+            local_path = os.path.join(cache_dir, path.lstrip('/'))
+            if os.path.exists(local_path):
+                pixmap = QPixmap(local_path)
+                pixmaps.append(pixmap if not pixmap.isNull() else None)
+            else:
+                pixmaps.append(None)
+        
+        self.inspector.poster_carousel.set_tv_posters(
+            series_pix=pixmaps[0],
+            season_pix=pixmaps[1],
+            episode_pix=pixmaps[2]
+        )
+
+    def _on_fix_requested(self, vid):
+        dialog = ManualResolveDialog(self.engine, vid)
         if dialog.exec():
-            # Refresh only the affected rows instantly
-            self._update_rows_natively(file_id)
-            self._on_selection_changed()
+            # Refresh specifically this row across all tables (it might move tabs!)
+            self.refresh_data() 
 
-    def _on_manual_fix_clicked(self, vid):
-        """Opens the Manual Resolve dialog for a specific file."""
-        dialog = ManualResolveDialog(self.engine, vid, self)
-        if dialog.exec():
-            # Refresh only the affected rows instantly
-            self._update_rows_natively(vid['id'])
-            self._on_selection_changed()
+    def _on_ignore_requested(self, file_id):
+        f_data = self.engine.db.get_file_by_id(file_id)
+        if f_data:
+            curr_status = f_data.get('match_status', 'PENDING')
+            self.engine.db.update_file(file_id, match_status='IGNORED', previous_match_status=curr_status)
+        self.refresh_data()
 
-    def _on_rename_all_clicked(self):
-        """Creates a plan and executes the renaming process."""
-        self.rename_all_btn.setEnabled(False)
-        self.status_info.setText("Analyzing files and generating plan...")
-        self.status_info.show()
+    def _on_restore_requested(self, file_id, row_idx):
+        f_data = self.engine.db.get_file_by_id(file_id)
+        target_status = 'PENDING'
+        if f_data and f_data.get('previous_match_status'):
+            target_status = f_data['previous_match_status']
+            
+        self.engine.db.update_file(file_id, match_status=target_status)
+        self.refresh_data()
+
+    def _on_clear_match_requested(self, file_id):
+        self.engine.db.update_file(file_id, match_status='PENDING')
+        # Also clear links
+        with self.engine.db._get_connection() as conn:
+            conn.execute("DELETE FROM file_media_links WHERE file_id = ?", (file_id,))
+        self.refresh_data()
+
+    def _on_open_folder_requested(self, path):
+        import subprocess
+        folder = os.path.dirname(path)
+        if os.path.exists(folder):
+            subprocess.Popen(f'explorer /select,"{os.path.normpath(path)}"')
+
+    def _on_batch_clear(self):
+        table = self._get_active_table()
+        selected = table.selectedItems()
+        unique_ids = set(table.item(item.row(), 1).data(Qt.UserRole) for item in selected)
+        
+        for fid in unique_ids:
+            self.engine.db.update_file(fid, match_status='PENDING')
+            with self.engine.db._get_connection() as conn:
+                conn.execute("DELETE FROM file_media_links WHERE file_id = ?", (fid,))
+        
+        self.refresh_data()
+
+    def _on_apply_clicked(self):
         self.progress_bar.show()
-        self.progress_bar.setRange(0, 0) # Indeterminate
+        self.progress_bar.setRange(0, 0)
         
         self.plan_worker = PlanWorker(self.engine)
-        self.active_workers.append(self.plan_worker)
         self.plan_worker.plan_ready.connect(self._on_plan_ready)
-        self.plan_worker.error.connect(self._on_plan_error)
-        self.plan_worker.finished.connect(self.plan_worker.deleteLater)
         self.plan_worker.start()
 
     def _on_plan_ready(self, plan):
-        self.rename_all_btn.setEnabled(True)
-        self.status_info.hide()
         self.progress_bar.hide()
-        
-        # Filter for renames
-        renames = [p for p in plan if p['action'] in ('rename', 'delete')]
-        if not renames:
-            QMessageBox.information(self, "Rename", "No files need renaming or all are already up to date.")
+        if not plan:
+            QMessageBox.information(self, "Rename", "No files ready for renaming.")
             return
             
-        # 2. Confirm with user
-        dialog = PreviewDialog(renames, self)
-        if dialog.exec() == QDialog.Accepted:
-            self._execute_rename_plan(renames)
+        dialog = PreviewDialog(plan)
+        if dialog.exec():
+            self.progress_bar.show()
+            self.status_info.show()
+            self.worker = RenameWorker(self.engine, plan)
+            self.worker.progress.connect(self._on_worker_progress)
+            self.worker.finished.connect(self._on_rename_finished)
+            self.worker.start()
 
-    def _on_plan_error(self, error_msg):
-        self.rename_all_btn.setEnabled(True)
-        self.status_info.hide()
-        self.progress_bar.hide()
-        QMessageBox.critical(self, "Plan Error", f"Failed to generate rename plan: {error_msg}")
-
-    def _execute_rename_plan(self, plan):
-        # 3. Start Worker
-        self.rename_all_btn.setEnabled(False)
-        self.status_info.setText("Executing renames...")
+    def _on_worker_progress(self, val, text):
         self.progress_bar.setRange(0, 100)
-        self.progress_bar.setValue(10)
-        
-        self.rename_worker = RenameWorker(self.engine, plan)
-        self.active_workers.append(self.rename_worker)
-        self.rename_worker.finished.connect(self._on_rename_finished)
-        self.rename_worker.finished.connect(self.rename_worker.deleteLater)
-        self.rename_worker.start()
+        self.progress_bar.setValue(val)
+        self.status_info.setText(text)
 
     def _on_rename_finished(self, results):
-        self.rename_all_btn.setEnabled(True)
-        self.status_info.hide()
         self.progress_bar.hide()
+        self.status_info.hide()
         
-        summary = (f"Renaming Complete!\n\n"
-                   f"✅ Success: {results['success']}\n"
-                   f"🗑️ Deleted: {results['deleted']}\n"
-                   f"⚠️ Failed: {results['failed']}\n"
-                   f"⏭️ Skipped: {results['skipped']}")
-        
-        if results['failed'] > 0:
-            summary += "\n\nCheck logs for details on failures."
+        if results['success'] > 0:
+            msg = f"✅ {results['success']} files renamed successfully."
+            self.notif_bar.show_message(msg, batch_id=results.get('batch_id'))
+        elif results['failed'] > 0:
+            QMessageBox.critical(self, "Error", f"Renaming failed for {results['failed']} files.")
             
-        QMessageBox.information(self, "Rename Results", summary)
         self.refresh_data()
 
-    def _on_open_folder(self, file_path):
-        """Opens the system file explorer at the file's location."""
-        import os
-        folder = os.path.dirname(file_path)
-        if os.path.exists(folder):
-            if os.name == 'nt':
-                os.startfile(folder)
-            else:
-                import subprocess
-                import sys
-                opener = "open" if sys.platform == "darwin" else "xdg-open"
-                subprocess.call([opener, folder])
-
-    def _on_filter_btn_clicked(self, clicked_btn):
-        # Enforce single selection style logic manually
-        for btn in self.filter_btns:
-            if btn != clicked_btn:
-                btn.blockSignals(True)
-                btn.setChecked(False)
-                btn.blockSignals(False)
-            else:
-                btn.setChecked(True) # Prevent unchecking the active one
-                self.current_filter = btn.property("filter_val")
-                
-        # Update batch action button based on context
-        try:
-            self.batch_ignore_btn.clicked.disconnect()
-        except: pass
+    def _on_undo_requested(self, batch_id):
+        self.progress_bar.show()
+        self.status_info.show()
+        self.progress_bar.setRange(0, 0)
         
-        if self.current_filter == "ignored":
-            self.batch_ignore_btn.setText("↩️ Restore Selected")
-            self.batch_ignore_btn.setStyleSheet(f"""
-                QPushButton {{ background: {Theme.SUCCESS}; color: white; border-radius: 4px; padding: 6px 12px; font-weight: bold; border: none; }}
-                QPushButton:hover {{ background: #059669; }}
-            """)
-            self.batch_ignore_btn.clicked.connect(self._restore_selected)
-        else:
-            self.batch_ignore_btn.setText("🗑 Ignore Selected")
-            self.batch_ignore_btn.setStyleSheet(f"""
-                QPushButton {{ background: {Theme.ERROR}; color: white; border-radius: 4px; padding: 6px 12px; font-weight: bold; border: none; }}
-                QPushButton:hover {{ background: #DC2626; }}
-            """)
-            self.batch_ignore_btn.clicked.connect(self._ignore_selected)
-                
-        self._apply_filters()
-        self.table.clearSelection()
+        self.undo_worker = UndoWorker(self.engine, batch_id)
+        self.undo_worker.progress.connect(self._on_worker_progress)
+        self.undo_worker.finished.connect(self._on_undo_finished)
+        self.undo_worker.start()
 
-    def _apply_filters(self):
-        """Filters the table rows based on the search text and button filter."""
-        search_text = self.filter_input.text().lower()
+    def _on_undo_finished(self, success, failed, errors):
+        self.progress_bar.hide()
+        self.status_info.hide()
+        if success > 0:
+            self.notif_bar.show_message(f"⏪ Restored {success} files to original state.", duration=4000)
         
-        for row in range(self.table.rowCount()):
-            # 1. Evaluate Text Search Match
-            text_match = False
-            if not search_text:
-                text_match = True
-            else:
-                for col in range(4):
-                    item = self.table.item(row, col)
-                    if item:
-                        if search_text in item.text().lower():
-                            text_match = True
-                            break
-                        role_data = item.data(Qt.UserRole)
-                        if isinstance(role_data, str) and search_text in role_data.lower():
-                            text_match = True
-                            break
-                            
-            # 2. Evaluate Button Filter Match
-            btn_match = False
-            status_item = self.table.item(row, 0)
-            type_item = self.table.item(row, 2)
+        if failed > 0:
+            QMessageBox.warning(self, "Undo Partial", f"Could not restore {failed} files.\nErrors: {', '.join(errors[:3])}")
             
-            if status_item and type_item:
-                status = status_item.data(Qt.UserRole)
-                media_type = type_item.text()
-                
-                if self.current_filter == "ignored":
-                    if status == 'IGNORED':
-                        btn_match = True
-                else:
-                    if status == 'IGNORED':
-                        btn_match = False
-                    elif self.current_filter == "all":
-                        if status != 'IGNORED':
-                            btn_match = True
-                    elif self.current_filter == "review":
-                        # Pending, multiple, uncertain, no_match
-                        if status in ('PENDING', 'MULTIPLE', 'UNCERTAIN', 'NO_MATCH'):
-                            btn_match = True
-                    elif self.current_filter == "movies":
-                        if status == 'MATCHED' and media_type == "Movie":
-                            btn_match = True
-                    elif self.current_filter == "shows":
-                        if status == 'MATCHED' and media_type == "TV Show":
-                            btn_match = True
-                    elif self.current_filter == "extras":
-                        raw_cat = type_item.data(Qt.UserRole)
-                        if raw_cat != 'video':
-                            btn_match = True
-
-            # Show row only if BOTH match
-            self.table.setRowHidden(row, not (text_match and btn_match))
-
-    def _on_selection_changed(self):
-        selected_items = self.table.selectedItems()
-        self._update_batch_bar()
-        
-        if not selected_items:
-            self.inspector.set_empty()
-            return
-            
-        selected_rows = set(i.row() for i in selected_items)
-        if len(selected_rows) > 1:
-            self.inspector.set_empty()
-            self.inspector.title_label.setText(f"{len(selected_rows)} files selected")
-            self.inspector.plot_label.setText("Batch editing is available via the floating action bar.")
-            return
-
-        # Row 1 (Original Name) has the file_id in UserRole
-        row = selected_items[0].row()
-        item_with_id = self.table.item(row, 1)
-        if not item_with_id: return
-        file_id = item_with_id.data(Qt.UserRole)
-        
-        # Get file data from DB
-        file_data = self.engine.db.get_file_by_id(file_id)
-        if not file_data:
-            return
-
-        # Update technical info regardless of status
-        self.inspector.update_tech_info(file_data)
-        
-        # Update status badge
-        status = file_data.get('match_status', 'pending').upper()
-        if file_data.get('category') != 'video':
-            status = 'LINKED' if file_data.get('parent_file_id') else 'ORPHANED'
-        self.inspector.update_status(status)
-
-        # Fetch links for this file
-        links = self.engine.db.get_links_for_file(file_id)
-        media_item_id = links[0]['media_item_id'] if links else None
-        tv_episode_id = links[0].get('tv_episode_id') if links else None
-
-        # Populate children for the data sheet popup
-        children = self.engine.db.get_children_files(file_id)
-        self.inspector._current_children = children
-
-        # If matched, get media item details
-        if file_data['match_status'] in ('matched', 'uncertain') and media_item_id:
-            media_item = self.engine.db.get_media_item_by_id(media_item_id)
-            if media_item:
-                self.inspector.update_from_data(media_item, candidates=None)
-                
-                # TV show: load episode info + poster carousel
-                if tv_episode_id:
-                    episode = self.engine.db.get_episode_by_id(tv_episode_id)
-                    season = self.engine.db.get_season_for_episode(tv_episode_id)
-                    self.inspector.update_episode_info(episode, season)
-                    
-                    # Load TV poster carousel (series + season + episode still)
-                    self._load_tv_posters(
-                        series_path=media_item.get('poster_path'),
-                        season_path=season.get('poster_path') if season else None,
-                        episode_path=episode.get('still_path') if episode else None
-                    )
-                else:
-                    # Movie: hide episode frame, load single poster
-                    self.inspector.update_episode_info(None)
-                    if media_item.get('poster_path'):
-                        self._load_poster(media_item['poster_path'])
-        
-        elif file_data['match_status'] == 'multiple':
-            self.inspector.update_from_data({'title': file_data['file_name'], 'overview': 'Multiple potential matches found for this file. Please use the "Fix" button to choose the correct one.'}, candidates=None)
-            self.inspector.update_episode_info(None)
-            self.inspector.poster_carousel.clear()
-        else:
-            self.inspector.set_empty()
-            self.inspector.update_tech_info(file_data)
-            self.inspector.update_status(status)
-            self.inspector.title_label.setText(file_data['file_name'])
-            self.inspector.plot_label.setText("No identification found yet. Use manual fix if needed.")
-            self.inspector.poster_carousel.clear()
-
-
-    def _update_batch_bar(self):
-        selected_items = self.table.selectedItems()
-        # In a SelectRows mode, each cell is considered "selected".
-        # So we count the unique rows.
-        selected_rows = set(item.row() for item in selected_items if not self.table.isRowHidden(item.row()))
-        checked_count = len(selected_rows)
-                
-        if checked_count > 1:
-            self.batch_count_lbl.setText(f"{checked_count} files selected")
-            self.batch_bar.show()
-            
-            # Show "Confirm Selected" only if there are UNCERTAIN files in selection
-            has_uncertain = False
-            for row in selected_rows:
-                status_item = self.table.item(row, 0)
-                if status_item and status_item.data(Qt.UserRole) == 'UNCERTAIN':
-                    has_uncertain = True
-                    break
-            self.batch_confirm_btn.setVisible(has_uncertain)
-        else:
-            self.batch_bar.hide()
-            
-    def _deselect_all(self):
-        self.table.clearSelection()
-
-    def _confirm_selected(self):
-        """Promotes all selected UNCERTAIN files to MATCHED status."""
-        selected_items = self.table.selectedItems()
-        selected_rows = set(item.row() for item in selected_items if not self.table.isRowHidden(item.row()))
-        
-        confirmed_count = 0
-        self.table.setUpdatesEnabled(False)
-        with self.engine.db._get_connection() as conn:
-            for row in selected_rows:
-                status_item = self.table.item(row, 0)
-                if not status_item or status_item.data(Qt.UserRole) != 'UNCERTAIN':
-                    continue
-                    
-                item_with_id = self.table.item(row, 1)
-                if not item_with_id:
-                    continue
-                file_id = item_with_id.data(Qt.UserRole)
-                
-                # Promote to matched
-                conn.execute("UPDATE media_files SET match_status = 'matched' WHERE id = ?", (file_id,))
-                confirmed_count += 1
-                
-                # Update UI natively
-                status_item.setData(Qt.UserRole, 'MATCHED')
-                status_item.setText('MATCHED')
-                status_label = self.table.cellWidget(row, 0)
-                if status_label:
-                    sc = Theme.STATUS_COLORS.get('MATCHED', '#10B981')
-                    status_label.setText('MATCHED')
-                    status_label.setStyleSheet(f"color: {sc}; background: transparent; font-weight: 700; font-size: 11px;")
-        
-        self.table.setUpdatesEnabled(True)
-        self.table.clearSelection()
-        
-        if confirmed_count:
-            self.rename_all_btn.show()
-        
-    def _clear_match_selected(self):
-        # Collect IDs to clear
-        ids_to_clear = []
-        selected_items = self.table.selectedItems()
-        selected_rows = set(item.row() for item in selected_items if not self.table.isRowHidden(item.row()))
-        
-        for row in selected_rows:
-            item_with_id = self.table.item(row, 1)
-            if item_with_id:
-                ids_to_clear.append(item_with_id.data(Qt.UserRole))
-                    
-        if not ids_to_clear: return
-        
-        self.table.setUpdatesEnabled(False)
-        for file_id in ids_to_clear:
-            self.engine.db.clear_match(file_id)
-            self._update_rows_natively(file_id)
-            
-        self.table.setUpdatesEnabled(True)
-        self._on_selection_changed() # Update inspector panel
-
-    def _ignore_selected(self):
-        # Collect IDs to ignore
-        selected_items = self.table.selectedItems()
-        selected_rows = set(item.row() for item in selected_items if not self.table.isRowHidden(item.row()))
-        
-        if not selected_rows: return
-        
-        self.table.setUpdatesEnabled(False)
-        with self.engine.db._get_connection() as conn:
-            for row in selected_rows:
-                item_with_id = self.table.item(row, 1)
-                if not item_with_id: continue
-                file_id = item_with_id.data(Qt.UserRole)
-                
-                # Update DB
-                conn.execute("UPDATE media_files SET match_status = 'IGNORED' WHERE id = ?", (file_id,))
-                
-                # Update UI Row Status
-                status_item = self.table.item(row, 0)
-                if status_item:
-                    status_item.setData(Qt.UserRole, 'IGNORED')
-                    status_item.setText('IGNORED')
-                    status_label = self.table.cellWidget(row, 0)
-                    if status_label:
-                        sc = Theme.STATUS_COLORS.get('IGNORED', '#EF4444')
-                        status_label.setText('IGNORED')
-                        status_label.setStyleSheet(f"color: {sc}; background: transparent; font-weight: 700; font-size: 11px;")
-
-        self.table.setUpdatesEnabled(True)
-        self.table.clearSelection()
-        self._apply_filters()
-        self.stats_label.setText(f"{self.table.rowCount()} files found")
-
-    def _restore_selected(self):
-        # Collect IDs to restore
-        ids_to_restore = []
-        selected_items = self.table.selectedItems()
-        selected_rows = set(item.row() for item in selected_items if not self.table.isRowHidden(item.row()))
-        
-        for row in selected_rows:
-            item_with_id = self.table.item(row, 1)
-            if item_with_id:
-                ids_to_restore.append((row, item_with_id.data(Qt.UserRole)))
-                    
-        if not ids_to_restore: return
-        
-        with self.engine.db._get_connection() as conn:
-            self.table.setUpdatesEnabled(False)
-            for row, file_id in ids_to_restore:
-                # Smart restore: figure out what status it should be
-                link = conn.execute("SELECT id FROM file_media_links WHERE file_id = ?", (file_id,)).fetchone()
-                if link:
-                    new_status = 'matched'
-                else:
-                    candidate = conn.execute("SELECT id FROM match_candidates WHERE file_id = ?", (file_id,)).fetchone()
-                    new_status = 'multiple' if candidate else 'pending'
-                    
-                conn.execute("UPDATE media_files SET match_status = ? WHERE id = ?", (new_status, file_id))
-                
-                # Update UI natively
-                status_item = self.table.item(row, 0)
-                if status_item:
-                    display_status = new_status.upper()
-                    status_item.setData(Qt.UserRole, display_status)
-                    status_item.setText(display_status)
-                    status_label = self.table.cellWidget(row, 0)
-                    if status_label:
-                        sc = Theme.STATUS_COLORS.get(display_status, '#64748B')
-                        status_label.setText(display_status)
-                        status_label.setStyleSheet(f"color: {sc}; background: transparent; font-weight: 700; font-size: 11px;")
-            self.table.setUpdatesEnabled(True)
-        
-        self.table.clearSelection()
-        self._apply_filters()
-        self.stats_label.setText(f"{self.table.rowCount()} files found")
-
-    def _on_data_loaded(self, videos, poster_paths=None):
-        """Populates the table and starts prefetching posters."""
-        if not videos:
-            self.table.setRowCount(0)
-            self.stats_label.setText("0 files found")
-            return
-
-        self.table.blockSignals(True)
-        self.table.setUpdatesEnabled(False)
-        self.table.setSortingEnabled(False)
-
-        try:
-            self.table.setRowCount(len(videos))
-            self.stats_label.setText(f"{len(videos)} files found")
-
-            # Use centralized Theme constants
-            status_colors = Theme.STATUS_COLORS
-            btn_style = Theme.get_action_button_style()
-
-            for i, vid in enumerate(videos):
-                # 3. Type
-                raw_cat = vid.get('category') or 'video'
-                if raw_cat == 'video':
-                    db_type = vid.get('_media_type_from_db')
-                    if db_type in ('movie', 'tv'):
-                        cat_display = "TV Show" if db_type == 'tv' else "Movie"
-                    else:
-                        sub_cat = vid.get('sub_category') or vid.get('fn_media_type') or 'movie'
-                        cat_display = "TV Show" if sub_cat in ('tv', 'episode') else "Movie"
-                elif raw_cat == 'extra':
-                    cat_display = "Bonus Video"
-                else:
-                    cat_display = raw_cat.capitalize()
-                    
-                # 0. Status (colored text)
-                status = vid.get('match_status', 'pending').upper()
-                if raw_cat != 'video':
-                    status = 'LINKED' if vid.get('parent_file_id') else 'ORPHANED'
-
-                sc = status_colors.get(status, '#64748B')
-
-                status_label = QLabel(status)
-                status_label.setAlignment(Qt.AlignCenter)
-                status_label.setStyleSheet(f"color: {sc}; background: transparent; font-weight: 700; font-size: 11px;")
-                self.table.setCellWidget(i, 0, status_label)
-
-                # Set text for sorting, but make it transparent so the QLabel shows cleanly
-                status_item = QTableWidgetItem(status)
-                status_item.setForeground(QColor(0, 0, 0, 0))
-                status_item.setData(Qt.UserRole, status)
-                self.table.setItem(i, 0, status_item)
-
-                # 1. Original Name
-                name_item = QTableWidgetItem(vid['file_name'])
-                name_item.setData(Qt.UserRole, vid['id'])
-                self.table.setItem(i, 1, name_item)
-                
-                # 2. Type
-                type_item = QTableWidgetItem(cat_display)
-                type_item.setData(Qt.UserRole, raw_cat)
-                self.table.setItem(i, 2, type_item)
-
-                # 3. New Name Preview
-                ident_text = vid.get('_new_name') or "-"
-                if raw_cat != 'video' and not vid.get('_new_name'):
-                    parent_id = vid.get('parent_file_id')
-                    if parent_id:
-                        parent_file = self.engine.db.get_file_by_id(parent_id)
-                        if parent_file:
-                            ident_text = f"Parent: {parent_file.get('file_name', 'Unknown')}"
-                self.table.setItem(i, 3, QTableWidgetItem(ident_text))
-
-                # 5. Actions
-                actions_widget = QWidget()
-                actions_layout = QHBoxLayout(actions_widget)
-                actions_layout.setContentsMargins(4, 2, 4, 2)
-                actions_layout.setSpacing(4)
-
-                edit_btn = QPushButton("Fix")
-                edit_btn.setFixedSize(45, 24)
-                edit_btn.setCursor(Qt.PointingHandCursor)
-                edit_btn.setStyleSheet(btn_style)
-                edit_btn.clicked.connect(lambda checked=False, v=vid: self._on_manual_fix_clicked(v))
-
-                folder_btn = QPushButton("Open")
-                folder_btn.setFixedSize(45, 24)
-                folder_btn.setCursor(Qt.PointingHandCursor)
-                folder_btn.setStyleSheet(btn_style)
-                folder_btn.clicked.connect(lambda checked=False, p=vid['current_path']: self._on_open_folder(p))
-
-                if status == 'IGNORED':
-                    del_btn = QPushButton("Undo")
-                    del_btn.setFixedSize(40, 24)
-                    del_btn.setCursor(Qt.PointingHandCursor)
-                    del_btn.setToolTip("Restore this file")
-                    del_btn.setStyleSheet(f"""
-                        QPushButton {{ background: {Theme.SURFACE_LIGHT}; color: {Theme.SUCCESS}; border-radius: 4px; font-size: 11px; font-weight: 700; border: 1px solid {Theme.BORDER}; }}
-                        QPushButton:hover {{ background: {Theme.SURFACE_LIGHTER}; border-color: {Theme.SUCCESS}; }}
-                    """)
-                    del_btn.clicked.connect(lambda checked=False, f_id=vid['id'], r=i: self._restore_file(f_id, r))
-                else:
-                    del_btn = QPushButton("Del")
-                    del_btn.setFixedSize(34, 24)
-                    del_btn.setCursor(Qt.PointingHandCursor)
-                    del_btn.setToolTip("Ignore this file")
-                    del_btn.setStyleSheet(f"""
-                        QPushButton {{ background: {Theme.SURFACE_LIGHT}; color: {Theme.ERROR}; border-radius: 4px; font-size: 11px; font-weight: 700; border: 1px solid {Theme.BORDER}; }}
-                        QPushButton:hover {{ background: {Theme.SURFACE_LIGHTER}; border-color: {Theme.ERROR}; }}
-                    """)
-                    del_btn.clicked.connect(lambda checked=False, f_id=vid['id']: self._ignore_file(f_id))
-
-                clear_row_btn = QPushButton("Clr")
-                clear_row_btn.setFixedSize(34, 24)
-                clear_row_btn.setCursor(Qt.PointingHandCursor)
-                clear_row_btn.setToolTip("Clear Match — reset to Pending")
-                clear_row_btn.setStyleSheet(f"""
-                    QPushButton {{ background: {Theme.SURFACE_LIGHT}; color: {Theme.WARNING}; border-radius: 4px; font-size: 11px; font-weight: 700; border: 1px solid {Theme.BORDER}; }}
-                    QPushButton:hover {{ background: {Theme.SURFACE_LIGHTER}; border-color: {Theme.WARNING}; }}
-                    QPushButton:disabled {{ background: {Theme.SURFACE_DARK}; color: {Theme.TEXT_DIM}; border-color: transparent; }}
-                """)
-                if status == 'PENDING':
-                    clear_row_btn.setEnabled(False)
-                clear_row_btn.clicked.connect(lambda checked=False, f_id=vid['id']: self._clear_match_single(f_id))
-
-                actions_layout.addWidget(edit_btn)
-                actions_layout.addWidget(folder_btn)
-                actions_layout.addWidget(clear_row_btn)
-                actions_layout.addWidget(del_btn)
-                self.table.setCellWidget(i, 4, actions_widget)
-
-                # Keep UI alive — every 10 rows
-                if i % 10 == 0:
-                    QApplication.processEvents()
-
-            # Update Stats and visibility
-            has_matches = any(v.get('match_status') == 'matched' for v in videos)
-            if has_matches:
-                self.rename_all_btn.show()
-            else:
-                self.rename_all_btn.hide()
-
-            # Start prefetching posters in background (paths already collected by DataLoader)
-            if poster_paths:
-                self._start_prefetch(poster_paths)
-
-        finally:
-            self.table.setSortingEnabled(True)
-            self.table.setUpdatesEnabled(True)
-            self.table.blockSignals(False)
-            self._update_batch_bar()
-            # Force inspector refresh with fresh DB data
-            self._on_selection_changed()
-
-    def _clear_match_single(self, file_id):
-        """Clears match for a single file from the row action button."""
-        self.engine.db.clear_match(file_id)
-        self._update_rows_natively(file_id)
-        # Update inspector panel if the cleared file is currently selected
-        selected_items = self.table.selectedItems()
-        if selected_items:
-            row = selected_items[0].row()
-            item_with_id = self.table.item(row, 1)
-            if item_with_id and item_with_id.data(Qt.UserRole) == file_id:
-                self._on_selection_changed()
-
-    def _ignore_file(self, file_id):
-        """Sets the file's status to IGNORED and hides it from the current view."""
-        with self.engine.db._get_connection() as conn:
-            conn.execute("UPDATE media_files SET match_status = 'IGNORED' WHERE id = ?", (file_id,))
-            
-        # Find row and update its status natively
-        for row in range(self.table.rowCount()):
-            item = self.table.item(row, 1)
-            if item and item.data(Qt.UserRole) == file_id:
-                status_item = self.table.item(row, 0)
-                if status_item:
-                    status_item.setData(Qt.UserRole, 'IGNORED')
-                    status_item.setText('IGNORED')
-                    status_label = self.table.cellWidget(row, 0)
-                    if status_label:
-                        sc = Theme.STATUS_COLORS.get('IGNORED', '#EF4444')
-                        status_label.setText('IGNORED')
-                        status_label.setStyleSheet(f"color: {sc}; background: transparent; font-weight: 700; font-size: 11px;")
-                break
-                
-        self.table.clearSelection()
-        self._apply_filters()
-        self.stats_label.setText(f"{self.table.rowCount()} files found")
-
-    def _restore_file(self, file_id, row):
-        """Restores an ignored file back to its correct state."""
-        with self.engine.db._get_connection() as conn:
-            # Smart restore: figure out what status it should be
-            link = conn.execute("SELECT id FROM file_media_links WHERE file_id = ?", (file_id,)).fetchone()
-            if link:
-                new_status = 'matched'
-            else:
-                candidate = conn.execute("SELECT id FROM match_candidates WHERE file_id = ?", (file_id,)).fetchone()
-                new_status = 'multiple' if candidate else 'pending'
-                
-            conn.execute("UPDATE media_files SET match_status = ? WHERE id = ?", (new_status, file_id))
-            
-        status_item = self.table.item(row, 0)
-        if status_item:
-            display_status = new_status.upper()
-            status_item.setData(Qt.UserRole, display_status)
-            status_item.setText(display_status)
-            status_label = self.table.cellWidget(row, 0)
-            if status_label:
-                sc = Theme.STATUS_COLORS.get(display_status, '#64748B')
-                status_label.setText(display_status)
-                status_label.setStyleSheet(f"color: {sc}; background: transparent; font-weight: 700; font-size: 11px;")
-                
-        self.table.clearSelection()
-        self._apply_filters()
-        self.stats_label.setText(f"{self.table.rowCount()} files found")
-
-    def _load_poster(self, poster_path):
-        """Asynchronously load poster image, with sync check for local cache."""
-        if not poster_path:
-            self.inspector.poster_label.setText("No Poster")
-            return
-
-        # Correct root path
-        root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-        cache_dir = os.path.join(root, 'data', 'cache', 'posters')
-        file_name = poster_path.lstrip('/')
-        local_path = os.path.join(cache_dir, file_name)
-
-        # 1. Sync check: If it's already on disk, show it immediately
-        if os.path.exists(local_path):
-            pixmap = QPixmap(local_path)
-            if not pixmap.isNull():
-                self._on_poster_loaded(pixmap)
-                return
-
-        # 2. Async download: Only if not in cache
-        if self.poster_worker and self.poster_worker.isRunning():
-            try: self.poster_worker.finished.disconnect(self._on_poster_loaded)
-            except: pass
-            self.active_workers.append(self.poster_worker) # Keep it alive
-
-        from ui.v3.components.image_loader import ImageDownloader
-        url = f"https://image.tmdb.org/t/p/w500{poster_path}"
-        self.poster_worker = ImageDownloader(url, local_path, session=self.engine.resolver.api.session)
-        self.active_workers.append(self.poster_worker)
-        self.poster_worker.finished.connect(self._on_poster_loaded)
-        self.poster_worker.finished.connect(self.poster_worker.deleteLater)
-        self.poster_worker.start()
-
-    def _cleanup_worker(self, worker):
-        """Removes finished workers from the active list."""
-        if worker in self.active_workers:
-            self.active_workers.remove(worker)
-        if worker == self.loader:
-            self.loader = None
-        if worker == self.poster_worker:
-            self.poster_worker = None
-        if hasattr(self, 'rename_worker') and worker == self.rename_worker:
-            self.rename_worker = None
-
-    def _on_poster_loaded(self, pixmap):
-        if not pixmap.isNull():
-            self.inspector.poster_carousel.set_single_poster(pixmap)
-
-    def _resolve_poster_path(self, poster_path):
-        """Resolves a TMDB poster_path to a local cache QPixmap, or None."""
-        if not poster_path:
-            return None
-        root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-        cache_dir = os.path.join(root, 'data', 'cache', 'posters')
-        file_name = poster_path.lstrip('/')
-        local_path = os.path.join(cache_dir, file_name)
-        if os.path.exists(local_path):
-            pix = QPixmap(local_path)
-            return pix if not pix.isNull() else None
-        return None
-
-    def _load_tv_posters(self, series_path=None, season_path=None, episode_path=None):
-        """Loads up to 3 posters for the TV carousel (sync from cache)."""
-        series_pix = self._resolve_poster_path(series_path)
-        season_pix = self._resolve_poster_path(season_path)
-        episode_pix = self._resolve_poster_path(episode_path)
-
-        if series_pix or season_pix or episode_pix:
-            self.inspector.poster_carousel.set_tv_posters(series_pix, season_pix, episode_pix)
-        else:
-            # Fallback: try async download of series poster only
-            if series_path:
-                self._load_poster(series_path)
-
-    def refresh_data(self):
-        """Triggers background data loading."""
-        # 1. Cleanup old loader safely
-        try:
-            if self.loader and self.loader.isRunning():
-                try: self.loader.data_ready.disconnect(self._on_data_loaded)
-                except: pass
-                self.active_workers.append(self.loader)
-        except RuntimeError:
-            self.loader = None
-
-        self.loader = DataLoader(self.engine)
-        self.active_workers.append(self.loader)
-        self.loader.data_ready.connect(self._on_data_loaded)
-        self.loader.finished.connect(self.loader.deleteLater)
-        self.loader.finished.connect(lambda: self._set_loader_none())
-        self.loader.start()
-
-    def _set_loader_none(self):
-        self.loader = None
-
-    def _start_prefetch(self, paths):
-        """Starts a background worker to download all posters in the list."""
-        try:
-            if hasattr(self, 'prefetcher') and self.prefetcher and self.prefetcher.isRunning():
-                return
-        except RuntimeError:
-            self.prefetcher = None
-            
-        class PrefetchWorker(QThread):
-            def __init__(self, paths, root, session):
-                super().__init__()
-                self.paths = paths
-                self.root = root
-                self.session = session
-            def run(self):
-                cache_dir = os.path.join(self.root, 'data', 'cache', 'posters')
-                for p in self.paths:
-                    local = os.path.join(cache_dir, p.lstrip('/'))
-                    if not os.path.exists(local):
-                        url = f"https://image.tmdb.org/t/p/w500{p}"
-                        try:
-                            r = self.session.get(url, timeout=5)
-                            if r.status_code == 200:
-                                os.makedirs(os.path.dirname(local), exist_ok=True)
-                                with open(local, 'wb') as f:
-                                    f.write(r.content)
-                        except: pass
-
-        root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-        self.prefetcher = PrefetchWorker(paths, root, self.engine.resolver.api.session)
-        self.active_workers.append(self.prefetcher)
-        self.prefetcher.finished.connect(self.prefetcher.deleteLater)
-        self.prefetcher.start()
+        self.refresh_data()

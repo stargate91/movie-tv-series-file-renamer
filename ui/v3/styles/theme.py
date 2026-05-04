@@ -379,6 +379,56 @@ class Theme:
         """
 
     @staticmethod
+    def get_discovery_action_btn_style(variant=None):
+        bg = "rgba(255, 255, 255, 0.05)"
+        color = Theme.TEXT_MUTED
+        border = Theme.BORDER
+        
+        if variant == 'danger':
+            bg = "rgba(239, 68, 68, 0.1)"
+            color = "#EF4444"
+            border = "rgba(239, 68, 68, 0.2)"
+        elif variant == 'success':
+            bg = "rgba(34, 197, 94, 0.1)"
+            color = "#22C55E"
+            border = "rgba(34, 197, 94, 0.2)"
+        elif variant == 'warning':
+            bg = "rgba(245, 158, 11, 0.1)"
+            color = "#F59E0B"
+            border = "rgba(245, 158, 11, 0.2)"
+        elif variant == 'primary':
+            bg = "rgba(59, 130, 246, 0.1)"
+            color = "#3B82F6"
+            border = "rgba(59, 130, 246, 0.2)"
+        elif variant == 'neutral':
+            bg = "rgba(148, 163, 184, 0.1)"
+            color = "#94A3B8"
+            border = "rgba(148, 163, 184, 0.2)"
+        
+        return f"""
+            QPushButton {{
+                background: {bg};
+                color: {color};
+                border-radius: 8px;
+                font-size: 22px;
+                font-weight: 700;
+                border: 1px solid {border};
+                padding: 0px;
+            }}
+            QPushButton:hover {{
+                background: {color};
+                color: {Theme.SURFACE_DARK};
+                border-color: {color};
+            }}
+            QPushButton:disabled {{
+                background: transparent;
+                color: {Theme.TEXT_DIM};
+                border-color: {Theme.BORDER};
+                opacity: 0.3;
+            }}
+        """
+
+    @staticmethod
     def get_primary_button_style():
         return f"""
             QPushButton {{
@@ -395,6 +445,65 @@ class Theme:
             QPushButton:disabled {{
                 background-color: {Theme.SURFACE_LIGHT};
                 color: {Theme.TEXT_DIM};
+            }}
+        """
+
+    @staticmethod
+    def get_secondary_button_style():
+        return f"""
+            QPushButton {{
+                background-color: {Theme.SURFACE_LIGHT};
+                color: {Theme.TEXT_MAIN};
+                border: 1px solid {Theme.BORDER};
+                border-radius: 8px;
+                font-weight: 700;
+                font-size: 13px;
+                padding: 10px 20px;
+            }}
+            QPushButton:hover {{
+                background-color: {Theme.SURFACE_LIGHTER};
+                border-color: {Theme.PRIMARY};
+            }}
+        """
+
+    @staticmethod
+    def get_input_style():
+        return f"""
+            QLineEdit {{
+                background-color: {Theme.SURFACE};
+                color: {Theme.TEXT_MAIN};
+                border: 1px solid {Theme.BORDER};
+                border-radius: 8px;
+                padding: 8px 12px;
+                font-size: 13px;
+            }}
+            QLineEdit:focus {{
+                border-color: {Theme.PRIMARY};
+                background-color: {Theme.SURFACE_LIGHT};
+            }}
+        """
+
+    @staticmethod
+    def get_sub_chip_style():
+        return f"""
+            QPushButton {{
+                background-color: transparent;
+                color: {Theme.TEXT_MUTED};
+                border: 1px solid {Theme.BORDER};
+                border-radius: 12px;
+                padding: 4px 12px;
+                font-size: 11px;
+                font-weight: 600;
+            }}
+            QPushButton:hover {{
+                color: {Theme.TEXT_MAIN};
+                border-color: {Theme.TEXT_DIM};
+                background-color: {Theme.SURFACE_LIGHT};
+            }}
+            QPushButton:checked {{
+                background-color: {Theme.PRIMARY}20;
+                color: {Theme.PRIMARY};
+                border-color: {Theme.PRIMARY};
             }}
         """
 

@@ -104,11 +104,13 @@ class MainWindowV3(QMainWindow):
 
         # Connect Discovery View Buttons
         self.discovery_page.scan_new_btn.clicked.connect(self._on_scan_clicked)
+        
+        # Connect Settings Signals
+        self.settings_view.database_wiped.connect(self.discovery_page.refresh_data)
 
     def _on_library_clicked(self):
-        """Switches to Library/Discovery page and auto-loads data."""
+        """Switches to Library/Discovery page."""
         self.content_stack.setCurrentIndex(1)
-        self.discovery_page.refresh_data()
 
     def _on_scan_clicked(self):
         import os

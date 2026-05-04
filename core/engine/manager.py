@@ -54,15 +54,20 @@ class RenamerEngineV3:
         Generates a preview plan for the given files (or all identified files).
         """
         if not file_ids:
-            # Fetch all identified video files
+            # Fetch only successfully MATCHED video files that are not deleted or already renamed
             videos = self.db.get_files_by_category('video')
-            file_ids = [v['id'] for v in videos if v.get('status') != 'deleted']
+            file_ids = [v['id'] for v in videos if (v.get('status') or '').upper() not in ('DELETED', 'RENAMED') 
+                        and (v.get('match_status') or '').upper() == 'MATCHED']
             
-            # Also include their extras
+            # Also include their extras (subtitles, bonus videos, etc.)
             all_ids = []
             for fid in file_ids:
                 all_ids.append(fid)
-                extras = self.db._get_connection().execute("SELECT id FROM media_files WHERE parent_file_id = ?", (fid,)).fetchall()
+                # Extras are included if their parent is matched, unless the extra itself is ignored
+                extras = self.db._get_connection().execute(
+                    "SELECT id FROM media_files WHERE parent_file_id = ? AND UPPER(match_status) != 'IGNORED' AND UPPER(status) NOT IN ('DELETED', 'RENAMED')", 
+                    (fid,)
+                ).fetchall()
                 all_ids.extend([e['id'] for e in extras])
             file_ids = all_ids
 

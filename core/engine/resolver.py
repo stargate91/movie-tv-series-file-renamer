@@ -63,6 +63,12 @@ class Resolver:
                 if progress_callback:
                     progress_callback(f"Resolved: {vid['file_name']}", completed, total)
 
+    def resolve_file(self, file_id):
+        """Public entry point to resolve a single file by ID."""
+        vid = self.db.get_file_by_id(file_id)
+        if vid:
+            self._resolve_single(vid)
+
     def _resolve_single(self, vid):
         """Runs the waterfall for a single file."""
         file_id = vid['id']
@@ -718,4 +724,3 @@ class Resolver:
         # Foldername GuessIt
         if vid.get('fd_title'):
             yield (vid['fd_title'], vid.get('fd_year'), 'foldername')
-

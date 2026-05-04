@@ -1,6 +1,7 @@
 import os
 import shutil
 import logging
+import uuid
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
@@ -125,16 +126,22 @@ class Executor:
                     
         return plan
 
-    def execute_plan(self, plan):
+    def execute_plan(self, plan, progress_callback=None):
         """
         Executes the file system operations based on a validated plan.
         Only processes items with status='safe' or 'auto_resolved'.
         Returns a summary of successes and errors.
         """
-        results = {'success': 0, 'failed': 0, 'skipped': 0, 'deleted': 0, 'errors': []}
-        dirs_to_check = set()
+        results = {'success': 0, 'failed': 0, 'skipped': 0, 'deleted': 0, 'errors': [], 'batch_id': None}
+        batch_id = str(uuid.uuid4())[:8] # Short unique ID for the batch
+        results['batch_id'] = batch_id
         
-        for p in plan:
+        dirs_to_check = set()
+        total = len(plan)
+        
+        for i, p in enumerate(plan):
+            if progress_callback:
+                progress_callback(i, total, p.get('original_path'))
             if p['action'] == 'skip':
                 results['skipped'] += 1
                 continue
@@ -173,8 +180,8 @@ class Executor:
                     # Create target directory if needed
                     os.makedirs(os.path.dirname(dest), exist_ok=True)
                     
-                    # Physically rename/move the file
-                    os.rename(orig, dest)
+                    # Physically rename/move the file (shutil handles cross-device)
+                    shutil.move(orig, dest)
                     
                     # Update Database
                     conn = self.db._get_connection()
@@ -186,9 +193,9 @@ class Executor:
                         """, (dest, p['file_id']))
                         
                         conn.execute("""
-                            INSERT INTO rename_history (file_id, old_path, new_path, timestamp)
-                            VALUES (?, ?, ?, ?)
-                        """, (p['file_id'], orig, dest, datetime.now()))
+                            INSERT INTO rename_history (batch_id, file_id, old_path, new_path, timestamp)
+                            VALUES (?, ?, ?, ?, ?)
+                        """, (batch_id, p['file_id'], orig, dest, datetime.now()))
                         conn.commit()
                     finally:
                         conn.close()
@@ -197,6 +204,9 @@ class Executor:
                 except Exception as e:
                     results['failed'] += 1
                     results['errors'].append(f"Rename failed {orig} -> {dest}: {str(e)}")
+
+        if progress_callback:
+            progress_callback(total, total, "Cleanup...")
 
         # Cleanup empty folders
         if self.s.cleanup_empty_folders:
@@ -226,7 +236,7 @@ class Executor:
             os.makedirs(os.path.dirname(old_path), exist_ok=True)
             
             # Physically move back
-            os.rename(new_path, old_path)
+            shutil.move(new_path, old_path)
             
             # Update DB state
             conn = self.db._get_connection()
@@ -246,6 +256,37 @@ class Executor:
         except Exception as e:
             logger.error(f"Undo failed: {e}")
             return False, str(e)
+
+    def undo_batch(self, batch_id, progress_callback=None):
+        """
+        Reverses all rename operations in a specific batch.
+        Returns (success_count, fail_count, errors)
+        """
+        history = self.db.get_batch_history(batch_id)
+        if not history:
+            return 0, 0, ["No history found for this batch."]
+
+        success = 0
+        failed = 0
+        errors = []
+        total = len(history)
+
+        for i, entry in enumerate(history):
+            if progress_callback:
+                progress_callback(i, total, entry.get('new_path'))
+            
+            ok, msg = self.undo_rename(entry['id'])
+            if ok:
+                success += 1
+            else:
+                failed += 1
+                errors.append(msg)
+
+        # Clean up history for this batch if it was fully/partially undone
+        # (undo_rename already deletes individual entries, but let's be sure)
+        self.db.delete_batch_history(batch_id)
+        
+        return success, failed, errors
         
     def _cleanup_dirs(self, dirs):
         """Iterates over directories and removes them if they are completely empty."""

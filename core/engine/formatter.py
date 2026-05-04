@@ -574,12 +574,12 @@ class Formatter:
         """Calculates the overall resolution for a TV series (or specific season) based on its files."""
         try:
             with self.db._get_connection() as conn:
-                # Get resolutions from all files linked to this media item
+                # v3.0 Table names: media_files, file_media_links
                 if season_number is not None:
                     query = """
                         SELECT f.resolution 
-                        FROM files f
-                        JOIN links l ON f.id = l.file_id
+                        FROM media_files f
+                        JOIN file_media_links l ON f.id = l.file_id
                         JOIN tv_episodes e ON l.tv_episode_id = e.id
                         WHERE l.media_item_id = ? AND e.season_number = ?
                     """
@@ -587,8 +587,8 @@ class Formatter:
                 else:
                     query = """
                         SELECT f.resolution 
-                        FROM files f
-                        JOIN links l ON f.id = l.file_id
+                        FROM media_files f
+                        JOIN file_media_links l ON f.id = l.file_id
                         WHERE l.media_item_id = ?
                     """
                     rows = conn.execute(query, (media_item_id,)).fetchall()
