@@ -72,8 +72,7 @@ class Resolver:
             result = self._resolve_by_imdb(vid['nfo_imdb_id'])
             if result:
                 media_item_id = self._store_result(result)
-                self.db.link_file_to_media(file_id, media_item_id, 'matched')
-                self._fetch_tv_details_if_needed(result, vid)
+                self._finalize_match(file_id, media_item_id, result, vid, 'matched')
                 return
 
         # ── Tier 2: FFmpeg internal title ──
@@ -251,44 +250,64 @@ class Resolver:
     def _finalize_match(self, file_id, media_item_id, res, vid, status='matched'):
         """Centralized logic to link file to media and specific episodes."""
         if res['media_type'] == 'tv':
-            season_num = vid.get('fn_season') or vid.get('fd_season')
+            # Force integer for season
+            s_val = vid.get('fn_season') or vid.get('fd_season')
+            try:
+                season_num = int(s_val) if s_val is not None else None
+            except (ValueError, TypeError):
+                season_num = None
+            
             if season_num is not None:
                 # 1. Fetch and store season (populates tv_episodes table)
+                logger.debug(f"Finalizing TV match for {vid['file_name']} S{season_num}")
                 self._fetch_and_store_season(res['tmdb_id'], season_num)
                 
                 # 2. Get episode numbers from filename/folder
                 ep_val = vid.get('fn_episode') or vid.get('fd_episode')
                 ep_nums = []
-                if isinstance(ep_val, (list, tuple)): ep_nums = list(ep_val)
-                elif isinstance(ep_val, int): ep_nums = [ep_val]
-                elif isinstance(ep_val, str) and ep_val:
-                    if ep_val.startswith('['):
-                        import ast
-                        try:
-                            parsed = ast.literal_eval(ep_val)
-                            ep_nums = list(parsed) if isinstance(parsed, (list, tuple)) else [parsed]
-                        except: pass
-                    if not ep_nums:
-                        ep_nums = [int(n) for n in re.findall(r'\d+', ep_val)]
+                if isinstance(ep_val, (list, tuple)):
+                    ep_nums = [int(n) for n in ep_val if str(n).isdigit()]
+                elif ep_val is not None:
+                    if isinstance(ep_val, int):
+                        ep_nums = [ep_val]
+                    elif isinstance(ep_val, str):
+                        if ep_val.startswith('['):
+                            import ast
+                            try:
+                                parsed = ast.literal_eval(ep_val)
+                                ep_nums = [int(n) for n in (list(parsed) if isinstance(parsed, (list, tuple)) else [parsed]) if str(n).isdigit()]
+                            except: pass
+                        
+                        if not ep_nums:
+                            try:
+                                ep_nums = [int(n) for n in re.findall(r'\d+', ep_val)]
+                            except: pass
                 
                 # 3. Link each detected episode
                 if ep_nums:
                     linked_any = False
+                    logger.debug(f"Linking episodes {ep_nums} for file {file_id}")
                     for ep_num in ep_nums:
                         with self.db._get_connection() as conn:
                             ep_row = conn.execute(
                                 "SELECT id FROM tv_episodes WHERE media_item_id = ? AND season_number = ? AND episode_number = ?",
-                                (media_item_id, season_num, ep_num)
+                                (media_item_id, int(season_num), int(ep_num))
                             ).fetchone()
                         if ep_row:
+                            logger.debug(f"Found ep_id {ep_row['id']} for S{season_num}E{ep_num}")
                             self.db.link_file_to_media(file_id, media_item_id, status, tv_episode_id=ep_row['id'])
                             linked_any = True
+                        else:
+                            logger.warning(f"Episode S{season_num}E{ep_num} not found in DB for media_item {media_item_id}")
                     
                     if not linked_any:
+                        logger.warning(f"No episodes linked for {vid['file_name']}, falling back to series-only link")
                         self.db.link_file_to_media(file_id, media_item_id, status)
                 else:
+                    logger.debug(f"No episode numbers found for {vid['file_name']}, series-only link")
                     self.db.link_file_to_media(file_id, media_item_id, status)
             else:
+                logger.debug(f"No season number found for {vid['file_name']}, series-only link")
                 self.db.link_file_to_media(file_id, media_item_id, status)
         else:
             # Movie logic
@@ -413,11 +432,20 @@ class Resolver:
             
             # Store episodes
             for ep in data.get('episodes', []):
+                ep_num = ep.get('episode_number')
+                imdb_id = None
+                try:
+                    full_ep = self.api.get_from_tmdb_episode(tmdb_id, season_number, ep_num, self.language)
+                    if full_ep:
+                        imdb_id = full_ep.get('external_ids', {}).get('imdb_id')
+                except Exception as e:
+                    logger.debug(f"Could not fetch full episode details for S{season_number}E{ep_num}: {e}")
+
                 self.db.upsert_episode(
                     season_id=season_id,
                     media_item_id=media_item_id,
                     season_number=season_number,
-                    episode_number=ep.get('episode_number'),
+                    episode_number=ep_num,
                     name=ep.get('name', ''),
                     overview=ep.get('overview', ''),
                     air_date=ep.get('air_date', ''),
@@ -427,7 +455,7 @@ class Resolver:
                     details_json=json.dumps(ep, ensure_ascii=False),
                     tmdb_id=ep.get('id'),  # Episode TMDB ID
                     vote_count_tmdb=ep.get('vote_count'),
-                    imdb_id=ep.get('external_ids', {}).get('imdb_id')
+                    imdb_id=imdb_id
                 )
                 # Pre-download episode still if available
                 if ep.get('still_path'):
@@ -443,7 +471,7 @@ class Resolver:
         tmdb_id = result['tmdb_id']
         media_type = result['media_type']
         
-        # 1. Enrich with FULL details from API (not just search result)
+        # 1. Initialize ALL enrichment variables
         director = ""
         cast = ""
         rating_tmdb = None
@@ -451,8 +479,6 @@ class Resolver:
         rating_rotten = None
         rating_metacritic = None
         votes_imdb = None
-        
-        # New fields init
         vote_count_tmdb = None
         budget = None
         revenue = None
@@ -472,7 +498,10 @@ class Resolver:
         languages = ""
         status = ""
         type = ""
+        imdb_id = result.get('imdb_id', '')
+        full_data = None
 
+        # 1a. TMDB Detail enrichment
         try:
             full_data = self.api.get_from_tmdb(tmdb_id, media_type, self.language)
             if full_data:
@@ -514,7 +543,7 @@ class Resolver:
                         result['year'] = int(release_date[:4])
                     except: pass
                 
-                # Genres (join list)
+                # Genres
                 genre_list = [g['name'] for g in full_data.get('genres', [])]
                 genres = ", ".join(genre_list)
                 
@@ -524,7 +553,7 @@ class Resolver:
                     countries = [c['iso_3166_1'] for c in full_data['production_countries']]
                 origin_country = ", ".join(countries) if isinstance(countries, list) else str(countries)
 
-                # Extract Director / Cast
+                # Director / Cast
                 directors = []
                 if media_type == 'movie':
                     crew = full_data.get('credits', {}).get('crew', [])
@@ -537,12 +566,18 @@ class Resolver:
                 cast_list = full_data.get('credits', {}).get('cast', [])
                 actors = [p['name'] for p in cast_list[:6]]
                 cast = ", ".join(actors) if actors else ""
+                
+                # Get IMDb ID from detail data
+                if not imdb_id:
+                    imdb_id = full_data.get('imdb_id') or full_data.get('external_ids', {}).get('imdb_id', '')
 
-            # 1b. Try OMDB for extra ratings if we have IMDb ID
-            imdb_id = result.get('imdb_id')
-            if not imdb_id and full_data:
-                imdb_id = full_data.get('imdb_id') or full_data.get('external_ids', {}).get('imdb_id')
-            
+        except Exception as e:
+            import traceback
+            logger.warning(f"TMDB enrichment failed for {media_type} {tmdb_id}: {e}")
+            logger.warning(traceback.format_exc())
+
+        # 1b. OMDB enrichment (separate so TMDB data is never lost)
+        try:
             if imdb_id:
                 omdb_data = self.api.get_from_omdb_by_imdb_id(imdb_id)
                 if omdb_data and omdb_data.get('Response') != 'False':
@@ -558,12 +593,12 @@ class Resolver:
                         if r['Source'] == 'Rotten Tomatoes':
                             rating_rotten = r['Value']
         except Exception as e:
-            logger.warning(f"Full enrichment failed for {media_type} {tmdb_id}: {e}")
+            logger.warning(f"OMDB enrichment failed for {media_type} {tmdb_id}: {e}")
 
         # 2. Save to DB
         item_id = self.db.upsert_media_item(
             tmdb_id=tmdb_id,
-            imdb_id=result.get('imdb_id'),
+            imdb_id=imdb_id,
             title=result['title'],
             year=result.get('year'),
             media_type=media_type,
@@ -604,7 +639,6 @@ class Resolver:
         # 4. TV Logic: Fetch ALL seasons/episodes for the Pocket Library
         if media_type == 'tv':
             try:
-                # We already have full_data from step 1
                 details = json.loads(result.get('details_json', '{}'))
                 if details and 'seasons' in details:
                     for s in details['seasons']:

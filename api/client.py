@@ -12,12 +12,22 @@ class APIClient:
         self.db = db # LibraryDB instance for caching
         self.session = requests.Session()
 
-    def _get_from_api(self, api_url, cache_key, headers=None, params=None):
+    def _get_from_api(self, api_url, cache_key, headers=None, params=None, required_keys=None):
         if self.db:
             cached_data = self.db.get_api_cache(cache_key)
             if cached_data:
-                logger.debug(f"Cache hit: {cache_key}")
-                return cached_data
+                # Validate cache: if required_keys are missing, invalidate and re-fetch
+                if required_keys and isinstance(cached_data, dict):
+                    missing = [k for k in required_keys if k not in cached_data]
+                    if missing:
+                        logger.info(f"Cache stale (missing {missing}), re-fetching: {cache_key}")
+                        self.db.delete_api_cache(cache_key)
+                    else:
+                        logger.debug(f"Cache hit: {cache_key}")
+                        return cached_data
+                else:
+                    logger.debug(f"Cache hit: {cache_key}")
+                    return cached_data
 
         try:
             response = self.session.get(api_url, headers=headers, params=params, timeout=10)
@@ -83,7 +93,7 @@ class APIClient:
         # append_to_response=credits to get Director and Cast
         api_url = f"https://api.themoviedb.org/3/movie/{id}?api_key={self.tmdb_key}&language={language}&append_to_response=credits"
         headers = {"Authorization": f"Bearer {self.tmdb_bearer_token}"}
-        return self._get_from_api(api_url, cache_key, headers)
+        return self._get_from_api(api_url, cache_key, headers, required_keys=['credits'])
 
     def get_from_tmdb_tv(self, title, year, language="hu-HU"):
         cache_key = f"tv-{title}-{year}-{language}"
@@ -105,7 +115,7 @@ class APIClient:
         # append_to_response=credits,external_ids to get Cast/Crew and IMDb ID
         api_url = f"https://api.themoviedb.org/3/tv/{id}?api_key={self.tmdb_key}&language={language}&append_to_response=credits,external_ids"
         headers = {"Authorization": f"Bearer {self.tmdb_bearer_token}"}
-        return self._get_from_api(api_url, cache_key, headers)
+        return self._get_from_api(api_url, cache_key, headers, required_keys=['credits', 'external_ids'])
 
     def get_from_tmdb_episode(self, id, season_number, episode_number, language="hu-HU"):
         s_num = season_number[0] if isinstance(season_number, list) else season_number
@@ -113,13 +123,13 @@ class APIClient:
         cache_key = f"episode-{id}-{s_num}-{e_num}-{language}"
         api_url = f"https://api.themoviedb.org/3/tv/{id}/season/{s_num}/episode/{e_num}?api_key={self.tmdb_key}&language={language}&append_to_response=external_ids"
         headers = {"Authorization": f"Bearer {self.tmdb_bearer_token}"}
-        return self._get_from_api(api_url, cache_key, headers)
+        return self._get_from_api(api_url, cache_key, headers, required_keys=['external_ids'])
 
     def get_from_tmdb_season(self, id, season_number, language="hu-HU"):
         cache_key = f"season-{id}-{season_number}-{language}"
         api_url = f"https://api.themoviedb.org/3/tv/{id}/season/{season_number}?api_key={self.tmdb_key}&language={language}&append_to_response=external_ids"
         headers = {"Authorization": f"Bearer {self.tmdb_bearer_token}"}
-        return self._get_from_api(api_url, cache_key, headers)
+        return self._get_from_api(api_url, cache_key, headers, required_keys=['episodes'])
 
     def get_from_tmdb(self, id, media_type, language="hu-HU"):
         """Unified helper to get movie or TV show details."""

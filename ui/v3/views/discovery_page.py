@@ -79,8 +79,10 @@ class DataLoader(QThread):
                     links = self.engine.db.get_links_for_file(target_id)
                     if links:
                         media = self.engine.db.get_media_item_by_id(links[0]['media_item_id'])
-                        if media and media.get('poster_path'):
-                            poster_paths.append(media['poster_path'])
+                        if media:
+                            vid['_media_type_from_db'] = media.get('media_type')
+                            if media.get('poster_path'):
+                                poster_paths.append(media['poster_path'])
                 except:
                     pass
 
@@ -276,6 +278,15 @@ class DiscoveryPage(QWidget):
         """)
         btn_deselect.clicked.connect(self._deselect_all)
         
+        self.batch_confirm_btn = QPushButton("✅ Confirm Selected")
+        self.batch_confirm_btn.setCursor(Qt.PointingHandCursor)
+        self.batch_confirm_btn.setStyleSheet(f"""
+            QPushButton {{ background: {Theme.SUCCESS}; color: white; border-radius: 4px; padding: 6px 12px; font-weight: bold; border: none; }}
+            QPushButton:hover {{ background: #059669; }}
+        """)
+        self.batch_confirm_btn.clicked.connect(self._confirm_selected)
+        self.batch_confirm_btn.hide()
+        
         self.batch_ignore_btn = QPushButton("🗑 Ignore Selected")
         self.batch_ignore_btn.setCursor(Qt.PointingHandCursor)
         self.batch_ignore_btn.setStyleSheet(f"""
@@ -284,9 +295,19 @@ class DiscoveryPage(QWidget):
         """)
         self.batch_ignore_btn.clicked.connect(self._ignore_selected)
         
+        self.batch_clear_btn = QPushButton("🧹 Clear Match")
+        self.batch_clear_btn.setCursor(Qt.PointingHandCursor)
+        self.batch_clear_btn.setStyleSheet(f"""
+            QPushButton {{ background: {Theme.WARNING}; color: {Theme.BACKGROUND}; border-radius: 4px; padding: 6px 12px; font-weight: bold; border: none; }}
+            QPushButton:hover {{ background: #F59E0B; }}
+        """)
+        self.batch_clear_btn.clicked.connect(self._clear_match_selected)
+        
         batch_layout.addWidget(self.batch_count_lbl)
         batch_layout.addStretch()
         batch_layout.addWidget(btn_deselect)
+        batch_layout.addWidget(self.batch_confirm_btn)
+        batch_layout.addWidget(self.batch_clear_btn)
         batch_layout.addWidget(self.batch_ignore_btn)
         
         layout.addWidget(self.batch_bar)
@@ -335,12 +356,12 @@ class DiscoveryPage(QWidget):
         header.setSectionResizeMode(3, QHeaderView.Stretch) # Identified As
         
         header.setSectionResizeMode(4, QHeaderView.Fixed)
-        self.table.setColumnWidth(4, 180) # Actions
+        self.table.setColumnWidth(4, 220) # Actions (Fix + Open + Clear + Ignore)
         
         header.setDefaultAlignment(Qt.AlignLeft)
         
         # Ensure row height is enough for buttons
-        self.table.verticalHeader().setDefaultSectionSize(45)
+        self.table.verticalHeader().setDefaultSectionSize(48)
         
         content_layout.addWidget(self.table)
 
@@ -585,7 +606,8 @@ class DiscoveryPage(QWidget):
                     if status == 'IGNORED':
                         btn_match = False
                     elif self.current_filter == "all":
-                        btn_match = True
+                        if status != 'IGNORED':
+                            btn_match = True
                     elif self.current_filter == "review":
                         # Pending, multiple, uncertain, no_match
                         if status in ('PENDING', 'MULTIPLE', 'UNCERTAIN', 'NO_MATCH'):
@@ -632,33 +654,58 @@ class DiscoveryPage(QWidget):
 
         # Update technical info regardless of status
         self.inspector.update_tech_info(file_data)
+        
+        # Update status badge
+        status = file_data.get('match_status', 'pending').upper()
+        if file_data.get('category') != 'video':
+            status = 'LINKED' if file_data.get('parent_file_id') else 'ORPHANED'
+        self.inspector.update_status(status)
 
         # Fetch links for this file
         links = self.engine.db.get_links_for_file(file_id)
         media_item_id = links[0]['media_item_id'] if links else None
+        tv_episode_id = links[0].get('tv_episode_id') if links else None
+
+        # Populate children for the data sheet popup
+        children = self.engine.db.get_children_files(file_id)
+        self.inspector._current_children = children
 
         # If matched, get media item details
         if file_data['match_status'] in ('matched', 'uncertain') and media_item_id:
             media_item = self.engine.db.get_media_item_by_id(media_item_id)
             if media_item:
-                import json
                 self.inspector.update_from_data(media_item, candidates=None)
                 
-                # Load poster if exists
-                if media_item['poster_path']:
-                    self._load_poster(media_item['poster_path'])
+                # TV show: load episode info + poster carousel
+                if tv_episode_id:
+                    episode = self.engine.db.get_episode_by_id(tv_episode_id)
+                    season = self.engine.db.get_season_for_episode(tv_episode_id)
+                    self.inspector.update_episode_info(episode, season)
+                    
+                    # Load TV poster carousel (series + season + episode still)
+                    self._load_tv_posters(
+                        series_path=media_item.get('poster_path'),
+                        season_path=season.get('poster_path') if season else None,
+                        episode_path=episode.get('still_path') if episode else None
+                    )
+                else:
+                    # Movie: hide episode frame, load single poster
+                    self.inspector.update_episode_info(None)
+                    if media_item.get('poster_path'):
+                        self._load_poster(media_item['poster_path'])
         
         elif file_data['match_status'] == 'multiple':
-            # Show file name and multiple found message
             self.inspector.update_from_data({'title': file_data['file_name'], 'overview': 'Multiple potential matches found for this file. Please use the "Fix" button to choose the correct one.'}, candidates=None)
-            self.inspector.poster_label.clear()
+            self.inspector.update_episode_info(None)
+            self.inspector.poster_carousel.clear()
         else:
             self.inspector.set_empty()
-            self.inspector.update_tech_info(file_data) # Re-fill tech info after set_empty
+            self.inspector.update_tech_info(file_data)
+            self.inspector.update_status(status)
             self.inspector.title_label.setText(file_data['file_name'])
             self.inspector.plot_label.setText("No identification found yet. Use manual fix if needed.")
-            self.inspector.poster_label.clear()
-            self.inspector.poster_label.clear()
+            self.inspector.poster_carousel.clear()
+
 
     def _update_batch_bar(self):
         selected_items = self.table.selectedItems()
@@ -670,36 +717,110 @@ class DiscoveryPage(QWidget):
         if checked_count > 1:
             self.batch_count_lbl.setText(f"{checked_count} files selected")
             self.batch_bar.show()
+            
+            # Show "Confirm Selected" only if there are UNCERTAIN files in selection
+            has_uncertain = False
+            for row in selected_rows:
+                status_item = self.table.item(row, 0)
+                if status_item and status_item.data(Qt.UserRole) == 'UNCERTAIN':
+                    has_uncertain = True
+                    break
+            self.batch_confirm_btn.setVisible(has_uncertain)
         else:
             self.batch_bar.hide()
             
     def _deselect_all(self):
         self.table.clearSelection()
+
+    def _confirm_selected(self):
+        """Promotes all selected UNCERTAIN files to MATCHED status."""
+        selected_items = self.table.selectedItems()
+        selected_rows = set(item.row() for item in selected_items if not self.table.isRowHidden(item.row()))
         
-    def _ignore_selected(self):
-        # Collect IDs to ignore
-        ids_to_ignore = []
+        confirmed_count = 0
+        self.table.setUpdatesEnabled(False)
+        with self.engine.db._get_connection() as conn:
+            for row in selected_rows:
+                status_item = self.table.item(row, 0)
+                if not status_item or status_item.data(Qt.UserRole) != 'UNCERTAIN':
+                    continue
+                    
+                item_with_id = self.table.item(row, 1)
+                if not item_with_id:
+                    continue
+                file_id = item_with_id.data(Qt.UserRole)
+                
+                # Promote to matched
+                conn.execute("UPDATE media_files SET match_status = 'matched' WHERE id = ?", (file_id,))
+                confirmed_count += 1
+                
+                # Update UI natively
+                status_item.setData(Qt.UserRole, 'MATCHED')
+                status_item.setText('MATCHED')
+                status_label = self.table.cellWidget(row, 0)
+                if status_label:
+                    sc = Theme.STATUS_COLORS.get('MATCHED', '#10B981')
+                    status_label.setText('MATCHED')
+                    status_label.setStyleSheet(f"color: {sc}; background: transparent; font-weight: 700; font-size: 11px;")
+        
+        self.table.setUpdatesEnabled(True)
+        self.table.clearSelection()
+        
+        if confirmed_count:
+            self.rename_all_btn.show()
+        
+    def _clear_match_selected(self):
+        # Collect IDs to clear
+        ids_to_clear = []
         selected_items = self.table.selectedItems()
         selected_rows = set(item.row() for item in selected_items if not self.table.isRowHidden(item.row()))
         
         for row in selected_rows:
             item_with_id = self.table.item(row, 1)
             if item_with_id:
-                ids_to_ignore.append(item_with_id.data(Qt.UserRole))
+                ids_to_clear.append(item_with_id.data(Qt.UserRole))
                     
-        if not ids_to_ignore: return
+        if not ids_to_clear: return
         
+        self.table.setUpdatesEnabled(False)
+        for file_id in ids_to_clear:
+            self.engine.db.clear_match(file_id)
+            self._update_rows_natively(file_id)
+            
+        self.table.setUpdatesEnabled(True)
+        self._on_selection_changed() # Update inspector panel
+
+    def _ignore_selected(self):
+        # Collect IDs to ignore
+        selected_items = self.table.selectedItems()
+        selected_rows = set(item.row() for item in selected_items if not self.table.isRowHidden(item.row()))
+        
+        if not selected_rows: return
+        
+        self.table.setUpdatesEnabled(False)
         with self.engine.db._get_connection() as conn:
-            for file_id in ids_to_ignore:
+            for row in selected_rows:
+                item_with_id = self.table.item(row, 1)
+                if not item_with_id: continue
+                file_id = item_with_id.data(Qt.UserRole)
+                
+                # Update DB
                 conn.execute("UPDATE media_files SET match_status = 'IGNORED' WHERE id = ?", (file_id,))
                 
-        # Instantly remove rows from UI for performance
-        self.table.setUpdatesEnabled(False)
-        for row in sorted(list(selected_rows), reverse=True):
-            self.table.removeRow(row)
+                # Update UI Row Status
+                status_item = self.table.item(row, 0)
+                if status_item:
+                    status_item.setData(Qt.UserRole, 'IGNORED')
+                    status_item.setText('IGNORED')
+                    status_label = self.table.cellWidget(row, 0)
+                    if status_label:
+                        sc = Theme.STATUS_COLORS.get('IGNORED', '#EF4444')
+                        status_label.setText('IGNORED')
+                        status_label.setStyleSheet(f"color: {sc}; background: transparent; font-weight: 700; font-size: 11px;")
+
         self.table.setUpdatesEnabled(True)
-        
         self.table.clearSelection()
+        self._apply_filters()
         self.stats_label.setText(f"{self.table.rowCount()} files found")
 
     def _restore_selected(self):
@@ -768,8 +889,12 @@ class DiscoveryPage(QWidget):
                 # 3. Type
                 raw_cat = vid.get('category') or 'video'
                 if raw_cat == 'video':
-                    sub_cat = vid.get('sub_category') or vid.get('fn_media_type') or 'movie'
-                    cat_display = "TV Show" if sub_cat in ('tv', 'episode') else "Movie"
+                    db_type = vid.get('_media_type_from_db')
+                    if db_type in ('movie', 'tv'):
+                        cat_display = "TV Show" if db_type == 'tv' else "Movie"
+                    else:
+                        sub_cat = vid.get('sub_category') or vid.get('fn_media_type') or 'movie'
+                        cat_display = "TV Show" if sub_cat in ('tv', 'episode') else "Movie"
                 elif raw_cat == 'extra':
                     cat_display = "Bonus Video"
                 else:
@@ -816,46 +941,59 @@ class DiscoveryPage(QWidget):
                 # 5. Actions
                 actions_widget = QWidget()
                 actions_layout = QHBoxLayout(actions_widget)
-                actions_layout.setContentsMargins(8, 2, 8, 2)
-                actions_layout.setSpacing(8)
+                actions_layout.setContentsMargins(4, 2, 4, 2)
+                actions_layout.setSpacing(4)
 
                 edit_btn = QPushButton("Fix")
-                edit_btn.setFixedSize(55, 24)
+                edit_btn.setFixedSize(45, 24)
                 edit_btn.setCursor(Qt.PointingHandCursor)
                 edit_btn.setStyleSheet(btn_style)
                 edit_btn.clicked.connect(lambda checked=False, v=vid: self._on_manual_fix_clicked(v))
 
                 folder_btn = QPushButton("Open")
-                folder_btn.setFixedSize(55, 24)
+                folder_btn.setFixedSize(45, 24)
                 folder_btn.setCursor(Qt.PointingHandCursor)
                 folder_btn.setStyleSheet(btn_style)
                 folder_btn.clicked.connect(lambda checked=False, p=vid['current_path']: self._on_open_folder(p))
 
                 if status == 'IGNORED':
-                    del_btn = QPushButton("↩️")
-                    del_btn.setFixedSize(28, 24)
+                    del_btn = QPushButton("Undo")
+                    del_btn.setFixedSize(40, 24)
                     del_btn.setCursor(Qt.PointingHandCursor)
                     del_btn.setToolTip("Restore this file")
                     del_btn.setStyleSheet(f"""
-                        QPushButton {{ background: transparent; color: {Theme.SUCCESS}; font-size: 14px; border-radius: 4px; }}
-                        QPushButton:hover {{ background: rgba(16, 185, 129, 0.1); }}
+                        QPushButton {{ background: {Theme.SURFACE_LIGHT}; color: {Theme.SUCCESS}; border-radius: 4px; font-size: 11px; font-weight: 700; border: 1px solid {Theme.BORDER}; }}
+                        QPushButton:hover {{ background: {Theme.SURFACE_LIGHTER}; border-color: {Theme.SUCCESS}; }}
                     """)
                     del_btn.clicked.connect(lambda checked=False, f_id=vid['id'], r=i: self._restore_file(f_id, r))
                 else:
-                    del_btn = QPushButton("🗑")
-                    del_btn.setFixedSize(28, 24)
+                    del_btn = QPushButton("Del")
+                    del_btn.setFixedSize(34, 24)
                     del_btn.setCursor(Qt.PointingHandCursor)
                     del_btn.setToolTip("Ignore this file")
                     del_btn.setStyleSheet(f"""
-                        QPushButton {{ background: transparent; color: {Theme.ERROR}; font-size: 14px; border-radius: 4px; }}
-                        QPushButton:hover {{ background: rgba(239, 68, 68, 0.1); }}
+                        QPushButton {{ background: {Theme.SURFACE_LIGHT}; color: {Theme.ERROR}; border-radius: 4px; font-size: 11px; font-weight: 700; border: 1px solid {Theme.BORDER}; }}
+                        QPushButton:hover {{ background: {Theme.SURFACE_LIGHTER}; border-color: {Theme.ERROR}; }}
                     """)
                     del_btn.clicked.connect(lambda checked=False, f_id=vid['id']: self._ignore_file(f_id))
 
+                clear_row_btn = QPushButton("Clr")
+                clear_row_btn.setFixedSize(34, 24)
+                clear_row_btn.setCursor(Qt.PointingHandCursor)
+                clear_row_btn.setToolTip("Clear Match — reset to Pending")
+                clear_row_btn.setStyleSheet(f"""
+                    QPushButton {{ background: {Theme.SURFACE_LIGHT}; color: {Theme.WARNING}; border-radius: 4px; font-size: 11px; font-weight: 700; border: 1px solid {Theme.BORDER}; }}
+                    QPushButton:hover {{ background: {Theme.SURFACE_LIGHTER}; border-color: {Theme.WARNING}; }}
+                    QPushButton:disabled {{ background: {Theme.SURFACE_DARK}; color: {Theme.TEXT_DIM}; border-color: transparent; }}
+                """)
+                if status == 'PENDING':
+                    clear_row_btn.setEnabled(False)
+                clear_row_btn.clicked.connect(lambda checked=False, f_id=vid['id']: self._clear_match_single(f_id))
+
                 actions_layout.addWidget(edit_btn)
                 actions_layout.addWidget(folder_btn)
+                actions_layout.addWidget(clear_row_btn)
                 actions_layout.addWidget(del_btn)
-                actions_widget.setStyleSheet("background: transparent;")
                 self.table.setCellWidget(i, 4, actions_widget)
 
                 # Keep UI alive — every 10 rows
@@ -878,20 +1016,43 @@ class DiscoveryPage(QWidget):
             self.table.setUpdatesEnabled(True)
             self.table.blockSignals(False)
             self._update_batch_bar()
+            # Force inspector refresh with fresh DB data
+            self._on_selection_changed()
+
+    def _clear_match_single(self, file_id):
+        """Clears match for a single file from the row action button."""
+        self.engine.db.clear_match(file_id)
+        self._update_rows_natively(file_id)
+        # Update inspector panel if the cleared file is currently selected
+        selected_items = self.table.selectedItems()
+        if selected_items:
+            row = selected_items[0].row()
+            item_with_id = self.table.item(row, 1)
+            if item_with_id and item_with_id.data(Qt.UserRole) == file_id:
+                self._on_selection_changed()
 
     def _ignore_file(self, file_id):
-        """Sets the file's status to IGNORED so it is hidden from the UI and skipped by the pipeline."""
+        """Sets the file's status to IGNORED and hides it from the current view."""
         with self.engine.db._get_connection() as conn:
             conn.execute("UPDATE media_files SET match_status = 'IGNORED' WHERE id = ?", (file_id,))
             
-        # Find row and remove it instantly
+        # Find row and update its status natively
         for row in range(self.table.rowCount()):
             item = self.table.item(row, 1)
             if item and item.data(Qt.UserRole) == file_id:
-                self.table.removeRow(row)
+                status_item = self.table.item(row, 0)
+                if status_item:
+                    status_item.setData(Qt.UserRole, 'IGNORED')
+                    status_item.setText('IGNORED')
+                    status_label = self.table.cellWidget(row, 0)
+                    if status_label:
+                        sc = Theme.STATUS_COLORS.get('IGNORED', '#EF4444')
+                        status_label.setText('IGNORED')
+                        status_label.setStyleSheet(f"color: {sc}; background: transparent; font-weight: 700; font-size: 11px;")
                 break
                 
         self.table.clearSelection()
+        self._apply_filters()
         self.stats_label.setText(f"{self.table.rowCount()} files found")
 
     def _restore_file(self, file_id, row):
@@ -968,10 +1129,33 @@ class DiscoveryPage(QWidget):
 
     def _on_poster_loaded(self, pixmap):
         if not pixmap.isNull():
-            scaled = pixmap.scaled(self.inspector.poster_label.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation)
-            self.inspector.poster_label.setPixmap(scaled)
+            self.inspector.poster_carousel.set_single_poster(pixmap)
+
+    def _resolve_poster_path(self, poster_path):
+        """Resolves a TMDB poster_path to a local cache QPixmap, or None."""
+        if not poster_path:
+            return None
+        root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+        cache_dir = os.path.join(root, 'data', 'cache', 'posters')
+        file_name = poster_path.lstrip('/')
+        local_path = os.path.join(cache_dir, file_name)
+        if os.path.exists(local_path):
+            pix = QPixmap(local_path)
+            return pix if not pix.isNull() else None
+        return None
+
+    def _load_tv_posters(self, series_path=None, season_path=None, episode_path=None):
+        """Loads up to 3 posters for the TV carousel (sync from cache)."""
+        series_pix = self._resolve_poster_path(series_path)
+        season_pix = self._resolve_poster_path(season_path)
+        episode_pix = self._resolve_poster_path(episode_path)
+
+        if series_pix or season_pix or episode_pix:
+            self.inspector.poster_carousel.set_tv_posters(series_pix, season_pix, episode_pix)
         else:
-            self.inspector.poster_label.setText("No Poster")
+            # Fallback: try async download of series poster only
+            if series_path:
+                self._load_poster(series_path)
 
     def refresh_data(self):
         """Triggers background data loading."""

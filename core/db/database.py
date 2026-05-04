@@ -459,35 +459,36 @@ class LibraryDB:
                 )
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
                 ON CONFLICT(tmdb_id) DO UPDATE SET
-                    title = excluded.title,
-                    director = excluded.director,
-                    cast = excluded.cast,
-                    rating_tmdb = excluded.rating_tmdb,
-                    rating_imdb = excluded.rating_imdb,
-                    rating_rotten = excluded.rating_rotten,
-                    rating_metacritic = excluded.rating_metacritic,
-                    votes_imdb = excluded.votes_imdb,
-                    vote_count_tmdb = excluded.vote_count_tmdb,
-                    budget = excluded.budget,
-                    revenue = excluded.revenue,
-                    runtime = excluded.runtime,
-                    popularity = excluded.popularity,
-                    tagline = excluded.tagline,
-                    overview = excluded.overview,
-                    genres = excluded.genres,
-                    original_title = excluded.original_title,
-                    original_language = excluded.original_language,
-                    origin_country = excluded.origin_country,
-                    release_date = excluded.release_date,
-                    first_air_date = excluded.first_air_date,
-                    last_air_date = excluded.last_air_date,
-                    number_of_episodes = excluded.number_of_episodes,
-                    number_of_seasons = excluded.number_of_seasons,
-                    languages = excluded.languages,
-                    status = excluded.status,
-                    type = excluded.type,
-                    details_json = excluded.details_json,
-                    poster_path = excluded.poster_path,
+                    imdb_id = COALESCE(NULLIF(excluded.imdb_id, ''), media_items.imdb_id),
+                    title = COALESCE(NULLIF(excluded.title, ''), media_items.title),
+                    director = COALESCE(NULLIF(excluded.director, ''), media_items.director),
+                    cast = COALESCE(NULLIF(excluded.cast, ''), media_items.cast),
+                    rating_tmdb = COALESCE(excluded.rating_tmdb, media_items.rating_tmdb),
+                    rating_imdb = COALESCE(excluded.rating_imdb, media_items.rating_imdb),
+                    rating_rotten = COALESCE(NULLIF(excluded.rating_rotten, ''), media_items.rating_rotten),
+                    rating_metacritic = COALESCE(excluded.rating_metacritic, media_items.rating_metacritic),
+                    votes_imdb = COALESCE(excluded.votes_imdb, media_items.votes_imdb),
+                    vote_count_tmdb = COALESCE(excluded.vote_count_tmdb, media_items.vote_count_tmdb),
+                    budget = COALESCE(excluded.budget, media_items.budget),
+                    revenue = COALESCE(excluded.revenue, media_items.revenue),
+                    runtime = COALESCE(excluded.runtime, media_items.runtime),
+                    popularity = COALESCE(excluded.popularity, media_items.popularity),
+                    tagline = COALESCE(NULLIF(excluded.tagline, ''), media_items.tagline),
+                    overview = COALESCE(NULLIF(excluded.overview, ''), media_items.overview),
+                    genres = COALESCE(NULLIF(excluded.genres, ''), media_items.genres),
+                    original_title = COALESCE(NULLIF(excluded.original_title, ''), media_items.original_title),
+                    original_language = COALESCE(NULLIF(excluded.original_language, ''), media_items.original_language),
+                    origin_country = COALESCE(NULLIF(excluded.origin_country, ''), media_items.origin_country),
+                    release_date = COALESCE(NULLIF(excluded.release_date, ''), media_items.release_date),
+                    first_air_date = COALESCE(NULLIF(excluded.first_air_date, ''), media_items.first_air_date),
+                    last_air_date = COALESCE(NULLIF(excluded.last_air_date, ''), media_items.last_air_date),
+                    number_of_episodes = COALESCE(excluded.number_of_episodes, media_items.number_of_episodes),
+                    number_of_seasons = COALESCE(excluded.number_of_seasons, media_items.number_of_seasons),
+                    languages = COALESCE(NULLIF(excluded.languages, ''), media_items.languages),
+                    status = COALESCE(NULLIF(excluded.status, ''), media_items.status),
+                    type = COALESCE(NULLIF(excluded.type, ''), media_items.type),
+                    details_json = COALESCE(excluded.details_json, media_items.details_json),
+                    poster_path = COALESCE(excluded.poster_path, media_items.poster_path),
                     last_updated = excluded.last_updated
             """, (tmdb_id, imdb_id, title, year, media_type, director, cast, rating_tmdb, 
                   rating_imdb, rating_rotten, rating_metacritic, votes_imdb, vote_count_tmdb, 
@@ -517,11 +518,30 @@ class LibraryDB:
                 "UPDATE media_files SET match_status = ? WHERE id = ?",
                 (match_status, file_id)
             )
+
+            # If we have a specific episode, remove any generic 'series-only' links for this file
+            if tv_episode_id:
+                conn.execute(
+                    "DELETE FROM file_media_links WHERE file_id = ? AND media_item_id = ? AND tv_episode_id IS NULL",
+                    (file_id, media_item_id)
+                )
+
             # Create the many-to-many link
             conn.execute("""
                 INSERT OR IGNORE INTO file_media_links (file_id, media_item_id, tv_episode_id)
                 VALUES (?, ?, ?)
             """, (file_id, media_item_id, tv_episode_id))
+            conn.commit()
+        finally:
+            conn.close()
+
+    def clear_match(self, file_id):
+        """Removes file-to-media links, clears candidates, and resets match status to pending."""
+        conn = self._get_connection()
+        try:
+            conn.execute("DELETE FROM file_media_links WHERE file_id = ?", (file_id,))
+            conn.execute("DELETE FROM match_candidates WHERE file_id = ?", (file_id,))
+            conn.execute("UPDATE media_files SET match_status = 'pending' WHERE id = ?", (file_id,))
             conn.commit()
         finally:
             conn.close()
@@ -675,4 +695,43 @@ class LibraryDB:
             conn.execute("DELETE FROM api_cache")
             conn.commit()
 
+    def delete_api_cache(self, key):
+        """Deletes a single cached API response by key."""
+        conn = self._get_connection()
+        try:
+            conn.execute("DELETE FROM api_cache WHERE cache_key = ?", (key,))
+            conn.commit()
+        finally:
+            conn.close()
 
+    # ── Inspector Helpers ────────────────────────────────────────
+
+    def get_episode_by_id(self, episode_id):
+        """Returns a single TV episode record by its primary key."""
+        if not episode_id:
+            return None
+        with self._get_connection() as conn:
+            row = conn.execute("SELECT * FROM tv_episodes WHERE id = ?", (episode_id,)).fetchone()
+            return dict(row) if row else None
+
+    def get_season_for_episode(self, episode_id):
+        """Returns the season record for a given episode."""
+        if not episode_id:
+            return None
+        with self._get_connection() as conn:
+            row = conn.execute("""
+                SELECT s.* FROM tv_seasons s
+                JOIN tv_episodes e ON e.season_id = s.id
+                WHERE e.id = ?
+            """, (episode_id,)).fetchone()
+            return dict(row) if row else None
+
+    def get_children_files(self, parent_file_id):
+        """Returns all child files (subtitles, extras, etc.) linked to a parent video."""
+        if not parent_file_id:
+            return []
+        with self._get_connection() as conn:
+            rows = conn.execute(
+                "SELECT * FROM media_files WHERE parent_file_id = ?", (parent_file_id,)
+            ).fetchall()
+            return [dict(r) for r in rows]
