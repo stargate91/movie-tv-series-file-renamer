@@ -1,7 +1,8 @@
 import datetime
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame, QPushButton
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame, QPushButton, QGridLayout
 from PySide6.QtCore import Qt, Signal
 from ui.v3.styles.theme import Theme
+from core.i18n import T
 
 class DashboardPage(QWidget):
     """
@@ -24,7 +25,7 @@ class DashboardPage(QWidget):
         self.greeting_label = QLabel(self._get_greeting())
         self.greeting_label.setStyleSheet(Theme.get_h2_style())
         
-        self.title_label = QLabel("Ready to organize your library?")
+        self.title_label = QLabel(T("dashboard.subtitle"))
         self.title_label.setStyleSheet(Theme.get_h1_style())
         
         layout.addWidget(self.greeting_label)
@@ -36,8 +37,8 @@ class DashboardPage(QWidget):
         action_layout.setSpacing(20)
 
         self.scan_card = self._create_action_card(
-            "Scan Directory", 
-            "Import new media files and identify them automatically.",
+            T("dashboard.scan.title"), 
+            T("dashboard.scan.desc"),
             self.scan_clicked.emit
         )
         action_layout.addWidget(self.scan_card)
@@ -51,10 +52,10 @@ class DashboardPage(QWidget):
 
     def _get_greeting(self):
         hour = datetime.datetime.now().hour
-        if 5 <= hour < 12: greeting = "Good morning"
-        elif 12 <= hour < 18: greeting = "Good afternoon"
-        elif 18 <= hour < 22: greeting = "Good evening"
-        else: greeting = "Good night"
+        if 5 <= hour < 12: greeting = T("greeting.morning")
+        elif 12 <= hour < 18: greeting = T("greeting.afternoon")
+        elif 18 <= hour < 22: greeting = T("greeting.evening")
+        else: greeting = T("greeting.night")
 
         user_name = self.engine.config.settings.user_name
         return f"{greeting}, {user_name}!" if user_name else f"{greeting},"
@@ -95,7 +96,7 @@ class DashboardPage(QWidget):
         layout = QVBoxLayout(card)
         layout.setContentsMargins(30, 30, 30, 30)
         
-        t_lbl = QLabel("Library Overview")
+        t_lbl = QLabel(T("dashboard.stats.overview_title"))
         t_lbl.setStyleSheet("font-size: 20px; font-weight: bold; color: white;")
         
         # Example stats (would be dynamic in a real scenario)
@@ -109,8 +110,8 @@ class DashboardPage(QWidget):
         except:
             m_count, s_count = 0, 0
 
-        m_lbl = QLabel(f"• {m_count} Movies indexed")
-        s_lbl = QLabel(f"• {s_count} TV Series indexed")
+        m_lbl = QLabel(T("dashboard.stats.movies_indexed", count=m_count))
+        s_lbl = QLabel(T("dashboard.stats.series_indexed", count=s_count))
         m_lbl.setStyleSheet("color: #888;")
         s_lbl.setStyleSheet("color: #888;")
         

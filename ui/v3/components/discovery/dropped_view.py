@@ -2,6 +2,7 @@ from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QM
 from PySide6.QtCore import Qt, Signal
 from ui.v3.styles.theme import Theme
 from ui.v3.components.discovery_table import DiscoveryTable
+from core.i18n import T
 
 class DroppedView(QWidget):
     """
@@ -22,15 +23,15 @@ class DroppedView(QWidget):
         
         # Action Bar
         actions = QHBoxLayout()
-        self.import_all_btn = QPushButton("🚀 Import All to Library")
+        self.import_all_btn = QPushButton(T("discovery.dropped.import_all"))
         self.import_all_btn.setStyleSheet(Theme.get_primary_button_style())
         self.import_all_btn.clicked.connect(self._on_import_all)
         
-        self.import_sel_btn = QPushButton("📥 Import Selected")
+        self.import_sel_btn = QPushButton(T("discovery.dropped.import_selected"))
         self.import_sel_btn.setStyleSheet(Theme.get_secondary_button_style())
         self.import_sel_btn.clicked.connect(self._on_import_selected)
         
-        self.clear_btn = QPushButton("🧹 Clear List")
+        self.clear_btn = QPushButton(T("discovery.dropped.clear_list"))
         self.clear_btn.setStyleSheet(Theme.get_danger_button_style())
         self.clear_btn.clicked.connect(self._on_clear_dropped)
         
@@ -80,7 +81,7 @@ class DroppedView(QWidget):
         self.refresh_requested.emit()
 
     def _on_clear_dropped(self):
-        res = QMessageBox.question(self, "Clear List", "Clear all items from the Dropped list?\n(Files will remain on disk)")
+        res = QMessageBox.question(self, T("discovery.dropped.clear_confirm_title"), T("discovery.dropped.clear_confirm_msg"))
         if res == QMessageBox.Yes:
             self.engine.db.files.delete_manual()
             self.refresh_requested.emit()

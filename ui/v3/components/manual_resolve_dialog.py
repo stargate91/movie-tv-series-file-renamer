@@ -11,6 +11,7 @@ from ui.v3.components.image_loader import ImageDownloader
 from .manual_resolve.searcher import SearchWorker
 from .manual_resolve.tv_selector import TVMetadataSelector
 from .manual_resolve.result_widget import ResultItemWidget
+from core.i18n import T
 
 logger = logging.getLogger(__name__)
 
@@ -44,16 +45,16 @@ class ManualResolveDialog(QDialog):
 
         # 1. Header Bar
         header = QHBoxLayout()
-        self.back_btn = QPushButton("← Back")
+        self.back_btn = QPushButton(f"← {T('manual_resolve.back')}")
         self.back_btn.setObjectName("SecondaryButton")
         self.back_btn.setFixedWidth(80)
         self.back_btn.setVisible(False)
         self.back_btn.clicked.connect(self._on_back)
         
-        self.nav_label = QLabel("Search Results")
+        self.nav_label = QLabel(T("manual_resolve.search_results"))
         self.nav_label.setStyleSheet(f"font-size: 18px; font-weight: 700; color: {Theme.TEXT_MAIN};")
         
-        self.mode_btn = QPushButton("Link Multiple Items")
+        self.mode_btn = QPushButton(T("manual_resolve.link_multiple"))
         self.mode_btn.setObjectName("SecondaryButton")
         self.mode_btn.setFixedWidth(160)
         self.mode_btn.setCheckable(True)
@@ -72,11 +73,11 @@ class ManualResolveDialog(QDialog):
 
         search_row = QHBoxLayout()
         self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("Search title... (e.g. 'The Matrix')")
+        self.search_input.setPlaceholderText(T("manual_resolve.search_placeholder"))
         self.search_input.setFixedHeight(40)
         self.search_input.returnPressed.connect(self._on_search_clicked)
         
-        self.search_btn = QPushButton("Search")
+        self.search_btn = QPushButton(T("manual_resolve.search_btn"))
         self.search_btn.setFixedHeight(40)
         self.search_btn.setFixedWidth(100)
         self.search_btn.clicked.connect(self._on_search_clicked)
@@ -88,10 +89,10 @@ class ManualResolveDialog(QDialog):
         filters_row = QHBoxLayout()
         self.year_spin = QSpinBox()
         self.year_spin.setRange(0, 2100)
-        self.year_spin.setSpecialValueText("Any Year")
+        self.year_spin.setSpecialValueText(T("manual_resolve.any_year"))
         self.year_spin.setFixedWidth(100)
         
-        filters_row.addWidget(QLabel("Year:"))
+        filters_row.addWidget(QLabel(T("manual_resolve.year_label")))
         filters_row.addWidget(self.year_spin)
         filters_row.addSpacing(20)
 
@@ -111,7 +112,7 @@ class ManualResolveDialog(QDialog):
         self.results_list.itemDoubleClicked.connect(self._on_item_double_clicked)
         res_col.addWidget(self.results_list)
         
-        self.action_btn = QPushButton("Match This Item")
+        self.action_btn = QPushButton(T("manual_resolve.match_btn"))
         self.action_btn.setFixedHeight(45)
         self.action_btn.setEnabled(False)
         self.action_btn.setStyleSheet(Theme.get_primary_button_style())
@@ -132,7 +133,7 @@ class ManualResolveDialog(QDialog):
         # Footer
         footer = QHBoxLayout()
         footer.addStretch()
-        footer.addWidget(QPushButton("Cancel", clicked=self.reject, objectName="SecondaryButton", fixedWidth=100, fixedHeight=40))
+        footer.addWidget(QPushButton(T("common.cancel"), clicked=self.reject, objectName="SecondaryButton", fixedWidth=100, fixedHeight=40))
         layout.addLayout(footer)
 
     def _create_preview_panel(self):
@@ -141,12 +142,12 @@ class ManualResolveDialog(QDialog):
         panel.setFixedWidth(280)
         layout = QVBoxLayout(panel)
         
-        self.preview_poster = QLabel("No Selection")
+        self.preview_poster = QLabel(T("manual_resolve.no_selection"))
         self.preview_poster.setAlignment(Qt.AlignCenter)
         self.preview_poster.setFixedSize(250, 375)
         self.preview_poster.setStyleSheet(f"background-color: {Theme.SURFACE}; border-radius: 8px;")
         
-        self.preview_title = QLabel("Select a result")
+        self.preview_title = QLabel(T("manual_resolve.select_result"))
         self.preview_title.setWordWrap(True)
         self.preview_title.setStyleSheet(f"font-weight: 800; font-size: 16px; color: {Theme.TEXT_MAIN};")
         
@@ -171,15 +172,15 @@ class ManualResolveDialog(QDialog):
         layout.setContentsMargins(0, 0, 0, 0)
         
         header = QHBoxLayout()
-        header.addWidget(QLabel("Basket"))
-        clear_btn = QPushButton("Clear", clicked=self._clear_basket, objectName="SecondaryButton")
+        header.addWidget(QLabel(T("manual_resolve.basket")))
+        clear_btn = QPushButton(T("manual_resolve.clear"), clicked=self._clear_basket, objectName="SecondaryButton")
         header.addWidget(clear_btn)
         layout.addLayout(header)
         
         self.basket_list = QListWidget()
         layout.addWidget(self.basket_list)
         
-        self.confirm_btn = QPushButton("Confirm & Link All", clicked=self._on_confirm)
+        self.confirm_btn = QPushButton(T("manual_resolve.confirm_all"), clicked=self._on_confirm)
         self.confirm_btn.setEnabled(False)
         self.confirm_btn.setFixedHeight(45)
         self.confirm_btn.setStyleSheet(Theme.get_success_button_style())
@@ -234,7 +235,7 @@ class ManualResolveDialog(QDialog):
     @Slot(list, str)
     def _on_search_results(self, results, mode):
         self.results_list.clear()
-        if mode == "candidates": self.nav_label.setText(f"Found {len(results)} Candidates")
+        if mode == "candidates": self.nav_label.setText(T("manual_resolve.candidates_found", count=len(results)))
         
         for res in results:
             item = QListWidgetItem()
@@ -246,7 +247,7 @@ class ManualResolveDialog(QDialog):
             self.results_list.setItemWidget(item, widget)
             
         if not results:
-            self.results_list.addItem("No matches found.")
+            self.results_list.addItem(T("manual_resolve.no_matches"))
 
     def _on_selection_changed(self):
         items = self.results_list.selectedItems()
@@ -260,7 +261,7 @@ class ManualResolveDialog(QDialog):
         self.action_btn.setEnabled(True)
         
         self.preview_title.setText(res['title'])
-        meta = f"Type: {res['media_type'].capitalize()}"
+        meta = T("manual_resolve.type_label", type=res['media_type'].capitalize())
         if res.get('year'): meta += f" • {res['year']}"
         self.preview_meta.setText(meta)
         self.preview_overview.setText(res.get('overview', ""))
@@ -268,14 +269,14 @@ class ManualResolveDialog(QDialog):
         if res.get('poster_path'):
             self._load_poster(res['poster_path'])
         else:
-            self.preview_poster.setText("No Poster")
+            self.preview_poster.setText(T("manual_resolve.no_poster"))
 
     def _on_item_double_clicked(self, item):
         res = item.data(Qt.UserRole)
         if not res: return
         
         if res['media_type'] == 'tv':
-            self.nav_stack.append(("search", None, None, "Search Results"))
+            self.nav_stack.append(("search", None, None, T("manual_resolve.search_results")))
             self._on_search_clicked(mode="seasons", parent_id=res['tmdb_id'], title=res['title'])
         elif res['media_type'] == 'season':
             self.nav_stack.append(("seasons", res['show_id'], None, self.nav_label.text()))
@@ -293,10 +294,10 @@ class ManualResolveDialog(QDialog):
         self.basket_widget.setVisible(checked)
         if checked:
             self.setMinimumWidth(1150)
-            self.action_btn.setText("+ Add to Basket")
+            self.action_btn.setText(T("manual_resolve.add_basket"))
         else:
             self.setMinimumWidth(850)
-            self.action_btn.setText("Match This Item")
+            self.action_btn.setText(T("manual_resolve.match_btn"))
 
     def _on_action_clicked(self):
         if not self.selected_media: return
@@ -378,4 +379,4 @@ class ManualResolveDialog(QDialog):
             scaled = pixmap.scaled(self.preview_poster.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation)
             self.preview_poster.setPixmap(scaled)
         else:
-            self.preview_poster.setText("No Poster")
+            self.preview_poster.setText(T("manual_resolve.no_poster"))

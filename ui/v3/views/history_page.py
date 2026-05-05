@@ -6,6 +6,7 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
 from PySide6.QtCore import Qt, Signal
 from ui.v3.styles.theme import Theme
 from ui.v3.workers.discovery_workers import UndoWorker
+from core.i18n import T
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +47,7 @@ class HistoryBatchCard(QFrame):
         date_lbl = QLabel(ts)
         date_lbl.setStyleSheet(f"color: {Theme.TEXT_MUTED}; font-size: 11px; font-weight: 600;")
         
-        title_lbl = QLabel(f"Renamed {len(self.items)} files")
+        title_lbl = QLabel(T("history.renamed_count", count=len(self.items)))
         title_lbl.setStyleSheet("color: white; font-size: 15px; font-weight: 800;")
         
         info_layout.addWidget(date_lbl)
@@ -56,7 +57,7 @@ class HistoryBatchCard(QFrame):
         header_layout.addStretch()
 
         # Undo Button
-        self.undo_btn = QPushButton("🔄 Undo Batch")
+        self.undo_btn = QPushButton(f"🔄 {T('history.undo_btn')}")
         self.undo_btn.setCursor(Qt.PointingHandCursor)
         self.undo_btn.setStyleSheet(f"""
             QPushButton {{
@@ -76,7 +77,7 @@ class HistoryBatchCard(QFrame):
         self.undo_btn.clicked.connect(lambda: self.undo_requested.emit(self.batch_id))
         
         # Expand Button
-        self.expand_btn = QPushButton("Expand ▼")
+        self.expand_btn = QPushButton(T("history.expand"))
         self.expand_btn.setCursor(Qt.PointingHandCursor)
         self.expand_btn.setStyleSheet(f"color: {Theme.TEXT_DIM}; background: transparent; border: none; font-weight: 700;")
         self.expand_btn.clicked.connect(self.toggle_expand)
@@ -112,7 +113,7 @@ class HistoryBatchCard(QFrame):
     def toggle_expand(self):
         self.is_expanded = not self.is_expanded
         self.details_container.setVisible(self.is_expanded)
-        self.expand_btn.setText("Collapse ▲" if self.is_expanded else "Expand ▼")
+        self.expand_btn.setText(T("history.collapse") if self.is_expanded else T("history.expand"))
 
 class HistoryPage(QWidget):
     """View for browsing and undoing previous rename operations."""
@@ -130,9 +131,9 @@ class HistoryPage(QWidget):
         # Header Section
         header_layout = QHBoxLayout()
         title_vbox = QVBoxLayout()
-        title = QLabel("Rename History")
+        title = QLabel(T("history.title"))
         title.setStyleSheet("font-size: 28px; font-weight: 800; color: white;")
-        subtitle = QLabel("Browse and revert previous library operations")
+        subtitle = QLabel(T("history.subtitle"))
         subtitle.setStyleSheet(f"color: {Theme.TEXT_MUTED}; font-size: 13px;")
         title_vbox.addWidget(title)
         title_vbox.addWidget(subtitle)
@@ -141,7 +142,7 @@ class HistoryPage(QWidget):
         
         # Search Bar
         self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("Search history by filename...")
+        self.search_input.setPlaceholderText(T("history.search_placeholder"))
         self.search_input.setFixedWidth(350)
         self.search_input.setStyleSheet(f"""
             QLineEdit {{
@@ -185,7 +186,7 @@ class HistoryPage(QWidget):
             # 1. Fetch all history entries
             raw_history = self.engine.db.history.get_recent(limit=500)
             if not raw_history:
-                empty_lbl = QLabel("No rename history found.")
+                empty_lbl = QLabel(T("history.no_history"))
                 empty_lbl.setStyleSheet(f"color: {Theme.TEXT_DIM}; font-size: 16px;")
                 empty_lbl.setAlignment(Qt.AlignCenter)
                 self.content_layout.insertWidget(0, empty_lbl)
@@ -227,7 +228,7 @@ class HistoryPage(QWidget):
                 widget.setVisible(match)
 
     def _on_undo_requested(self, batch_id):
-        if QMessageBox.question(self, "Undo Batch", "Are you sure you want to revert this entire operation?") == QMessageBox.Yes:
+        if QMessageBox.question(self, T("history.undo_btn"), T("discovery.messages.undo_confirm")) == QMessageBox.Yes:
             self.undo_worker = UndoWorker(self.engine, batch_id)
             self.undo_worker.finished.connect(self._on_undo_finished)
             self.undo_worker.start()

@@ -2,6 +2,7 @@ from PySide6.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QSpin
 from PySide6.QtCore import Qt
 from ui.v3.styles.theme import Theme
 from ui.v3.views.settings.base_tab import BaseSettingsTab
+from core.i18n import T
 import os
 
 class GeneralTab(BaseSettingsTab):
@@ -15,30 +16,50 @@ class GeneralTab(BaseSettingsTab):
         layout.setContentsMargins(40, 40, 40, 40)
         layout.setSpacing(30)
 
-        header = QLabel("General Settings")
+        header = QLabel(T("settings.general.header"))
         header.setStyleSheet(Theme.get_page_header_style())
         layout.addWidget(header)
         
         # User Info
-        layout.addWidget(self._create_section_header("USER INFORMATION"))
-        self.name_input = self._create_input_group("Display Name", self.engine.config.settings.user_name, "Your Name")
+        layout.addWidget(self._create_section_header(T("settings.general.sections.user_info")))
+        self.name_input = self._create_input_group(T("settings.general.fields.display_name"), self.engine.config.settings.user_name, T("settings.general.fields.display_name_placeholder"))
         layout.addLayout(self.name_input['layout'])
+ 
+        # Appearance
+        layout.addWidget(self._create_section_header(T("settings.general.sections.appearance")))
+        app_lang_layout = QVBoxLayout()
+        app_lang_layout.addWidget(QLabel(T("settings.general.fields.app_lang")))
+        self.app_lang_combo = QComboBox()
+        self.app_lang_combo.setFixedWidth(200)
+        self.app_lang_combo.addItem(T("common.languages.en"), "en")
+        
+        idx = self.app_lang_combo.findData(self.engine.config.settings.app_language)
+        if idx >= 0: self.app_lang_combo.setCurrentIndex(idx)
+        app_lang_layout.addWidget(self.app_lang_combo)
+        layout.addLayout(app_lang_layout)
 
         # Scan Path
-        layout.addWidget(self._create_section_header("DEFAULT DIRECTORIES"))
-        self.path_group = self._create_path_input("Default Scan Directory", self.engine.config.settings.default_scan_path, "scan", self._on_browse)
+        layout.addWidget(self._create_section_header(T("settings.general.sections.directories")))
+        self.path_group = self._create_path_input(T("settings.general.fields.scan_dir"), self.engine.config.settings.default_scan_path, "scan", self._on_browse)
         layout.addLayout(self.path_group['layout'])
 
         # Languages
-        layout.addWidget(self._create_section_header("METADATA PREFERENCES"))
+        layout.addWidget(self._create_section_header(T("settings.general.sections.metadata")))
         lang_layout = QHBoxLayout()
         
         # Primary Language
         l1_group = QVBoxLayout()
-        l1_group.addWidget(QLabel("Primary Metadata Language"))
+        l1_group.addWidget(QLabel(T("settings.general.fields.primary_lang")))
         self.lang_combo = QComboBox()
         self.lang_combo.setFixedWidth(200)
-        langs = [("Hungarian", "hu-HU"), ("English", "en-US"), ("German", "de-DE"), ("French", "fr-FR")]
+        langs = [
+            (T("common.languages.hu"), "hu-HU"), 
+            (T("common.languages.en"), "en-US"), 
+            (T("common.languages.de"), "de-DE"), 
+            (T("common.languages.fr"), "fr-FR"),
+            (T("common.languages.it"), "it-IT"),
+            (T("common.languages.es"), "es-ES")
+        ]
         for name, code in langs:
             self.lang_combo.addItem(name, code)
         
@@ -49,10 +70,10 @@ class GeneralTab(BaseSettingsTab):
         
         # Fallback Language
         l2_group = QVBoxLayout()
-        l2_group.addWidget(QLabel("Fallback Language"))
+        l2_group.addWidget(QLabel(T("settings.general.fields.fallback_lang")))
         self.fallback_combo = QComboBox()
         self.fallback_combo.setFixedWidth(200)
-        self.fallback_combo.addItem("None (Disable Fallback)", "")
+        self.fallback_combo.addItem(T("settings.general.fields.none_fallback"), "")
         for name, code in langs:
             self.fallback_combo.addItem(name, code)
             
@@ -64,9 +85,9 @@ class GeneralTab(BaseSettingsTab):
         layout.addLayout(lang_layout)
 
         # File Filters
-        layout.addWidget(self._create_section_header("FILE FILTERS"))
+        layout.addWidget(self._create_section_header(T("settings.general.sections.filters")))
         size_layout = QHBoxLayout()
-        size_lbl = QLabel("Minimum Video Size (MB):")
+        size_lbl = QLabel(T("settings.general.fields.min_size"))
         size_lbl.setFixedWidth(180)
         self.size_spin = QSpinBox()
         self.size_spin.setRange(0, 10000)
@@ -90,6 +111,7 @@ class GeneralTab(BaseSettingsTab):
 
     def save_to_settings(self, s):
         s.user_name = self.name_input['edit'].text().strip()
+        s.app_language = self.app_lang_combo.currentData()
         s.default_scan_path = self.path_group['edit'].text()
         s.metadata_language = self.lang_combo.currentData()
         s.fallback_language = self.fallback_combo.currentData()

@@ -1,5 +1,5 @@
-from PySide6.QtWidgets import QWidget, QHBoxLayout, QLabel, QSpinBox, QComboBox
 from PySide6.QtCore import Qt, Signal, QEvent
+from core.i18n import T
 
 class TVMetadataSelector(QWidget):
     """
@@ -17,9 +17,10 @@ class TVMetadataSelector(QWidget):
         layout.setSpacing(15)
 
         # 1. Type Toggle
-        layout.addWidget(QLabel("Type:"))
+        layout.addWidget(QLabel(T("common.type")))
         self.type_combo = QComboBox()
-        self.type_combo.addItems(["Movie", "TV Show"])
+        self.type_combo.addItem(T("common.types.movie"), "movie")
+        self.type_combo.addItem(T("common.types.tv"), "tv")
         self.type_combo.setFixedWidth(110)
         self.type_combo.currentTextChanged.connect(self._on_type_changed)
         layout.addWidget(self.type_combo)
@@ -50,8 +51,8 @@ class TVMetadataSelector(QWidget):
         return spin
 
     def _on_type_changed(self, text):
-        self.tv_container.setVisible(text == "TV Show")
-        self.type_changed.emit(text)
+        self.tv_container.setVisible(self.type_combo.currentData() == "tv")
+        self.type_changed.emit(self.type_combo.currentData())
 
     def eventFilter(self, source, event):
         """Auto-reset to 0 if field is cleared manually."""
@@ -62,13 +63,14 @@ class TVMetadataSelector(QWidget):
         return super().eventFilter(source, event)
 
     def set_values(self, m_type, s=0, e=0):
-        self.type_combo.setCurrentText("TV Show" if m_type == "tv" else "Movie")
+        idx = self.type_combo.findData(m_type)
+        if idx >= 0: self.type_combo.setCurrentIndex(idx)
         self.season_spin.setValue(int(s) if s else 0)
         self.episode_spin.setValue(int(e) if e else 0)
 
     def get_values(self):
         return {
-            'type': 'tv' if self.type_combo.currentText() == "TV Show" else 'movie',
+            'type': self.type_combo.currentData(),
             'season': self.season_spin.value(),
             'episode': self.episode_spin.value()
         }

@@ -1,0 +1,247 @@
+{
+    "app": {
+        "name": "RENDA",
+        "subtitle": "Smart Media Organizer"
+    },
+    "sidebar": {
+        "dashboard": "Dashboard",
+        "library": "Library",
+        "history": "History",
+        "settings": "Settings",
+        "restart": "Restart App"
+    },
+    "greeting": {
+        "morning": "Good morning",
+        "afternoon": "Good afternoon",
+        "evening": "Good evening",
+        "night": "Good night"
+    },
+    "dashboard": {
+        "title": "Welcome to RENDA",
+        "subtitle": "Ready to organize your library?",
+        "scan": {
+            "title": "Scan Directory",
+            "desc": "Import new media files and identify them automatically."
+        },
+        "stats": {
+            "movies": "Movies",
+            "episodes": "Episodes",
+            "total_size": "Total Size",
+            "overview_title": "Library Overview",
+            "movies_indexed": "• {count} Movies indexed",
+            "series_indexed": "• {count} TV Series indexed"
+        }
+    },
+    "discovery": {
+        "title": "Discovery Console",
+        "search_placeholder": "Search files...",
+        "tabs": {
+            "library": "🔍 Library Review",
+            "conflicts": "⚔️ Conflicts",
+            "extras": "📎 Extras",
+            "dropped": "📦 Dropped",
+            "trash": "🗑️ Trash"
+        },
+        "table": {
+            "status": "STATUS",
+            "original_name": "ORIGINAL NAME",
+            "type": "TYPE",
+            "new_name": "NEW NAME PREVIEW",
+            "actions": "ACTIONS"
+        },
+        "actions": {
+            "apply": "Apply Renames",
+            "batch_identify": "Batch Identify",
+            "batch_actions": "Batch Operations",
+            "scan_new": "Scan Directory",
+            "refresh": "Refresh List",
+            "fix": "Resolve Conflict",
+            "edit": "Edit Metadata",
+            "restore": "Restore to Library",
+            "ignore": "Ignore File"
+        },
+        "dropped": {
+            "import_all": "🚀 Import All to Library",
+            "import_selected": "📥 Import Selected",
+            "clear_list": "🧹 Clear List",
+            "clear_confirm_title": "Clear List",
+            "clear_confirm_msg": "Clear all items from the Dropped list?\n(Files will remain on disk)"
+        },
+        "messages": {
+            "rename_success": "Successfully renamed {count} files.",
+            "undo_success": "Successfully reverted {count} files.",
+            "ignore_confirm": "Are you sure you want to ignore {count} selected files?",
+            "clear_confirm": "Are you sure you want to clear metadata for {count} selected files?",
+            "undo_confirm": "Are you sure you want to revert the last renaming operation?",
+            "collision_detected": "{count} COLLISIONS DETECTED",
+            "collision_tooltip": "Please resolve collisions before executing."
+        }
+    },
+    "settings": {
+        "title": "Settings",
+        "tabs": {
+            "general": "⚙️ General",
+            "naming": "🏷️ Naming",
+            "folders": "📁 Folders",
+            "extras": "📎 Extras",
+            "api": "🔑 API Keys",
+            "advanced": "🛠️ Advanced"
+        },
+        "save_btn": "Save All Changes",
+        "saving": "Saving...",
+        "general": {
+            "header": "General Settings",
+            "sections": {
+                "user_info": "USER INFORMATION",
+                "appearance": "APPEARANCE & LANGUAGE",
+                "directories": "DEFAULT DIRECTORIES",
+                "metadata": "METADATA PREFERENCES",
+                "filters": "FILE FILTERS"
+            },
+            "fields": {
+                "display_name": "Display Name",
+                "display_name_placeholder": "Your Name",
+                "app_lang": "Interface Language",
+                "scan_dir": "Default Scan Directory",
+                "primary_lang": "Primary Metadata Language",
+                "fallback_lang": "Fallback Language",
+                "none_fallback": "None (Disable Fallback)",
+                "min_size": "Minimum Video Size (MB):"
+            }
+        },
+        "naming": {
+            "header": "Naming Templates & Styles",
+            "sections": {
+                "styling": "GLOBAL FILENAME STYLING",
+                "movie": "MOVIE NAMING TEMPLATE",
+                "episode": "TV EPISODE NAMING TEMPLATE",
+                "custom": "CUSTOM GLOBAL VARIABLE"
+            },
+            "fields": {
+                "casing": "Filename Casing",
+                "separator": "Word Separator",
+                "movie_tpl": "Movie Template",
+                "episode_tpl": "Episode Template",
+                "custom_val": "Custom Tag Value ({Custom})",
+                "custom_placeholder": "e.g. GroupName"
+            },
+            "casing_options": {
+                "none": "Original",
+                "lower": "lower case",
+                "upper": "UPPER CASE",
+                "title": "Title Case"
+            },
+            "separator_options": {
+                "space": "Space",
+                "dot": "Dot (.)",
+                "dash": "Dash (-)",
+                "underscore": "Underscore (_)"
+            }
+        }
+    },
+    "edit_file": {
+        "title": "Edit Properties: {filename}",
+        "sections": {
+            "classification": "📁 Classification",
+            "details": "📝 Details"
+        },
+        "fields": {
+            "primary_role": "Primary Role:",
+            "type": "Type:",
+            "season": "Season:",
+            "episode": "Episode:",
+            "edition": "Edition:",
+            "part": "Part:",
+            "language": "Language:",
+            "linked_to": "Linked to Parent Video:"
+        },
+        "roles": {
+            "movie": "Movie",
+            "episode": "Episode",
+            "bonus": "Bonus Video"
+        },
+        "editions": {
+            "theatrical": "Theatrical",
+            "directors_cut": "Director's Cut",
+            "extended": "Extended",
+            "remastered": "Remastered",
+            "uncut": "Uncut"
+        },
+        "parts": {
+            "part": "Part",
+            "cd": "CD",
+            "disk": "Disk"
+        },
+        "parent_select": "--- Select Parent ---",
+        "save_btn": "Save Changes"
+    },
+    "manual_resolve": {
+        "title": "Manual Resolve: {filename}",
+        "back": "Back",
+        "search_results": "Search Results",
+        "link_multiple": "Link Multiple Items",
+        "search_placeholder": "Search title... (e.g. 'The Matrix')",
+        "search_btn": "Search",
+        "any_year": "Any Year",
+        "year_label": "Year:",
+        "match_btn": "Match This Item",
+        "add_basket": "+ Add to Basket",
+        "no_selection": "No Selection",
+        "select_result": "Select a result",
+        "no_poster": "No Poster",
+        "searching": "Searching API...",
+        "browsing": "Browsing...",
+        "candidates_found": "Found {count} Candidates",
+        "no_matches": "No matches found.",
+        "basket": "Basket",
+        "clear": "Clear",
+        "confirm_all": "Confirm & Link All",
+        "type_label": "Type: {type}"
+    },
+    "preview": {
+        "title": "Review Renaming Plan",
+        "header": "Rename Preview ({count} items)",
+        "filter_placeholder": "Filter files...",
+        "col_current": "CURRENT FILENAME",
+        "col_proposed": "PROPOSED FILENAME",
+        "deleted": "DELETED",
+        "remove_tooltip": "Remove this file from the renaming plan (Skip)",
+        "summary": "Plan: {renames} Renames, {deletions} Deletions",
+        "execute": "Execute Changes"
+    },
+    "history": {
+        "title": "Rename History",
+        "subtitle": "Browse and revert previous library operations",
+        "search_placeholder": "Search history by filename...",
+        "no_history": "No rename history found.",
+        "renamed_count": "Renamed {count} files",
+        "undo_btn": "Undo Batch",
+        "expand": "Expand ▼",
+        "collapse": "Collapse ▲"
+    },
+    "common": {
+        "none": "None",
+        "type": "Type:",
+        "types": {
+            "movie": "Movie",
+            "tv": "TV Show"
+        },
+        "languages": {
+            "en": "English",
+            "de": "German",
+            "fr": "French",
+            "it": "Italian",
+            "es": "Spanish"
+        },
+        "ok": "OK",
+        "cancel": "Cancel",
+        "yes": "Yes",
+        "no": "No",
+        "error": "Error",
+        "warning": "Warning",
+        "loading": "Loading...",
+        "success": "Success",
+        "undo": "Undo",
+        "operation_successful": "Operation successful"
+    }
+}

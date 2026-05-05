@@ -1,6 +1,7 @@
 from PySide6.QtWidgets import QFrame, QVBoxLayout, QPushButton, QLabel
 from PySide6.QtCore import Qt, Signal
 from ui.v3.styles.theme import Theme
+from core.i18n import T
 
 class Sidebar(QFrame):
     """
@@ -22,10 +23,10 @@ class Sidebar(QFrame):
         layout.setSpacing(10)
 
         # 1. Branding
-        title = QLabel("RENDA")
+        title = QLabel(T("app.name"))
         title.setStyleSheet(Theme.get_sidebar_title_style())
         
-        subtitle = QLabel("Smart Media Organizer")
+        subtitle = QLabel(T("app.subtitle"))
         subtitle.setStyleSheet(Theme.get_sidebar_subtitle_style())
         
         layout.addWidget(title)
@@ -33,10 +34,10 @@ class Sidebar(QFrame):
         layout.addSpacing(20)
 
         # 2. Navigation Buttons
-        self.btn_dash = self._create_nav_btn("Dashboard", 0, True)
-        self.btn_lib = self._create_nav_btn("Library", 1)
-        self.btn_hist = self._create_nav_btn("History", 3)
-        self.btn_sett = self._create_nav_btn("Settings", 4)
+        self.btn_dash = self._create_nav_btn(T("sidebar.dashboard"), 0, True)
+        self.btn_lib = self._create_nav_btn(T("sidebar.library"), 1)
+        self.btn_hist = self._create_nav_btn(T("sidebar.history"), 3)
+        self.btn_sett = self._create_nav_btn(T("sidebar.settings"), 4)
 
         layout.addWidget(self.btn_dash)
         layout.addWidget(self.btn_lib)
@@ -44,7 +45,7 @@ class Sidebar(QFrame):
         layout.addStretch()
 
         # 3. Bottom Actions
-        self.btn_restart = QPushButton("  Restart App")
+        self.btn_restart = QPushButton(f"  {T('sidebar.restart')}")
         self.btn_restart.setObjectName("SecondaryButton")
         self.btn_restart.setFixedHeight(40)
         self.btn_restart.setCursor(Qt.PointingHandCursor)

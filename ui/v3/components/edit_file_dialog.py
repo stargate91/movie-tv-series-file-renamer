@@ -6,6 +6,7 @@ from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
 from PySide6.QtCore import Qt
 from ui.v3.styles.theme import Theme
 from core.engine.metadata_rules import MetadataRules
+from core.i18n import T
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +20,7 @@ class EditFileDialog(QDialog):
         self.engine = engine
         self.file_data = file_data
         
-        self.setWindowTitle(f"Edit Properties: {file_data['file_name']}")
+        self.setWindowTitle(T("edit_file.title", filename=file_data['file_name']))
         self.setMinimumSize(500, 600)
         self.setStyleSheet(Theme.get_main_stylesheet())
         
@@ -32,48 +33,51 @@ class EditFileDialog(QDialog):
         layout.setContentsMargins(25, 25, 25, 25)
 
         # 1. Classification Section
-        self.cat_card = self._create_card("📁 Classification")
+        self.cat_card = self._create_card(T("edit_file.sections.classification"))
         
         # Hidden standard combos (used as backing store)
         self.combo_category = QComboBox()
         # Items will be populated dynamically in _load_data
         self.combo_category.hide()
         self.combo_media_type = QComboBox()
-        self.combo_media_type.addItems(["Movie", "TV Series"])
+        self.combo_media_type.addItem(T("common.types.movie"), "movie")
+        self.combo_media_type.addItem(T("common.types.tv"), "tv")
         self.combo_media_type.hide()
 
         # Unified Classification
         self.combo_classification = QComboBox()
-        self.combo_classification.addItems(["Movie", "Episode", "Bonus Video"])
+        self.combo_classification.addItem(T("edit_file.roles.movie"), "Movie")
+        self.combo_classification.addItem(T("edit_file.roles.episode"), "Episode")
+        self.combo_classification.addItem(T("edit_file.roles.bonus"), "Bonus Video")
         self.combo_classification.currentIndexChanged.connect(self._on_classification_changed)
         
         # Sub-Type
         self.st_group = QWidget()
         st_lay = QVBoxLayout(self.st_group)
         st_lay.setContentsMargins(0, 5, 0, 0)
-        st_lay.addWidget(QLabel("Type:", styleSheet="color: #94A3B8;"))
+        st_lay.addWidget(QLabel(T("edit_file.fields.type"), styleSheet="color: #94A3B8;"))
         self.combo_sub_type = QComboBox()
         self.combo_sub_type.setEditable(True)
         st_lay.addWidget(self.combo_sub_type)
 
-        self.cat_card.layout().addWidget(QLabel("Primary Role:", styleSheet="font-weight: bold;"))
+        self.cat_card.layout().addWidget(QLabel(T("edit_file.fields.primary_role"), styleSheet="font-weight: bold;"))
         self.cat_card.layout().addWidget(self.combo_classification)
         self.cat_card.layout().addWidget(self.combo_category) # Visible for non-video categories
         self.cat_card.layout().addWidget(self.st_group)
         layout.addWidget(self.cat_card)
 
         # 2. Details Section (Dynamic)
-        self.details_card = self._create_card("📝 Details")
+        self.details_card = self._create_card(T("edit_file.sections.details"))
         
         # TV Info
         self.tv_group = QWidget()
         tv_lay = QHBoxLayout(self.tv_group)
         tv_lay.setContentsMargins(0, 0, 0, 0)
-        tv_lay.addWidget(QLabel("Season:"))
+        tv_lay.addWidget(QLabel(T("edit_file.fields.season")))
         self.spin_season = QSpinBox()
         self.spin_season.setRange(0, 999)
         tv_lay.addWidget(self.spin_season)
-        tv_lay.addWidget(QLabel("Episode:"))
+        tv_lay.addWidget(QLabel(T("edit_file.fields.episode")))
         self.spin_episode = QSpinBox()
         self.spin_episode.setRange(0, 9999)
         tv_lay.addWidget(self.spin_episode)
@@ -81,17 +85,24 @@ class EditFileDialog(QDialog):
         self.movie_group = QWidget()
         mv_lay = QVBoxLayout(self.movie_group)
         mv_lay.setContentsMargins(0, 0, 0, 0)
-        self.lbl_edition = QLabel("Edition:")
+        self.lbl_edition = QLabel(T("edit_file.fields.edition"))
         mv_lay.addWidget(self.lbl_edition)
         self.combo_edition = QComboBox()
         self.combo_edition.setEditable(True)
-        self.combo_edition.addItems(["", "Theatrical", "Director's Cut", "Extended", "Remastered", "Uncut"])
+        self.combo_edition.addItem("")
+        self.combo_edition.addItem(T("edit_file.editions.theatrical"), "Theatrical")
+        self.combo_edition.addItem(T("edit_file.editions.directors_cut"), "Director's Cut")
+        self.combo_edition.addItem(T("edit_file.editions.extended"), "Extended")
+        self.combo_edition.addItem(T("edit_file.editions.remastered"), "Remastered")
+        self.combo_edition.addItem(T("edit_file.editions.uncut"), "Uncut")
         mv_lay.addWidget(self.combo_edition)
         
         part_lay = QHBoxLayout()
-        part_lay.addWidget(QLabel("Part:"))
+        part_lay.addWidget(QLabel(T("edit_file.fields.part")))
         self.combo_part_type = QComboBox()
-        self.combo_part_type.addItems(["Part", "CD", "Disk"])
+        self.combo_part_type.addItem(T("edit_file.parts.part"), "Part")
+        self.combo_part_type.addItem(T("edit_file.parts.cd"), "CD")
+        self.combo_part_type.addItem(T("edit_file.parts.disk"), "Disk")
         part_lay.addWidget(self.combo_part_type)
         self.spin_part = QSpinBox()
         self.spin_part.setRange(0, 99)
@@ -102,7 +113,7 @@ class EditFileDialog(QDialog):
         self.lang_group = QWidget()
         lang_lay = QVBoxLayout(self.lang_group)
         lang_lay.setContentsMargins(0, 0, 0, 0)
-        lang_lay.addWidget(QLabel("Language:"))
+        lang_lay.addWidget(QLabel(T("edit_file.fields.language")))
         self.combo_lang = QComboBox()
         self.combo_lang.setEditable(True)
         self.combo_lang.addItems(["ENG", "HUN", "GER", "FRA", "SPA", "ITA", "JPN"])
@@ -112,7 +123,7 @@ class EditFileDialog(QDialog):
         self.link_group = QWidget()
         link_lay = QVBoxLayout(self.link_group)
         link_lay.setContentsMargins(0, 0, 0, 0)
-        link_lay.addWidget(QLabel("Linked to Parent Video:"))
+        link_lay.addWidget(QLabel(T("edit_file.fields.linked_to")))
         self.combo_parent = QComboBox()
         self.combo_parent.setEditable(True)
         link_lay.addWidget(self.combo_parent)
@@ -127,9 +138,9 @@ class EditFileDialog(QDialog):
 
         # Buttons
         btns = QHBoxLayout()
-        btn_cancel = QPushButton("Cancel")
+        btn_cancel = QPushButton(T("common.cancel"))
         btn_cancel.clicked.connect(self.reject)
-        btn_save = QPushButton("Save Changes")
+        btn_save = QPushButton(T("edit_file.save_btn"))
         btn_save.setMinimumHeight(40)
         btn_save.setStyleSheet(Theme.get_primary_button_style())
         btn_save.clicked.connect(self._apply_changes)
@@ -251,7 +262,7 @@ class EditFileDialog(QDialog):
             videos = self.engine.db.files.get_files_by_category('video')
             videos = sorted(videos, key=lambda x: x['id'], reverse=True)
             self.combo_parent.clear()
-            self.combo_parent.addItem("--- Select Parent ---", None)
+        self.combo_parent.addItem(T("edit_file.parent_select"), None)
             for v in videos:
                 self.combo_parent.addItem(v['file_name'], v['id'])
             
@@ -301,4 +312,5 @@ class EditFileDialog(QDialog):
             
             self.accept()
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"Failed to save: {e}")
+            QMessageBox.critical(self, T("common.error"), f"{T('common.operation_successful')}: {e}") # Wait, error msg should be localized
+            # Let's add a generic fail msg

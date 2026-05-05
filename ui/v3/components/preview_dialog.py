@@ -2,12 +2,13 @@ from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
                              QPushButton, QTextEdit, QScrollArea, QWidget, QFrame, QLineEdit, QApplication)
 from PySide6.QtCore import Qt
 from ui.v3.styles.theme import Theme
+from core.i18n import T
 
 class PreviewDialog(QDialog):
     """A professional, searchable dialog to preview renaming operations."""
     def __init__(self, plan, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Review Renaming Plan")
+        self.setWindowTitle(T("preview.title"))
         self.setMinimumSize(1000, 700)
         # Enable maximize and minimize buttons
         self.setWindowFlags(self.windowFlags() | Qt.WindowMaximizeButtonHint | Qt.WindowMinimizeButtonHint)
@@ -24,7 +25,7 @@ class PreviewDialog(QDialog):
 
         # Header Section
         header_layout = QHBoxLayout()
-        header = QLabel(f"Rename Preview ({len(self.plan)} items)")
+        header = QLabel(T("preview.header", count=len(self.plan)))
         header.setStyleSheet("font-size: 22px; font-weight: 800; color: white;")
         header_layout.addWidget(header)
         
@@ -32,8 +33,8 @@ class PreviewDialog(QDialog):
         
         # Search Bar
         self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("Filter files...")
-        self.search_input.setFixedWidth(300)
+        self.search_input.setPlaceholderText(T("preview.filter_placeholder"))
+        self.search_input.setFixedWidth(350)
         self.search_input.setStyleSheet(f"""
             QLineEdit {{
                 background: {Theme.SURFACE_DARK};
@@ -58,8 +59,8 @@ class PreviewDialog(QDialog):
         lh_layout = QHBoxLayout(list_header)
         lh_layout.setContentsMargins(20, 10, 20, 10)
         
-        l_old = QLabel("CURRENT FILENAME")
-        l_new = QLabel("PROPOSED FILENAME")
+        l_old = QLabel(T("preview.col_current"))
+        l_new = QLabel(T("preview.col_proposed"))
         for l in [l_old, l_new]:
             l.setStyleSheet(f"font-size: 11px; font-weight: 800; color: {Theme.TEXT_DIM}; letter-spacing: 1px;")
         
@@ -111,7 +112,7 @@ class PreviewDialog(QDialog):
                 return False
 
         def shorten_path(p):
-            if not p: return "DELETED"
+            if not p: return T("preview.deleted")
             p_norm = os.path.normpath(p)
             best_root = None
             for r in roots:
@@ -158,7 +159,7 @@ class PreviewDialog(QDialog):
             item_layout.setSpacing(20)
             
             old_name = os.path.basename(item['original_path'])
-            new_name = shorten_path(item['proposed_path']) if item['proposed_path'] else "DELETED"
+            new_name = shorten_path(item['proposed_path']) if item['proposed_path'] else T("preview.deleted")
             
             # Use basename for the QLineEdit so they don't have to retype folders
             new_basename = os.path.basename(item['proposed_path']) if item['proposed_path'] else ""
@@ -185,7 +186,7 @@ class PreviewDialog(QDialog):
             btn_remove = QPushButton("🗑")
             btn_remove.setCursor(Qt.PointingHandCursor)
             btn_remove.setFixedSize(28, 28)
-            btn_remove.setToolTip("Remove this file from the renaming plan (Skip)")
+            btn_remove.setToolTip(T("preview.remove_tooltip"))
             btn_remove.setStyleSheet(f"""
                 QPushButton {{ background: transparent; color: {Theme.ERROR}; font-size: 16px; border-radius: 4px; }}
                 QPushButton:hover {{ background: rgba(239, 68, 68, 0.1); }}
@@ -214,9 +215,12 @@ class PreviewDialog(QDialog):
                 item.layout().deleteLater()
 
         footer_top = QHBoxLayout()
-        summary_text = f"Plan: {len([p for p in self.plan if p['action']=='rename'])} Renames, {len([p for p in self.plan if p['action']=='delete'])} Deletions"
+        renames = len([p for p in self.plan if p['action']=='rename'])
+        deletions = len([p for p in self.plan if p['action']=='delete'])
+        
+        summary_text = T("preview.summary", renames=renames, deletions=deletions)
         if self.collision_count > 0:
-            summary_text += f" | <b style='color: {Theme.ERROR};'>{self.collision_count} COLLISIONS DETECTED</b>"
+            summary_text += f" | <b style='color: {Theme.ERROR};'>{T('discovery.messages.collision_detected', count=self.collision_count)}</b>"
             
         summary = QLabel(summary_text)
         summary.setStyleSheet(f"color: {Theme.TEXT_DIM}; font-size: 13px;")
@@ -227,7 +231,7 @@ class PreviewDialog(QDialog):
         footer_btns = QHBoxLayout()
         footer_btns.setContentsMargins(0, 10, 0, 0)
         
-        cancel_btn = QPushButton("Cancel")
+        cancel_btn = QPushButton(T("common.cancel"))
         cancel_btn.setFixedSize(140, 45)
         cancel_btn.setCursor(Qt.PointingHandCursor)
         cancel_btn.setStyleSheet(f"""
@@ -242,7 +246,7 @@ class PreviewDialog(QDialog):
         """)
         cancel_btn.clicked.connect(self.reject)
         
-        apply_btn = QPushButton("Execute Changes")
+        apply_btn = QPushButton(T("preview.execute"))
         apply_btn.setFixedSize(220, 45)
         apply_btn.setCursor(Qt.PointingHandCursor)
         apply_btn.setStyleSheet(Theme.get_primary_button_style())
@@ -250,7 +254,7 @@ class PreviewDialog(QDialog):
         
         if self.collision_count > 0:
             apply_btn.setEnabled(False)
-            apply_btn.setToolTip("Please resolve collisions before executing.")
+            apply_btn.setToolTip(T("discovery.messages.collision_tooltip"))
         
         footer_btns.addStretch()
         footer_btns.addWidget(cancel_btn)

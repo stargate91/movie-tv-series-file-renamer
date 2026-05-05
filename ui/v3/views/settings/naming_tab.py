@@ -2,6 +2,7 @@ from PySide6.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QLine
 from PySide6.QtCore import Qt
 from ui.v3.styles.theme import Theme
 from ui.v3.views.settings.base_tab import BaseSettingsTab
+from core.i18n import T
 
 class NamingTab(BaseSettingsTab):
     def __init__(self, engine, parent=None):
@@ -14,20 +15,26 @@ class NamingTab(BaseSettingsTab):
         layout.setContentsMargins(40, 40, 40, 40)
         layout.setSpacing(30)
 
-        header = QLabel("Naming Templates & Styles")
+        header = QLabel(T("settings.naming.header"))
         header.setStyleSheet(Theme.get_page_header_style())
         layout.addWidget(header)
 
         # --- Section: Global Styles ---
-        layout.addWidget(self._create_section_header("GLOBAL FILENAME STYLING"))
+        layout.addWidget(self._create_section_header(T("settings.naming.sections.styling")))
         style_row = QHBoxLayout()
         
         # Casing
         c_group = QVBoxLayout()
-        c_group.addWidget(QLabel("Filename Casing"))
+        c_group.addWidget(QLabel(T("settings.naming.fields.casing")))
         self.casing_combo = QComboBox()
         self.casing_combo.setFixedWidth(160)
-        for label, val in [("Original", "none"), ("lower case", "lower"), ("UPPER CASE", "upper"), ("Title Case", "title")]:
+        c_opts = [
+            (T("settings.naming.casing_options.none"), "none"), 
+            (T("settings.naming.casing_options.lower"), "lower"), 
+            (T("settings.naming.casing_options.upper"), "upper"), 
+            (T("settings.naming.casing_options.title"), "title")
+        ]
+        for label, val in c_opts:
             self.casing_combo.addItem(label, val)
         idx = self.casing_combo.findData(self.engine.config.settings.filename_case)
         if idx >= 0: self.casing_combo.setCurrentIndex(idx)
@@ -36,10 +43,16 @@ class NamingTab(BaseSettingsTab):
         
         # Separator
         s_group = QVBoxLayout()
-        s_group.addWidget(QLabel("Word Separator"))
+        s_group.addWidget(QLabel(T("settings.naming.fields.separator")))
         self.sep_combo = QComboBox()
         self.sep_combo.setFixedWidth(160)
-        for label, val in [("Space", "space"), ("Dot (.)", "dot"), ("Dash (-)", "dash"), ("Underscore (_)", "underscore")]:
+        s_opts = [
+            (T("settings.naming.separator_options.space"), "space"), 
+            (T("settings.naming.separator_options.dot"), "dot"), 
+            (T("settings.naming.separator_options.dash"), "dash"), 
+            (T("settings.naming.separator_options.underscore"), "underscore")
+        ]
+        for label, val in s_opts:
             self.sep_combo.addItem(label, val)
         idx = self.sep_combo.findData(self.engine.config.settings.separator)
         if idx >= 0: self.sep_combo.setCurrentIndex(idx)
@@ -51,8 +64,8 @@ class NamingTab(BaseSettingsTab):
         layout.addWidget(Theme.create_hline())
 
         # --- Section: Movie Template ---
-        layout.addWidget(self._create_section_header("MOVIE NAMING TEMPLATE"))
-        self.movie_tpl = self._create_input_group("Movie Template", self.engine.config.settings.movie_template, "{Title} ({Year})")
+        layout.addWidget(self._create_section_header(T("settings.naming.sections.movie")))
+        self.movie_tpl = self._create_input_group(T("settings.naming.fields.movie_tpl"), self.engine.config.settings.movie_template, "{Title} ({Year})")
         layout.addLayout(self.movie_tpl['layout'])
         
         m_tags = ["Title", "Year", "Resolution", "VideoCodec", "AudioCodec", "AudioChannels", "HDR", "OriginalTitle", "IMDB_ID"]
@@ -61,16 +74,16 @@ class NamingTab(BaseSettingsTab):
         layout.addSpacing(10)
 
         # --- Section: Episode Template ---
-        layout.addWidget(self._create_section_header("TV EPISODE NAMING TEMPLATE"))
-        self.episode_tpl = self._create_input_group("Episode Template", self.engine.config.settings.episode_template, "{ShowTitle} - {Season}{Episode} - {EpisodeTitle}")
+        layout.addWidget(self._create_section_header(T("settings.naming.sections.episode")))
+        self.episode_tpl = self._create_input_group(T("settings.naming.fields.episode_tpl"), self.engine.config.settings.episode_template, "{ShowTitle} - {Season}{Episode} - {EpisodeTitle}")
         layout.addLayout(self.episode_tpl['layout'])
         
         e_tags = ["ShowTitle", "Season", "Episode", "EpisodeTitle", "Year", "Resolution", "VideoCodec", "EpisodeRating"]
         layout.addLayout(self._create_tag_chips(e_tags, self.episode_tpl['edit']))
 
         layout.addSpacing(20)
-        layout.addWidget(self._create_section_header("CUSTOM GLOBAL VARIABLE"))
-        self.custom_var_input = self._create_input_group("Custom Tag Value ({Custom})", self.engine.config.settings.custom_variable, "e.g. GroupName")
+        layout.addWidget(self._create_section_header(T("settings.naming.sections.custom")))
+        self.custom_var_input = self._create_input_group(T("settings.naming.fields.custom_val"), self.engine.config.settings.custom_variable, T("settings.naming.fields.custom_placeholder"))
         layout.addLayout(self.custom_var_input['layout'])
 
         layout.addStretch()

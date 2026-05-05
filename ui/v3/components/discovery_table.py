@@ -3,6 +3,7 @@ from PySide6.QtWidgets import (QTableWidget, QTableWidgetItem, QHeaderView, QLab
 from PySide6.QtGui import QColor, QLinearGradient, QPainter, QPalette
 from PySide6.QtCore import Qt, QSize, QRect, Signal, Slot
 from ui.v3.styles.theme import Theme
+from core.i18n import T
 
 class PremiumDelegate(QStyledItemDelegate):
     """Custom delegate to draw premium row selection with a left accent bar."""
@@ -53,7 +54,13 @@ class DiscoveryTable(QTableWidget):
 
     def _init_setup(self):
         self.setColumnCount(5)
-        self.setHorizontalHeaderLabels(["STATUS", "ORIGINAL NAME", "TYPE", "NEW NAME PREVIEW", "ACTIONS"])
+        self.setHorizontalHeaderLabels([
+            T("discovery.table.status"), 
+            T("discovery.table.original_name"), 
+            T("discovery.table.type"), 
+            T("discovery.table.new_name"), 
+            T("discovery.table.actions")
+        ])
         self.setEditTriggers(QTableWidget.NoEditTriggers)
         self.setSelectionBehavior(QTableWidget.SelectRows)
         self.setShowGrid(False)
@@ -160,26 +167,25 @@ class DiscoveryTable(QTableWidget):
                 actions_layout.setContentsMargins(8, 8, 8, 8) # Maximum breathing room
                 actions_layout.setSpacing(10)
 
-                # 1. IDENTIFY button (Only for Videos)
-                if raw_cat == 'video':
-                    ident_btn = QPushButton("🪄")
-                    ident_btn.setToolTip("Identify Media (API / DB)")
-                    ident_btn.setFixedSize(48, 42)
-                    ident_btn.setCursor(Qt.PointingHandCursor)
-                    ident_btn.setStyleSheet(Theme.get_discovery_action_btn_style('primary'))
-                    ident_btn.clicked.connect(lambda checked=False, v=vid: self.fix_requested.emit(v))
-                    actions_layout.addWidget(ident_btn)
-
-                # 2. EDIT button (Always available)
-                edit_btn = QPushButton("✏️")
-                edit_btn.setToolTip("Manual Edit Metadata")
-                edit_btn.setFixedSize(48, 42)
-                edit_btn.setCursor(Qt.PointingHandCursor)
-                edit_btn.setStyleSheet(Theme.get_discovery_action_btn_style('neutral'))
-                # Emit a special signal or reuse fix_requested with a flag
-                # For now, let's emit fix_requested, but we'll need DiscoveryPage to know it's a manual edit
-                edit_btn.clicked.connect(lambda checked=False, v=vid: self._on_manual_edit_clicked(v))
-                actions_layout.addWidget(edit_btn)
+                # 1. FIX button (for video) / EDIT button (for others)
+                if status == 'CONFLICT':
+                    fix_btn = QPushButton("🛠️")
+                    fix_btn.setToolTip(T("discovery.actions.fix"))
+                    fix_btn.setFixedSize(58, 46)
+                    fix_btn.setCursor(Qt.PointingHandCursor)
+                    fix_btn.setStyleSheet(Theme.get_discovery_action_btn_style('danger'))
+                    fix_btn.clicked.connect(lambda checked=False, v=vid: self.fix_requested.emit(v))
+                    actions_layout.addWidget(fix_btn)
+                else:
+                    edit_btn = QPushButton("✏️")
+                    edit_btn.setToolTip(T("discovery.actions.edit"))
+                    edit_btn.setFixedSize(58, 46)
+                    edit_btn.setCursor(Qt.PointingHandCursor)
+                    edit_btn.setStyleSheet(Theme.get_discovery_action_btn_style('neutral'))
+                    # Emit a special signal or reuse fix_requested with a flag
+                    # For now, let's emit fix_requested, but we'll need DiscoveryPage to know it's a manual edit
+                    edit_btn.clicked.connect(lambda checked=False, v=vid: self._on_manual_edit_clicked(v))
+                    actions_layout.addWidget(edit_btn)
                 
                 # 3. FOLDER button
                 folder_btn = QPushButton("📂")
@@ -203,7 +209,7 @@ class DiscoveryTable(QTableWidget):
                 # 4. DELETE / RESTORE button
                 if status == 'IGNORED':
                     restore_btn = QPushButton("📥")
-                    restore_btn.setToolTip("Restore to Library")
+                    restore_btn.setToolTip(T("discovery.actions.restore"))
                     restore_btn.setFixedSize(58, 46)
                     restore_btn.setCursor(Qt.PointingHandCursor)
                     restore_btn.setStyleSheet(Theme.get_discovery_action_btn_style('success'))
@@ -211,7 +217,7 @@ class DiscoveryTable(QTableWidget):
                     actions_layout.addWidget(restore_btn)
                 else:
                     delete_btn = QPushButton("🗑️")
-                    delete_btn.setToolTip("Ignore File")
+                    delete_btn.setToolTip(T("discovery.actions.ignore"))
                     delete_btn.setFixedSize(58, 46)
                     delete_btn.setCursor(Qt.PointingHandCursor)
                     delete_btn.setStyleSheet(Theme.get_discovery_action_btn_style('danger'))

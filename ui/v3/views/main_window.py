@@ -15,6 +15,11 @@ class MainWindowV3(QMainWindow):
     def __init__(self):
         super().__init__()
         self.engine = RenamerEngineV3()
+        
+        # Initialize i18n
+        from core.i18n import Translator
+        Translator().set_language(self.engine.config.settings.app_language)
+        
         self.active_workers = [] # Prevent ScanWorker GC crash
         
         self.setWindowTitle("RENDA - Smart Media Organizer")

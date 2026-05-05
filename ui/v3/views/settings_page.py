@@ -3,6 +3,7 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                              QPushButton, QScrollArea, QListWidget, QListWidgetItem, QStackedWidget)
 from PySide6.QtCore import Qt, QThread, Signal
 from ui.v3.styles.theme import Theme
+from core.i18n import T
 
 # Import modular tabs
 from ui.v3.views.settings.general_tab import GeneralTab
@@ -44,7 +45,7 @@ class SettingsPage(QWidget):
         sidebar_layout.setContentsMargins(20, 30, 20, 30)
         sidebar_layout.setSpacing(10)
 
-        title = QLabel("Settings")
+        title = QLabel(T("settings.title"))
         title.setStyleSheet(f"font-size: 24px; font-weight: 800; color: {Theme.TEXT_MAIN}; margin-bottom: 20px;")
         sidebar_layout.addWidget(title)
 
@@ -57,12 +58,12 @@ class SettingsPage(QWidget):
         """)
         
         items = [
-            ("⚙️ General", 0),
-            ("🏷️ Naming", 1),
-            ("📁 Folders", 2),
-            ("📎 Extras", 3),
-            ("🔑 API Keys", 4),
-            ("🛠️ Advanced", 5)
+            (T("settings.tabs.general"), 0),
+            (T("settings.tabs.naming"), 1),
+            (T("settings.tabs.folders"), 2),
+            (T("settings.tabs.extras"), 3),
+            (T("settings.tabs.api"), 4),
+            (T("settings.tabs.advanced"), 5)
         ]
         
         for label, idx in items:
@@ -73,7 +74,7 @@ class SettingsPage(QWidget):
         sidebar_layout.addStretch()
 
         # Save Button at bottom of sidebar
-        self.save_btn = QPushButton("Save All Changes")
+        self.save_btn = QPushButton(T("settings.save_btn"))
         self.save_btn.setFixedHeight(45)
         self.save_btn.setStyleSheet(Theme.get_primary_button_style())
         self.save_btn.clicked.connect(self._on_save)
@@ -119,7 +120,7 @@ class SettingsPage(QWidget):
                 tab.save_to_settings(s)
         
         self.save_btn.setEnabled(False)
-        self.save_btn.setText("Saving...")
+        self.save_btn.setText(T("settings.saving"))
         
         self.save_worker = SaveWorker(self.engine)
         self.save_worker.finished.connect(self._on_save_finished)
@@ -127,7 +128,7 @@ class SettingsPage(QWidget):
 
     def _on_save_finished(self):
         self.save_btn.setEnabled(True)
-        self.save_btn.setText("Save All Changes")
+        self.save_btn.setText(T("settings.save_btn"))
         logger.info("Settings saved successfully.")
 
 from PySide6.QtWidgets import QFrame # Ensure QFrame is available

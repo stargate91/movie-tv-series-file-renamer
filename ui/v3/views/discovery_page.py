@@ -15,6 +15,7 @@ from ui.v3.components.manual_resolve_dialog import ManualResolveDialog
 from ui.v3.components.preview_dialog import PreviewDialog
 from ui.v3.components.notification_bar import NotificationBar
 from ui.v3.workers.discovery_workers import DataLoader, PosterPrefetcher, RenameWorker, PlanWorker, DropProcessor, UndoWorker, SyncWorker
+from core.i18n import T
 
 # Modular Views
 from ui.v3.components.discovery.review_view import ReviewView
@@ -41,21 +42,21 @@ class DiscoveryPage(QWidget):
 
         # 1. Header
         header = QHBoxLayout()
-        title = QLabel("Discovery Console")
+        title = QLabel(T("discovery.title"))
         title.setStyleSheet(f"font-size: 28px; font-weight: 800; color: {Theme.TEXT_MAIN};")
         
         self.search_box = QLineEdit()
-        self.search_box.setPlaceholderText("Search files...")
+        self.search_box.setPlaceholderText(T("discovery.search_placeholder"))
         self.search_box.setFixedWidth(300)
         self.search_box.setStyleSheet(Theme.get_input_style())
         self.search_box.textChanged.connect(self._on_search_changed)
 
-        self.scan_new_btn = QPushButton("Scan Directory")
+        self.scan_new_btn = QPushButton(f"  {T('discovery.actions.scan_new')}")
         self.scan_new_btn.setFixedWidth(140)
         self.scan_new_btn.setStyleSheet(Theme.get_secondary_button_style())
         self.scan_new_btn.clicked.connect(self._on_manual_scan_triggered)
 
-        refresh_btn = QPushButton("Refresh List")
+        refresh_btn = QPushButton(T("discovery.actions.refresh"))
         refresh_btn.setFixedWidth(120)
         refresh_btn.setStyleSheet(Theme.get_secondary_button_style())
         refresh_btn.clicked.connect(self.refresh_data)
@@ -82,11 +83,11 @@ class DiscoveryPage(QWidget):
         self.dropped_view = DroppedView(self.engine)
         self.trash_view = DiscoveryTable()
 
-        self.main_tabs.addTab(self.review_view, "🔍 Library Review")
-        self.main_tabs.addTab(self.conflicts_view, "⚔️ Conflicts")
-        self.main_tabs.addTab(self.extras_view, "📎 Extras")
-        self.main_tabs.addTab(self.dropped_view, "📦 Dropped")
-        self.main_tabs.addTab(self.trash_view, "🗑️ Trash")
+        self.main_tabs.addTab(self.review_view, T("discovery.tabs.library"))
+        self.main_tabs.addTab(self.conflicts_view, T("discovery.tabs.conflicts"))
+        self.main_tabs.addTab(self.extras_view, T("discovery.tabs.extras"))
+        self.main_tabs.addTab(self.dropped_view, T("discovery.tabs.dropped"))
+        self.main_tabs.addTab(self.trash_view, T("discovery.tabs.trash"))
 
         # Connect internal signals
         self.dropped_view.refresh_requested.connect(self.refresh_data)
@@ -111,7 +112,7 @@ class DiscoveryPage(QWidget):
         self._init_status_elements(layout)
 
         # 5. Apply Button
-        self.apply_btn = QPushButton("Apply Renames")
+        self.apply_btn = QPushButton(T("discovery.actions.apply"))
         self.apply_btn.setFixedHeight(50)
         self.apply_btn.setStyleSheet(Theme.get_primary_button_style())
         self.apply_btn.clicked.connect(self._on_apply_clicked)

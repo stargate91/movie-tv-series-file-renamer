@@ -23,6 +23,7 @@ class AppSettings:
     
     # Personalization
     user_name: str = ""
+    app_language: str = "en"
     
     # Global Organization
     move_files: bool = False

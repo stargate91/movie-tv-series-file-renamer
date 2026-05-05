@@ -1,6 +1,7 @@
 from PySide6.QtWidgets import QWidget, QHBoxLayout, QLabel, QPushButton, QGraphicsOpacityEffect
 from PySide6.QtCore import Qt, QTimer, QPropertyAnimation, QEasingCurve, Signal
 from ui.v3.styles.theme import Theme
+from core.i18n import T
 
 class NotificationBar(QWidget):
     undo_requested = Signal(str) # batch_id
@@ -38,9 +39,9 @@ class NotificationBar(QWidget):
         layout.setContentsMargins(20, 0, 10, 0)
         layout.setSpacing(15)
 
-        self.label = QLabel("Operation successful")
+        self.label = QLabel(T("common.operation_successful") if T("common.operation_successful") != "common.operation_successful" else "Operation successful")
         
-        self.undo_btn = QPushButton("UNDO")
+        self.undo_btn = QPushButton(T("common.undo") if T("common.undo") != "common.undo" else "Undo")
         self.undo_btn.setFixedSize(80, 30)
         self.undo_btn.setCursor(Qt.PointingHandCursor)
         self.undo_btn.setStyleSheet(f"""
