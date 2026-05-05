@@ -2,6 +2,7 @@ from PySide6.QtWidgets import QVBoxLayout, QLabel
 from PySide6.QtCore import Qt
 from ui.v3.styles.theme import Theme
 from ui.v3.views.settings.base_tab import BaseSettingsTab
+from core.i18n import T
 
 class APITab(BaseSettingsTab):
     def __init__(self, engine, parent=None):
@@ -14,20 +15,20 @@ class APITab(BaseSettingsTab):
         layout.setContentsMargins(40, 40, 40, 40)
         layout.setSpacing(25)
 
-        header = QLabel("API Configuration")
+        header = QLabel(T("settings.api.header"))
         header.setStyleSheet(Theme.get_page_header_style())
         layout.addWidget(header)
         
-        layout.addWidget(self._create_section_header("TMDB (THE MOVIE DATABASE)"))
-        self.tmdb_key_input = self._create_input_group("TMDB API Key (v3)", self.engine.config.settings.tmdb_key, "Enter your v3 API key")
+        layout.addWidget(self._create_section_header(T("settings.api.sections.tmdb")))
+        self.tmdb_key_input = self._create_input_group(T("settings.api.fields.tmdb_v3"), self.engine.config.settings.tmdb_key, T("settings.api.fields.tmdb_v3_placeholder"))
         layout.addLayout(self.tmdb_key_input['layout'])
-
-        self.tmdb_token_input = self._create_input_group("TMDB Bearer Token (v4)", self.engine.config.settings.tmdb_bearer_token, "Paste your Read Access Token")
+ 
+        self.tmdb_token_input = self._create_input_group(T("settings.api.fields.tmdb_v4"), self.engine.config.settings.tmdb_bearer_token, T("settings.api.fields.tmdb_v4_placeholder"))
         layout.addLayout(self.tmdb_token_input['layout'])
-
+ 
         layout.addSpacing(10)
-        layout.addWidget(self._create_section_header("OMDB (FOR IMDB RATINGS)"))
-        self.omdb_key_input = self._create_input_group("OMDB API Key", self.engine.config.settings.omdb_key, "Enter your OMDB key")
+        layout.addWidget(self._create_section_header(T("settings.api.sections.omdb")))
+        self.omdb_key_input = self._create_input_group(T("settings.api.fields.omdb_key"), self.engine.config.settings.omdb_key, T("settings.api.fields.omdb_key_placeholder"))
         layout.addLayout(self.omdb_key_input['layout'])
 
         layout.addStretch()

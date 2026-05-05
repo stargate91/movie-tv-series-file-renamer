@@ -43,7 +43,7 @@ class HistoryBatchCard(QFrame):
         
         # Icon & Info
         info_layout = QVBoxLayout()
-        ts = self.items[0].get('timestamp', 'Unknown date')
+        ts = self.items[0].get('timestamp', T("history.unknown_date"))
         date_lbl = QLabel(ts)
         date_lbl.setStyleSheet(f"color: {Theme.TEXT_MUTED}; font-size: 11px; font-weight: 600;")
         
@@ -235,8 +235,8 @@ class HistoryPage(QWidget):
 
     def _on_undo_finished(self, results):
         if results.get('success', 0) > 0:
-            QMessageBox.information(self, "Success", f"Reverted {results['success']} files.")
+            QMessageBox.information(self, T("history.undo_success_title"), T("discovery.messages.undo_success", count=results['success']))
             self.refresh_data()
         if results.get('failed', 0) > 0:
-            QMessageBox.warning(self, "Partial Success", f"Failed to revert {results['failed']} files.")
+            QMessageBox.warning(self, T("history.undo_partial_title"), T("discovery.messages.undo_errors_msg", count=results['failed']))
             self.refresh_data()

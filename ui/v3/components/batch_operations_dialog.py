@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
 from PySide6.QtCore import Qt
 from ui.v3.styles.theme import Theme
 from core.engine.metadata_rules import MetadataRules
+from core.i18n import T
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +25,7 @@ class BatchOperationsDialog(QDialog):
         # Detect if we should use unified classification (all video/extra)
         self.is_video_batch = all(f.get('category') in ['video', 'extra'] for f in self.selected_files)
         
-        self.setWindowTitle(f"Batch Operations ({len(self.selected_files)} files)")
+        self.setWindowTitle(T("discovery.batch_operations.title", count=len(self.selected_files)))
         self.setMinimumSize(1000, 700)
         self.setWindowFlags(self.windowFlags() | Qt.WindowMaximizeButtonHint | Qt.WindowMinimizeButtonHint)
         self.setStyleSheet(Theme.get_main_stylesheet())
@@ -42,7 +43,7 @@ class BatchOperationsDialog(QDialog):
         self.left_pane_widget = QWidget()
         left_layout = QVBoxLayout(self.left_pane_widget)
         left_layout.setContentsMargins(0, 0, 0, 0)
-        left_layout.addWidget(QLabel("1. File Selection / Order:", styleSheet="font-weight: bold; font-size: 14px;"))
+        left_layout.addWidget(QLabel(T("discovery.batch_operations.file_selection"), styleSheet="font-weight: bold; font-size: 14px;"))
         self.list_widget = QListWidget()
         self.list_widget.setDragDropMode(QAbstractItemView.InternalMove)
         self.list_widget.setDefaultDropAction(Qt.MoveAction)
@@ -53,7 +54,7 @@ class BatchOperationsDialog(QDialog):
 
         # RIGHT PANE: Operations
         right_pane = QVBoxLayout()
-        right_pane.addWidget(QLabel("2. Configure Properties:", styleSheet="font-weight: bold; font-size: 14px;"))
+        right_pane.addWidget(QLabel(T("discovery.batch_operations.configure_props"), styleSheet="font-weight: bold; font-size: 14px;"))
         
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
@@ -65,32 +66,40 @@ class BatchOperationsDialog(QDialog):
         scroll_layout.setSpacing(15)
 
         # --- Card 1: Category & Type ---
-        self.cat_card = self._create_card("📁 Category & Type Override")
+        self.cat_card = self._create_card(T("discovery.batch_operations.cards.category"))
         
-        self.chk_category = QCheckBox("Override main category:")
+        self.chk_category = QCheckBox(T("discovery.batch_operations.fields.override_cat"))
         self.combo_category = QComboBox()
-        self.combo_category.addItems(["Video / Movie", "Extra / Bonus", "Subtitle", "Audio", "Image", "NFO / Meta"])
+        self.combo_category.addItem(T("discovery.batch_operations.options.categories.video"), "video")
+        self.combo_category.addItem(T("discovery.batch_operations.options.categories.extra"), "extra")
+        self.combo_category.addItem(T("discovery.batch_operations.options.categories.subtitle"), "subtitle")
+        self.combo_category.addItem(T("discovery.batch_operations.options.categories.audio"), "audio")
+        self.combo_category.addItem(T("discovery.batch_operations.options.categories.image"), "image")
+        self.combo_category.addItem(T("discovery.batch_operations.options.categories.meta"), "meta")
         self.combo_category.setEnabled(False)
         self.chk_category.toggled.connect(self.combo_category.setEnabled)
         self.combo_category.currentIndexChanged.connect(self._update_ui_visibility)
         
         # Unified Classification
         self.combo_classification = QComboBox()
-        self.combo_classification.addItems(["Movie", "Episode", "Bonus Video"])
+        self.combo_classification.addItem(T("discovery.batch_operations.options.roles.movie"), "Movie")
+        self.combo_classification.addItem(T("discovery.batch_operations.options.roles.episode"), "Episode")
+        self.combo_classification.addItem(T("discovery.batch_operations.options.roles.bonus"), "Bonus Video")
         self.combo_classification.currentIndexChanged.connect(self._on_classification_changed)
         self.combo_classification.setEnabled(False)
         self.chk_category.toggled.connect(self.combo_classification.setEnabled)
 
-        self.chk_sub_category = QCheckBox("Override Sub-type:")
+        self.chk_sub_category = QCheckBox(T("discovery.batch_operations.fields.override_sub"))
         self.combo_sub_category = QComboBox()
         self.combo_sub_category.setEditable(True)
         self.combo_sub_category.addItems(MetadataRules.get_sub_type_config('default')['items'])
         self.combo_sub_category.setEnabled(False)
         self.chk_sub_category.toggled.connect(self.combo_sub_category.setEnabled)
         
-        self.chk_media_type = QCheckBox("Media Type (Videos only):")
+        self.chk_media_type = QCheckBox(T("discovery.batch_operations.fields.media_type"))
         self.combo_media_type = QComboBox()
-        self.combo_media_type.addItems(["Movie", "TV Series"])
+        self.combo_media_type.addItem(T("discovery.batch_operations.options.media_types.movie"), "movie")
+        self.combo_media_type.addItem(T("discovery.batch_operations.options.media_types.tv"), "tv")
         self.combo_media_type.setEnabled(False)
         self.chk_media_type.toggled.connect(self.combo_media_type.setEnabled)
         self.combo_media_type.currentIndexChanged.connect(self._update_ui_visibility)
@@ -112,16 +121,16 @@ class BatchOperationsDialog(QDialog):
             self.combo_classification.hide()
 
         # --- Card 2: TV Series ---
-        self.tv_card = self._create_card("📺 TV Series & Episodes")
-        self.chk_season = QCheckBox("Set Season for all:")
+        self.tv_card = self._create_card(T("discovery.batch_operations.cards.tv"))
+        self.chk_season = QCheckBox(T("discovery.batch_operations.fields.set_season"))
         self.spin_season = QSpinBox()
         self.spin_season.setRange(0, 999)
         self.spin_season.setEnabled(False)
         self.chk_season.toggled.connect(self.spin_season.setEnabled)
         
-        self.chk_episodes = QCheckBox("Renumber Episodes (Top to Bottom)")
+        self.chk_episodes = QCheckBox(T("discovery.batch_operations.fields.renumber_ep"))
         ep_layout = QHBoxLayout()
-        ep_layout.addWidget(QLabel("Start Episode:"))
+        ep_layout.addWidget(QLabel(T("discovery.batch_operations.fields.start_ep")))
         self.spin_episode_start = QSpinBox()
         self.spin_episode_start.setRange(0, 9999)
         self.spin_episode_start.setValue(1)
@@ -137,11 +146,13 @@ class BatchOperationsDialog(QDialog):
         scroll_layout.addWidget(self.tv_card)
 
         # --- Card 3: Parts ---
-        self.part_card = self._create_card("✂️ Multi-part files")
-        self.chk_parts = QCheckBox("Renumber as Parts (CD1, CD2...)")
+        self.part_card = self._create_card(T("discovery.batch_operations.cards.parts"))
+        self.chk_parts = QCheckBox(T("discovery.batch_operations.fields.renumber_parts"))
         p_layout = QHBoxLayout()
         self.combo_part_type = QComboBox()
-        self.combo_part_type.addItems(["Part", "CD", "Disk"])
+        self.combo_part_type.addItem(T("discovery.batch_operations.options.parts.part"), "Part")
+        self.combo_part_type.addItem(T("discovery.batch_operations.options.parts.cd"), "CD")
+        self.combo_part_type.addItem(T("discovery.batch_operations.options.parts.disk"), "Disk")
         self.combo_part_type.setEnabled(False)
         self.spin_part_start = QSpinBox()
         self.spin_part_start.setRange(1, 99)
@@ -156,22 +167,25 @@ class BatchOperationsDialog(QDialog):
         scroll_layout.addWidget(self.part_card)
 
         # --- Card 4: Tags & Linking ---
-        self.meta_card = self._create_card("🏷️ Tags & Linking")
-        self.chk_edition = QCheckBox("Set Edition:")
-        self.lbl_edition = QLabel("Edition:") # Backing for edit_dialog similarity
+        self.meta_card = self._create_card(T("discovery.batch_operations.cards.meta"))
+        self.chk_edition = QCheckBox(T("discovery.batch_operations.fields.set_edition"))
+        self.lbl_edition = QLabel(T("discovery.batch_operations.fields.edition_label")) # Backing for edit_dialog similarity
         self.combo_edition = QComboBox()
         self.combo_edition.setEditable(True)
-        self.combo_edition.addItems(["", "Theatrical", "Director's Cut", "Extended"])
+        self.combo_edition.addItem("")
+        self.combo_edition.addItem(T("discovery.batch_operations.options.editions.theatrical"), "Theatrical")
+        self.combo_edition.addItem(T("discovery.batch_operations.options.editions.directors_cut"), "Director's Cut")
+        self.combo_edition.addItem(T("discovery.batch_operations.options.editions.extended"), "Extended")
         self.combo_edition.setEnabled(False)
         self.chk_edition.toggled.connect(self.combo_edition.setEnabled)
 
-        self.chk_lang = QCheckBox("Override Language:")
+        self.chk_lang = QCheckBox(T("discovery.batch_operations.fields.override_lang"))
         self.combo_lang = QComboBox()
         self.combo_lang.addItems(["ENG", "HUN", "GER", "FRA", "SPA"])
         self.combo_lang.setEnabled(False)
         self.chk_lang.toggled.connect(self.combo_lang.setEnabled)
 
-        self.chk_parent = QCheckBox("Link to Parent:")
+        self.chk_parent = QCheckBox(T("discovery.batch_operations.fields.link_parent"))
         self.combo_parent = QComboBox()
         self.combo_parent.setEnabled(False)
         self.chk_parent.toggled.connect(self.combo_parent.setEnabled)
@@ -189,7 +203,7 @@ class BatchOperationsDialog(QDialog):
 
         # Buttons
         btns = QHBoxLayout()
-        btn_apply = QPushButton("Apply to Selected")
+        btn_apply = QPushButton(T("discovery.batch_operations.apply_btn"))
         btn_apply.setMinimumHeight(40)
         btn_apply.setStyleSheet(Theme.get_primary_button_style())
         btn_apply.clicked.connect(self._apply_changes)
@@ -208,9 +222,9 @@ class BatchOperationsDialog(QDialog):
         # Category
         self.combo_category.setCurrentText(MetadataRules.get_category_label(cat))
         if self.is_video_batch:
-            if cat == 'extra': self.combo_classification.setCurrentText("Bonus Video")
-            elif f.get('fn_media_type') == 'tv': self.combo_classification.setCurrentText("Episode")
-            else: self.combo_classification.setCurrentText("Movie")
+            if cat == 'extra': self.combo_classification.setCurrentText(T("discovery.batch_operations.options.roles.bonus"))
+            elif f.get('fn_media_type') == 'tv': self.combo_classification.setCurrentText(T("discovery.batch_operations.options.roles.episode"))
+            else: self.combo_classification.setCurrentText(T("discovery.batch_operations.options.roles.movie"))
 
         # Sub-type
         self.combo_sub_category.setCurrentText(f.get('sub_category') or "")
@@ -291,7 +305,7 @@ class BatchOperationsDialog(QDialog):
             videos = self.engine.db.files.get_files_by_category('video')
             videos = sorted(videos, key=lambda x: x['id'], reverse=True)
             self.combo_parent.clear()
-            self.combo_parent.addItem("--- Select Parent ---", None)
+            self.combo_parent.addItem(T("discovery.batch_operations.fields.select_parent"), None)
             for v in videos:
                 self.combo_parent.addItem(v['file_name'], v['id'])
         except: pass
@@ -343,8 +357,8 @@ class BatchOperationsDialog(QDialog):
                 for up in updates_to_apply:
                     self.engine.resolver.resolve_from_local_data(up['id'])
                 
-                QMessageBox.information(self, "Success", f"Updated {len(updates_to_apply)} files.")
+                QMessageBox.information(self, T("common.success"), T("discovery.batch_resolve.success_msg", count=len(updates_to_apply))) # Reuse msg
                 self.accept()
             except Exception as e:
-                QMessageBox.critical(self, "Error", f"Failed: {e}")
+                QMessageBox.critical(self, T("common.error"), f"Failed: {e}")
 

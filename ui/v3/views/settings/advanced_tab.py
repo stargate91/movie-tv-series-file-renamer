@@ -2,6 +2,7 @@ from PySide6.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QCheckBox, QComb
 from PySide6.QtCore import Qt, Signal
 from ui.v3.styles.theme import Theme
 from ui.v3.views.settings.base_tab import BaseSettingsTab
+from core.i18n import T
 
 class AdvancedTab(BaseSettingsTab):
     database_wiped = Signal()
@@ -16,39 +17,39 @@ class AdvancedTab(BaseSettingsTab):
         layout.setContentsMargins(40, 40, 40, 40)
         layout.setSpacing(30)
 
-        header = QLabel("Advanced Engine Settings")
+        header = QLabel(T("settings.advanced.header"))
         header.setStyleSheet(Theme.get_page_header_style())
         layout.addWidget(header)
 
         # --- Section: Multi-Part ---
-        layout.addWidget(self._create_section_header("MULTI-PART FILE HANDLING"))
+        layout.addWidget(self._create_section_header(T("settings.advanced.sections.multi_part")))
         self.multi_kw_combo = QComboBox()
         self.multi_kw_combo.addItems(["Part", "CD", "Disk", "pt"])
         self.multi_kw_combo.setEditable(True)
         self.multi_kw_combo.setCurrentText(self.engine.config.settings.multi_part_keyword)
         
         kw_layout = QHBoxLayout()
-        kw_layout.addWidget(QLabel("Part Keyword:"))
+        kw_layout.addWidget(QLabel(T("settings.advanced.fields.part_keyword")))
         kw_layout.addWidget(self.multi_kw_combo)
         kw_layout.addStretch()
         layout.addLayout(kw_layout)
 
         # --- Section: Cleanup ---
-        layout.addWidget(self._create_section_header("POST-RENAME ACTIONS"))
-        self.cleanup_cb = QCheckBox("Remove empty folders after moving files")
+        layout.addWidget(self._create_section_header(T("settings.advanced.sections.cleanup")))
+        self.cleanup_cb = QCheckBox(T("settings.advanced.fields.cleanup_folders"))
         self.cleanup_cb.setChecked(self.engine.config.settings.cleanup_empty_folders)
         layout.addWidget(self.cleanup_cb)
 
         # --- Section: Danger Zone ---
         layout.addSpacing(40)
-        layout.addWidget(self._create_section_header("DANGER ZONE"))
+        layout.addWidget(self._create_section_header(T("settings.advanced.sections.danger")))
         
-        danger_desc = QLabel("Clears all indexed files, matches, and metadata from the local database. Your physical files will NOT be affected.")
+        danger_desc = QLabel(T("settings.advanced.fields.wipe_desc"))
         danger_desc.setWordWrap(True)
         danger_desc.setStyleSheet(f"color: {Theme.TEXT_MUTED}; font-size: 13px;")
         layout.addWidget(danger_desc)
         
-        self.wipe_btn = QPushButton("Wipe Local Database")
+        self.wipe_btn = QPushButton(T("settings.advanced.fields.wipe_btn"))
         self.wipe_btn.setFixedSize(200, 40)
         self.wipe_btn.setStyleSheet("""
             QPushButton { 
@@ -63,8 +64,8 @@ class AdvancedTab(BaseSettingsTab):
 
     def _on_wipe_database(self):
         reply = QMessageBox.question(
-            self, "Wipe Database", 
-            "Are you sure? This will clear all discovery data and history.",
+            self, T("settings.advanced.fields.wipe_confirm_title"), 
+            T("settings.advanced.fields.wipe_confirm_msg"),
             QMessageBox.Yes | QMessageBox.No, QMessageBox.No
         )
         
@@ -73,9 +74,9 @@ class AdvancedTab(BaseSettingsTab):
                 # Actual wipe logic
                 self.engine.db.wipe_discovery_data()
                 self.database_wiped.emit()
-                QMessageBox.information(self, "Success", "Database has been wiped.")
+                QMessageBox.information(self, T("common.success"), T("settings.advanced.fields.wipe_success"))
             except Exception as e:
-                QMessageBox.critical(self, "Error", f"Failed to wipe database: {e}")
+                QMessageBox.critical(self, T("common.error"), f"{T('settings.advanced.fields.wipe_error_msg')} {e}")
 
     def save_to_settings(self, s):
         s.multi_part_keyword = self.multi_kw_combo.currentText()

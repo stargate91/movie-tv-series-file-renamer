@@ -197,15 +197,15 @@ class DiscoveryPage(QWidget):
         self.batch_action_btn.setStyleSheet(f"background: white; color: {Theme.PRIMARY}; padding: 8px 16px; font-weight: 800; border-radius: 6px;")
         self.batch_action_btn.clicked.connect(self._on_batch_actions_requested)
         
-        self.batch_clear_btn = QPushButton("🔄 Clear Metadata")
+        self.batch_clear_btn = QPushButton(T("discovery.batch.clear"))
         self.batch_clear_btn.setStyleSheet(f"background: transparent; color: white; border: 1px solid {Theme.WARNING}; padding: 8px 16px; font-weight: 700; border-radius: 6px;")
         self.batch_clear_btn.clicked.connect(self._on_batch_clear_requested)
 
-        self.batch_ignore_btn = QPushButton("🗑️ Ignore Selection")
+        self.batch_ignore_btn = QPushButton(T("discovery.batch.ignore"))
         self.batch_ignore_btn.setStyleSheet(f"background: transparent; color: white; border: 1px solid {Theme.ERROR}; padding: 8px 16px; font-weight: 700; border-radius: 6px;")
         self.batch_ignore_btn.clicked.connect(self._on_batch_ignore_requested)
 
-        self.batch_identify_btn = QPushButton("🪄 Batch Identify")
+        self.batch_identify_btn = QPushButton(T("discovery.batch.identify"))
         self.batch_identify_btn.setStyleSheet(f"background: {Theme.SURFACE}22; color: white; border: 1px solid white; padding: 8px 16px; font-weight: 700; border-radius: 6px;")
         self.batch_identify_btn.clicked.connect(self._on_batch_identify_requested)
 
@@ -227,7 +227,7 @@ class DiscoveryPage(QWidget):
         self.drop_overlay.setStyleSheet(f"#DropOverlay {{ background-color: {Theme.PRIMARY}cc; border: 3px dashed white; border-radius: 20px; }}")
         self.drop_overlay.hide()
         overlay_layout = QVBoxLayout(self.drop_overlay)
-        overlay_label = QLabel("🚀 Drop files to Ingest into Library")
+        overlay_label = QLabel(T("discovery.messages.drop_ingest"))
         overlay_label.setStyleSheet("color: white; font-size: 24px; font-weight: 800;")
         overlay_label.setAlignment(Qt.AlignCenter)
         overlay_layout.addWidget(overlay_label)
@@ -257,7 +257,7 @@ class DiscoveryPage(QWidget):
         self.progress_container.show()
         self.progress_bar.show()
         self.status_info.show()
-        self.status_info.setText("Refreshing library...")
+        self.status_info.setText(T("discovery.messages.refreshing"))
         self.abort_btn.hide()
         self.progress_bar.setRange(0, 0) # Indeterminate for simple DB read
         self.loader = DataLoader(self.engine)
@@ -274,7 +274,7 @@ class DiscoveryPage(QWidget):
         if not default_path or not os.path.exists(default_path):
             default_path = os.path.expanduser("~")
             
-        path = QFileDialog.getExistingDirectory(self, "Select Directory to Scan", default_path)
+        path = QFileDialog.getExistingDirectory(self, T("discovery.messages.select_dir"), default_path)
         if not path:
             self.scan_new_btn.setEnabled(True)
             return
@@ -292,7 +292,7 @@ class DiscoveryPage(QWidget):
         self._set_controls_enabled(False)
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(0)
-        self.status_info.setText("Starting discovery pipeline...")
+        self.status_info.setText(T("discovery.messages.starting_pipeline"))
         
         self.sync_worker = SyncWorker(self.engine, path)
         self.sync_worker.progress.connect(self._on_worker_progress)
@@ -300,7 +300,7 @@ class DiscoveryPage(QWidget):
         self.sync_worker.start()
 
     def _on_sync_finished(self):
-        self.status_info.setText("Discovery complete. Loading list...")
+        self.status_info.setText(T("discovery.messages.loading_list"))
         self.abort_btn.hide()
         self._set_controls_enabled(True)
         self.refresh_data()
@@ -466,8 +466,8 @@ class DiscoveryPage(QWidget):
                     self.inspector.poster_carousel.clear()
 
         unique_rows = set(item.row() for item in selected)
-        if len(unique_rows) > 1:
-            self.batch_label.setText(f"{len(unique_rows)} items selected")
+        if unique_rows:
+            self.batch_label.setText(T("discovery.messages.items_selected", count=len(unique_rows)))
             self.batch_bar.show()
         else:
             self.batch_bar.hide()
@@ -477,9 +477,8 @@ class DiscoveryPage(QWidget):
         # 1. Check for Conflicts first
         conflicts = [f for f in self.engine.db.files.get_all_files() if f.get('match_status') == 'conflict']
         if conflicts:
-            QMessageBox.warning(self, "Conflicts Detected", 
-                f"You have {len(conflicts)} name collisions that must be resolved first.\n\n"
-                "Please go to the 'Conflicts' tab and use 'Batch Operations' to assign unique Parts or Editions.")
+            QMessageBox.warning(self, T("discovery.messages.global_conflicts_title"), 
+                T("discovery.messages.global_conflicts_msg", count=len(conflicts)))
             self.main_tabs.setCurrentIndex(1) # Switch to Conflicts tab
             return
 
@@ -488,7 +487,7 @@ class DiscoveryPage(QWidget):
         self.progress_bar.show()
         self.abort_btn.show()
         self.status_info.show()
-        self.status_info.setText("Generating rename plan...")
+        self.status_info.setText(T("discovery.messages.generating_plan"))
         self.progress_bar.setRange(0, 0) # Indeterminate for plan generation
         self.plan_worker = PlanWorker(self.engine)
         self.plan_worker.plan_ready.connect(self._on_plan_ready)
@@ -499,17 +498,15 @@ class DiscoveryPage(QWidget):
         
         if not plan:
             self._set_controls_enabled(True)
-            QMessageBox.information(self, "Rename", "No files ready for renaming.")
+            QMessageBox.information(self, T("discovery.actions.apply"), T("discovery.messages.rename_empty"))
             return
 
         # 2. Check for Plan-level collisions (e.g. folder name overlaps)
         plan_conflicts = [item for item in plan if item.get('status') == 'collision']
         if plan_conflicts:
             self._set_controls_enabled(True)
-            QMessageBox.warning(self, "Conflicts Detected", 
-                f"The rename plan has {len(plan_conflicts)} name collisions.\n\n"
-                "This usually happens when multiple files result in the same target filename.\n"
-                "Please fix these in the 'Conflicts' tab before proceeding.")
+            QMessageBox.warning(self, T("discovery.messages.conflicts_title"), 
+                T("discovery.messages.conflicts_msg", count=len(plan_conflicts)))
             self.main_tabs.setCurrentIndex(1)
             return
 
@@ -543,17 +540,17 @@ class DiscoveryPage(QWidget):
         self.last_batch_id = results.get('batch_id')
         
         if success > 0:
-            msg = f"✅ {success} files renamed successfully."
+            msg = T("discovery.messages.rename_success_notif", count=success)
             self.notif_bar.show_message(msg, batch_id=results.get('batch_id'), show_undo=True)
             
         if results.get('failed', 0) > 0:
-            QMessageBox.warning(self, "Rename Errors", f"Failed to rename {results['failed']} files.")
+            QMessageBox.warning(self, T("discovery.messages.rename_errors_title"), T("discovery.messages.rename_errors_msg", count=results['failed']))
             
         self.refresh_data()
 
     def _on_abort_clicked(self):
         self.abort_btn.setEnabled(False)
-        self.status_info.setText("Aborting... please wait.")
+        self.status_info.setText(T("discovery.messages.aborting"))
         # Signal all possible workers
         for attr in ['sync_worker', 'worker', 'undo_worker']:
             w = getattr(self, attr, None)
@@ -570,13 +567,13 @@ class DiscoveryPage(QWidget):
     def _on_undo_requested(self, batch_id):
         if not batch_id: return
         
-        if QMessageBox.question(self, "Undo Rename", "Are you sure you want to revert the last renaming operation?") == QMessageBox.Yes:
+        if QMessageBox.question(self, T("common.undo"), T("discovery.messages.undo_confirm")) == QMessageBox.Yes:
             self._set_controls_enabled(False)
             self.progress_container.show()
             self.progress_bar.show()
             self.progress_bar.setRange(0, 100)
             self.status_info.show()
-            self.status_info.setText("Reverting renames...")
+            self.status_info.setText(T("discovery.messages.undo_reverting"))
             
             self.undo_worker = UndoWorker(self.engine, batch_id)
             self.undo_worker.progress.connect(self._on_worker_progress)
@@ -592,10 +589,10 @@ class DiscoveryPage(QWidget):
         
         success = results.get('success', 0)
         if success > 0:
-            self.notif_bar.show_message(f"Successfully reverted {success} files.", type='success')
+            self.notif_bar.show_message(T("discovery.messages.undo_success", count=success), type='success')
         
         if results.get('failed', 0) > 0:
-             QMessageBox.warning(self, "Undo Errors", f"Failed to revert {results['failed']} files.\n\n" + "\n".join(results.get('errors', [])))
+             QMessageBox.warning(self, T("discovery.messages.undo_errors_title"), T("discovery.messages.undo_errors_msg", count=results['failed']) + "\n\n" + "\n".join(results.get('errors', [])))
              
         self.refresh_data()
 
@@ -659,8 +656,8 @@ class DiscoveryPage(QWidget):
         ids = table.get_selected_ids()
         if not ids: return
         
-        if QMessageBox.question(self, "Ignore Selection", 
-            f"Are you sure you want to ignore {len(ids)} selected files?") == QMessageBox.Yes:
+        if QMessageBox.question(self, T("discovery.actions.ignore"), 
+            T("discovery.messages.ignore_confirm", count=len(ids))) == QMessageBox.Yes:
             for fid in ids:
                 self.engine.db.files.update_file(fid, match_status='IGNORED')
             self.refresh_data()
@@ -671,8 +668,8 @@ class DiscoveryPage(QWidget):
         ids = table.get_selected_ids()
         if not ids: return
         
-        if QMessageBox.question(self, "Clear Metadata", 
-            f"Are you sure you want to clear metadata for {len(ids)} selected files?") == QMessageBox.Yes:
+        if QMessageBox.question(self, T("discovery.actions.batch_actions"), 
+            T("discovery.messages.clear_confirm", count=len(ids))) == QMessageBox.Yes:
             for fid in ids:
                 self.engine.db.matches.clear_all_for_file(fid)
             self.refresh_data()

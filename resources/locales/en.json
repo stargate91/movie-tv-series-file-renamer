@@ -58,7 +58,9 @@
             "fix": "Resolve Conflict",
             "edit": "Edit Metadata",
             "restore": "Restore to Library",
-            "ignore": "Ignore File"
+            "ignore": "Ignore File",
+            "open_folder": "Open Folder",
+            "clear_match": "Clear Metadata Match"
         },
         "dropped": {
             "import_all": "🚀 Import All to Library",
@@ -69,12 +71,181 @@
         },
         "messages": {
             "rename_success": "Successfully renamed {count} files.",
+            "rename_success_notif": "✅ {count} files renamed successfully.",
+            "rename_empty": "No files ready for renaming.",
+            "rename_errors_title": "Rename Errors",
+            "rename_errors_msg": "Failed to rename {count} files.",
+            "conflicts_title": "Conflicts Detected",
+            "conflicts_msg": "The rename plan has {count} name collisions.\n\nPlease fix these in the 'Conflicts' tab before proceeding.",
             "undo_success": "Successfully reverted {count} files.",
+            "undo_confirm": "Are you sure you want to revert the last renaming operation?",
+            "undo_reverting": "Reverting renames...",
+            "undo_errors_title": "Undo Errors",
+            "undo_errors_msg": "Failed to revert {count} files.",
             "ignore_confirm": "Are you sure you want to ignore {count} selected files?",
             "clear_confirm": "Are you sure you want to clear metadata for {count} selected files?",
-            "undo_confirm": "Are you sure you want to revert the last renaming operation?",
             "collision_detected": "{count} COLLISIONS DETECTED",
-            "collision_tooltip": "Please resolve collisions before executing."
+            "collision_tooltip": "Please resolve collisions before executing.",
+            "aborting": "Aborting... please wait.",
+            "initializing": "Initializing...",
+            "refreshing": "Refreshing library...",
+            "generating_plan": "Generating rename plan...",
+            "loading_list": "Discovery complete. Loading list...",
+            "starting_pipeline": "Starting discovery pipeline...",
+            "items_selected": "{count} items selected",
+            "global_conflicts_title": "Conflicts Detected",
+            "global_conflicts_msg": "You have {count} name collisions that must be resolved first.\n\nPlease go to the 'Conflicts' tab and use 'Batch Operations' to assign unique Parts or Editions.",
+            "select_dir": "Select Directory to Scan",
+            "drop_ingest": "🚀 Drop files to Ingest into Library"
+        },
+        "batch_operations": {
+            "title": "Batch Operations ({count} files)",
+            "file_selection": "1. File Selection / Order:",
+            "configure_props": "2. Configure Properties:",
+            "cards": {
+                "category": "📁 Category & Type Override",
+                "tv": "📺 TV Series & Episodes",
+                "parts": "✂️ Multi-part files",
+                "meta": "🏷️ Tags & Linking"
+            },
+            "fields": {
+                "override_cat": "Override main category:",
+                "override_sub": "Override Sub-type:",
+                "media_type": "Media Type (Videos only):",
+                "set_season": "Set Season for all:",
+                "renumber_ep": "Renumber Episodes (Top to Bottom)",
+                "start_ep": "Start Episode:",
+                "renumber_parts": "Renumber as Parts (CD1, CD2...)",
+                "set_edition": "Set Edition:",
+                "edition_label": "Edition:",
+                "override_lang": "Override Language:",
+                "link_parent": "Link to Parent:",
+                "select_parent": "--- Select Parent ---"
+            },
+            "options": {
+                "roles": {
+                    "movie": "Movie",
+                    "episode": "Episode",
+                    "bonus": "Bonus Video"
+                },
+                "categories": {
+                    "video": "Video / Movie",
+                    "extra": "Extra / Bonus",
+                    "subtitle": "Subtitle",
+                    "audio": "Audio",
+                    "image": "Image",
+                    "meta": "NFO / Meta"
+                },
+                "media_types": {
+                    "movie": "Movie",
+                    "tv": "TV Series"
+                },
+                "parts": {
+                    "part": "Part",
+                    "cd": "CD",
+                    "disk": "Disk"
+                },
+                "editions": {
+                    "theatrical": "Theatrical",
+                    "directors_cut": "Director's Cut",
+                    "extended": "Extended"
+                }
+            },
+            "apply_btn": "Apply to Selected"
+        },
+        "manual_resolve": {
+            "title": "Manual Resolve: {filename}",
+            "back": "Back",
+            "search_results": "Search Results",
+            "link_multiple": "🔗 Link Multiple",
+            "search_placeholder": "Search Movie or Series...",
+            "search_btn": "Search",
+            "any_year": "Any Year",
+            "year_label": "Filter Year:",
+            "searching": "Searching...",
+            "no_results": "No results found.",
+            "save_btn": "Save Identification",
+            "no_selection_title": "No Selection",
+            "no_selection_msg": "Please select a media item to associate with this file.",
+            "success_msg": "File '{filename}' manually identified."
+        },
+        "batch": {
+            "clear": "🔄 Clear Metadata",
+            "ignore": "🗑️ Ignore Selection",
+            "identify": "🪄 Batch Identify"
+        },
+        "inspector": {
+            "check_data": "📋 Check Full Data",
+            "sections": {
+                "technical": "TECHNICAL INFO",
+                "technical_header": "TECHNICAL",
+                "media": "MEDIA INFO",
+                "episodes": "EPISODES"
+            },
+            "fields": {
+                "size": "Size:",
+                "resolution": "Resolution:",
+                "bitrate": "Bitrate:",
+                "codec": "Codec:",
+                "audio": "Audio:",
+                "subs": "Subtitles:",
+                "path": "File Path:",
+                "year": "Year:",
+                "rating": "Rating:",
+                "runtime": "Runtime:",
+                "genre": "Genre:",
+                "network": "Network:",
+                "status": "Status:",
+                "title": "Title",
+                "original_title": "Original Title",
+                "tagline": "Tagline",
+                "director": "Director",
+                "cast": "Cast",
+                "release_date": "Release Date",
+                "genres": "Genres"
+            },
+            "data_sheet": {
+                "title": "📋 Data Sheet",
+                "tabs": {
+                    "media": "🎬 Media Info",
+                    "episodes": "📺 Episode(s)",
+                    "episode": "📺 Episode",
+                    "technical": "⚙️ Technical",
+                    "linked": "📎 Linked Files ({count})",
+                    "raw": "{ } Raw API"
+                },
+                "cols": {
+                    "property": "Property",
+                    "value": "Value",
+                    "name": "File Name",
+                    "category": "Category",
+                    "status": "Status"
+                }
+            },
+            "empty": {
+                "title": "Select a file",
+                "overview": "Select a file to see details and manage identification.",
+                "no_description": "No description available."
+            }
+        },
+        "batch_resolve": {
+            "title": "Batch Identification ({count} files)",
+            "arrange_order": "1. Arrange Order:",
+            "drag_hint": "Drag & drop to set sequence for parts/episodes.",
+            "search_results": "Search Results",
+            "searching": "Searching...",
+            "back": "← Back",
+            "search_placeholder": "Search Movie or Series...",
+            "search_btn": "Search",
+            "action_btn_default": "Identify All Files",
+            "identify_movie": "Identify All as Movie: {title}",
+            "link_series": "Link All to Series: {title} (Review)",
+            "link_season": "Link All to Season {number} (Review)",
+            "identify_episode": "Identify All as Episode S{s}E{e} (Parts)",
+            "no_selection": "No Selection",
+            "select_result": "Select a result",
+            "no_poster": "No Poster",
+            "success_msg": "Identified {count} files."
         }
     },
     "settings": {
@@ -137,16 +308,63 @@
                 "dash": "Dash (-)",
                 "underscore": "Underscore (_)"
             }
+        },
+        "folders": {
+            "header": "Directory Organization",
+            "sections": {
+                "logic": "CORE LOGIC",
+                "sorting": "AUTOMATIC SORTING",
+                "templates": "FOLDER NAMING TEMPLATES"
+            },
+            "fields": {
+                "move_files": "Move files to a central library (Recommended)",
+                "root_path": "Library Root Path",
+                "auto_sort": "Automatically sort by type (Movies / TV Shows subfolders)",
+                "movies_sub": "Movies Subfolder",
+                "shows_sub": "TV Shows Subfolder",
+                "movie_folder": "Create subfolder for each Movie",
+                "movie_tpl": "Movie Folder Template",
+                "show_folder": "Create root folder for each Show",
+                "show_tpl": "Show Folder Template",
+                "season_folder": "Create Season subfolders",
+                "season_tpl": "Season Folder Template",
+                "select_dir": "Select Directory"
+            }
         }
     },
-    "edit_file": {
-        "title": "Edit Properties: {filename}",
-        "sections": {
-            "classification": "📁 Classification",
-            "details": "📝 Details"
+        "api": {
+            "header": "API Configuration",
+            "sections": {
+                "tmdb": "TMDB (THE MOVIE DATABASE)",
+                "omdb": "OMDB (FOR IMDB RATINGS)"
+            },
+            "fields": {
+                "tmdb_v3": "TMDB API Key (v3)",
+                "tmdb_v3_placeholder": "Enter your v3 API key",
+                "tmdb_v4": "TMDB Bearer Token (v4)",
+                "tmdb_v4_placeholder": "Paste your Read Access Token",
+                "omdb_key": "OMDB API Key",
+                "omdb_key_placeholder": "Enter your OMDB key"
+            }
         },
-        "fields": {
-            "primary_role": "Primary Role:",
+        "advanced": {
+            "header": "Advanced Engine Settings",
+            "sections": {
+                "multi_part": "MULTI-PART FILE HANDLING",
+                "cleanup": "POST-RENAME ACTIONS",
+                "danger": "DANGER ZONE"
+            },
+            "fields": {
+                "part_keyword": "Part Keyword:",
+                "cleanup_folders": "Remove empty folders after moving files",
+                "wipe_desc": "Clears all indexed files, matches, and metadata from the local database. Your physical files will NOT be affected.",
+                "wipe_btn": "Wipe Local Database",
+                "wipe_confirm_title": "Wipe Database",
+                "wipe_confirm_msg": "Are you sure? This will clear all discovery data and history.",
+                "wipe_success": "Database has been wiped."
+            }
+        }
+    },
             "type": "Type:",
             "season": "Season:",
             "episode": "Episode:",
@@ -210,22 +428,30 @@
         "execute": "Execute Changes"
     },
     "history": {
-        "title": "Rename History",
-        "subtitle": "Browse and revert previous library operations",
-        "search_placeholder": "Search history by filename...",
-        "no_history": "No rename history found.",
-        "renamed_count": "Renamed {count} files",
+        "title": "History",
+        "subtitle": "Review and revert previous rename operations",
+        "search_placeholder": "Search previous renames...",
+        "renamed_count": "{count} files renamed",
         "undo_btn": "Undo Batch",
-        "expand": "Expand ▼",
-        "collapse": "Collapse ▲"
+        "expand": "Show Details",
+        "collapse": "Hide Details",
+        "no_history": "No rename history found yet.",
+        "unknown_date": "Unknown date",
+        "undo_success_title": "Success",
+        "undo_partial_title": "Partial Success"
     },
     "common": {
         "none": "None",
         "type": "Type:",
         "types": {
             "movie": "Movie",
-            "tv": "TV Show"
+            "tv": "TV Show",
+            "video": "Video",
+            "bonus": "Bonus Video",
+            "season": "Season",
+            "episode": "Episode"
         },
+        "episodes": "{count} episodes",
         "languages": {
             "en": "English",
             "de": "German",

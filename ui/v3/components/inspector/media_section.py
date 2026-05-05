@@ -1,6 +1,7 @@
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame, QScrollArea
 from PySide6.QtCore import Qt
 from ui.v3.styles.theme import Theme
+from core.i18n import T
 
 class MediaSection(QWidget):
     """
@@ -17,7 +18,7 @@ class MediaSection(QWidget):
 
         # 1. Title & Status Row
         title_row = QHBoxLayout()
-        self.title_lbl = QLabel("Select a file")
+        self.title_lbl = QLabel(T("discovery.inspector.empty.title"))
         self.title_lbl.setStyleSheet(f"font-size: 18px; font-weight: 800; color: {Theme.TEXT_MAIN};")
         self.title_lbl.setWordWrap(True)
         title_row.addWidget(self.title_lbl)
@@ -55,7 +56,7 @@ class MediaSection(QWidget):
         layout.addWidget(self.ep_frame)
 
         # 4. Overview
-        self.overview_lbl = QLabel("Select a file to see details and manage identification.")
+        self.overview_lbl = QLabel(T("discovery.inspector.empty.overview"))
         self.overview_lbl.setWordWrap(True)
         self.overview_lbl.setStyleSheet(f"color: {Theme.TEXT_MUTED}; line-height: 1.5; font-size: 12px;")
         
@@ -68,9 +69,9 @@ class MediaSection(QWidget):
 
     def update_media(self, data):
         if not data: return
-        self.title_lbl.setText(data.get('title', 'Unknown'))
+        self.title_lbl.setText(data.get('title', T("common.none"))) # Or unknown
         self.year_lbl.setText(str(data.get('year', '')))
-        self.overview_lbl.setText(data.get('overview', 'No description available.'))
+        self.overview_lbl.setText(data.get('overview', T("discovery.inspector.empty.no_description")))
 
     def update_episode(self, ep_data_list):
         if not ep_data_list:
@@ -108,8 +109,8 @@ class MediaSection(QWidget):
         self.status_badge.show()
 
     def clear(self):
-        self.title_lbl.setText("Select a file")
+        self.title_lbl.setText(T("discovery.inspector.empty.title"))
         self.year_lbl.setText("")
-        self.overview_lbl.setText("Select a file to see details.")
+        self.overview_lbl.setText(T("discovery.inspector.empty.overview"))
         self.status_badge.hide()
         self.ep_frame.hide()

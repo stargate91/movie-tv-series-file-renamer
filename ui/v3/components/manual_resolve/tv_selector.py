@@ -32,11 +32,11 @@ class TVMetadataSelector(QWidget):
         tv_layout.setSpacing(10)
 
         tv_layout.addWidget(QLabel("S:"))
-        self.season_spin = self._create_spin(0, 999, "None")
+        self.season_spin = self._create_spin(0, 999, T("common.none"))
         tv_layout.addWidget(self.season_spin)
 
         tv_layout.addWidget(QLabel("E:"))
-        self.episode_spin = self._create_spin(0, 999, "None")
+        self.episode_spin = self._create_spin(0, 999, T("common.none"))
         tv_layout.addWidget(self.episode_spin)
 
         layout.addWidget(self.tv_container)

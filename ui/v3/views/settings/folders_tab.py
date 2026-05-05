@@ -2,6 +2,7 @@ from PySide6.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QCheckBox, QPush
 from PySide6.QtCore import Qt
 from ui.v3.styles.theme import Theme
 from ui.v3.views.settings.base_tab import BaseSettingsTab
+from core.i18n import T
 import os
 
 class FoldersTab(BaseSettingsTab):
@@ -15,18 +16,18 @@ class FoldersTab(BaseSettingsTab):
         layout.setContentsMargins(40, 40, 40, 40)
         layout.setSpacing(25)
 
-        header = QLabel("Directory Organization")
+        header = QLabel(T("settings.folders.header"))
         header.setStyleSheet(Theme.get_page_header_style())
         layout.addWidget(header)
 
         # --- Section: Basic Logic ---
-        layout.addWidget(self._create_section_header("CORE LOGIC"))
-        self.move_files_cb = QCheckBox("Move files to a central library (Recommended)")
+        layout.addWidget(self._create_section_header(T("settings.folders.sections.logic")))
+        self.move_files_cb = QCheckBox(T("settings.folders.fields.move_files"))
         self.move_files_cb.setChecked(self.engine.config.settings.move_files)
         self.move_files_cb.setStyleSheet("font-size: 14px; color: white;")
         layout.addWidget(self.move_files_cb)
 
-        self.base_path_input = self._create_path_input("Library Root Path", self.engine.config.settings.base_target_path, "root", self._on_browse)
+        self.base_path_input = self._create_path_input(T("settings.folders.fields.root_path"), self.engine.config.settings.base_target_path, "root", self._on_browse)
         layout.addLayout(self.base_path_input['layout'])
         self.base_path_input['edit'].setEnabled(self.engine.config.settings.move_files)
         self.move_files_cb.toggled.connect(self.base_path_input['edit'].setEnabled)
@@ -35,14 +36,14 @@ class FoldersTab(BaseSettingsTab):
         layout.addWidget(Theme.create_hline())
 
         # --- Section: Automatic Sorting ---
-        layout.addWidget(self._create_section_header("AUTOMATIC SORTING"))
-        self.auto_org_cb = QCheckBox("Automatically sort by type (Movies / TV Shows subfolders)")
+        layout.addWidget(self._create_section_header(T("settings.folders.sections.sorting")))
+        self.auto_org_cb = QCheckBox(T("settings.folders.fields.auto_sort"))
         self.auto_org_cb.setChecked(self.engine.config.settings.auto_organize_by_type)
         layout.addWidget(self.auto_org_cb)
 
         sort_row = QHBoxLayout()
-        self.movie_sub_name = self._create_input_group("Movies Subfolder", self.engine.config.settings.movies_subfolder_name, "Movies")
-        self.show_sub_name = self._create_input_group("TV Shows Subfolder", self.engine.config.settings.shows_subfolder_name, "TV Shows")
+        self.movie_sub_name = self._create_input_group(T("settings.folders.fields.movies_sub"), self.engine.config.settings.movies_subfolder_name, "Movies")
+        self.show_sub_name = self._create_input_group(T("settings.folders.fields.shows_sub"), self.engine.config.settings.shows_subfolder_name, "TV Shows")
         sort_row.addLayout(self.movie_sub_name['layout'])
         sort_row.addLayout(self.show_sub_name['layout'])
         layout.addLayout(sort_row)
@@ -54,27 +55,27 @@ class FoldersTab(BaseSettingsTab):
         layout.addWidget(Theme.create_hline())
 
         # --- Section: Folder Templates ---
-        layout.addWidget(self._create_section_header("FOLDER NAMING TEMPLATES"))
+        layout.addWidget(self._create_section_header(T("settings.folders.sections.templates")))
         
         # Movies
-        self.movie_folder_cb = QCheckBox("Create subfolder for each Movie")
+        self.movie_folder_cb = QCheckBox(T("settings.folders.fields.movie_folder"))
         self.movie_folder_cb.setChecked(self.engine.config.settings.create_movie_folder)
         layout.addWidget(self.movie_folder_cb)
-        self.movie_folder_tpl = self._create_input_group("Movie Folder Template", self.engine.config.settings.movie_folder_template, "{Title} ({Year})")
+        self.movie_folder_tpl = self._create_input_group(T("settings.folders.fields.movie_tpl"), self.engine.config.settings.movie_folder_template, "{Title} ({Year})")
         layout.addLayout(self.movie_folder_tpl['layout'])
         
         # TV Shows
         layout.addSpacing(10)
-        self.show_folder_cb = QCheckBox("Create root folder for each Show")
+        self.show_folder_cb = QCheckBox(T("settings.folders.fields.show_folder"))
         self.show_folder_cb.setChecked(self.engine.config.settings.create_show_folder)
         layout.addWidget(self.show_folder_cb)
-        self.show_folder_tpl = self._create_input_group("Show Folder Template", self.engine.config.settings.show_folder_template, "{ShowTitle}")
+        self.show_folder_tpl = self._create_input_group(T("settings.folders.fields.show_tpl"), self.engine.config.settings.show_folder_template, "{ShowTitle}")
         layout.addLayout(self.show_folder_tpl['layout'])
 
-        self.season_folder_cb = QCheckBox("Create Season subfolders")
+        self.season_folder_cb = QCheckBox(T("settings.folders.fields.season_folder"))
         self.season_folder_cb.setChecked(self.engine.config.settings.create_season_folder)
         layout.addWidget(self.season_folder_cb)
-        self.season_folder_tpl = self._create_input_group("Season Folder Template", self.engine.config.settings.season_folder_template, "Season {Season}")
+        self.season_folder_tpl = self._create_input_group(T("settings.folders.fields.season_tpl"), self.engine.config.settings.season_folder_template, "Season {Season}")
         layout.addLayout(self.season_folder_tpl['layout'])
 
         layout.addStretch()
@@ -96,6 +97,6 @@ class FoldersTab(BaseSettingsTab):
         current = edit_field.text()
         if not current or not os.path.exists(current):
             current = os.path.expanduser("~")
-        folder = QFileDialog.getExistingDirectory(self, "Select Directory", current)
+        folder = QFileDialog.getExistingDirectory(self, T("settings.folders.fields.select_dir"), current)
         if folder:
             edit_field.setText(folder)

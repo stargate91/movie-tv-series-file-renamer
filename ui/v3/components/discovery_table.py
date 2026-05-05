@@ -127,7 +127,7 @@ class DiscoveryTable(QTableWidget):
                 self.setItem(i, 0, status_item)
 
                 # 1. Original Name
-                name_item = QTableWidgetItem(vid.get('file_name', 'Unknown'))
+                name_item = QTableWidgetItem(vid.get('file_name', T("common.unknown")))
                 name_item.setData(Qt.UserRole, vid['id'])
                 if is_new_group:
                     name_item.setData(Qt.UserRole + 1, True)
@@ -138,9 +138,9 @@ class DiscoveryTable(QTableWidget):
                 sub_cat = vid.get('sub_category')
                 
                 if raw_cat == 'video':
-                    cat_display = "Movie" if mtype == 'movie' else "TV Show" if mtype == 'tv' else "Video"
+                    cat_display = T("common.types.movie") if mtype == 'movie' else T("common.types.tv") if mtype == 'tv' else T("common.types.video")
                 elif raw_cat == 'extra':
-                    cat_display = sub_cat.title() if sub_cat else "Bonus Video"
+                    cat_display = sub_cat.title() if sub_cat else T("common.types.bonus")
                 else:
                     # Show sub-category if available (e.g. Forced instead of Subtitle)
                     if sub_cat and sub_cat != raw_cat:
@@ -189,7 +189,7 @@ class DiscoveryTable(QTableWidget):
                 
                 # 3. FOLDER button
                 folder_btn = QPushButton("📂")
-                folder_btn.setToolTip("Open Folder")
+                folder_btn.setToolTip(T("discovery.actions.open_folder"))
                 folder_btn.setFixedSize(48, 42)
                 folder_btn.setCursor(Qt.PointingHandCursor)
                 folder_btn.setStyleSheet(Theme.get_discovery_action_btn_style('neutral'))
@@ -198,7 +198,7 @@ class DiscoveryTable(QTableWidget):
 
                 # 3. CLEAR MATCH (Link) button
                 clear_btn = QPushButton("🔄")
-                clear_btn.setToolTip("Clear Metadata Match")
+                clear_btn.setToolTip(T("discovery.actions.clear_match"))
                 clear_btn.setFixedSize(58, 46)
                 clear_btn.setCursor(Qt.PointingHandCursor)
                 clear_btn.setStyleSheet(Theme.get_discovery_action_btn_style('warning'))
@@ -298,9 +298,9 @@ class DiscoveryTable(QTableWidget):
                         mtype = media.get('media_type')
                         raw_cat = file_data.get('category', 'video')
                         if raw_cat == 'video':
-                            display = "Movie" if mtype == 'movie' else "TV Show" if mtype == 'tv' else "Video"
+                            display = T("common.types.movie") if mtype == 'movie' else T("common.types.tv") if mtype == 'tv' else T("common.types.video")
                         elif raw_cat == 'extra':
-                            display = "Bonus Video"
+                            display = T("common.types.bonus")
                         else:
                             display = raw_cat.capitalize()
                         self.setItem(row, 2, QTableWidgetItem(display))

@@ -1,6 +1,7 @@
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTabWidget
 from ui.v3.styles.theme import Theme
 from ui.v3.components.discovery_table import DiscoveryTable
+from core.i18n import T
 
 class ExtrasView(QWidget):
     """
@@ -36,14 +37,14 @@ class ExtrasView(QWidget):
         }
         
         self.tabs.addTab(self._wrap_with_filter("extra", self.tables["extra"], 
-            ["all", "sample", "trailer", "behind the scenes", "deleted", "interview", "featurette"]), "🎬 Bonus Videos")
+            ["all", "sample", "trailer", "behind the scenes", "deleted", "interview", "featurette"]), T("discovery.extras.tabs.bonus"))
         self.tabs.addTab(self._wrap_with_filter("image", self.tables["image"], 
-            ["all", "poster", "fanart", "background", "banner", "thumb", "logo", "disc"]), "🖼️ Images")
-        self.tabs.addTab(self.tables["metadata"], "📝 Metadata")
+            ["all", "poster", "fanart", "background", "banner", "thumb", "logo", "disc"]), T("discovery.extras.tabs.images"))
+        self.tabs.addTab(self.tables["metadata"], T("discovery.extras.tabs.metadata"))
         self.tabs.addTab(self._wrap_with_filter("subtitle", self.tables["subtitle"], 
-            ["all", "forced", "full"]), "📜 Subtitles")
+            ["all", "forced", "full"]), T("discovery.extras.tabs.subtitles"))
         self.tabs.addTab(self._wrap_with_filter("audio", self.tables["audio"], 
-            ["all", "dub", "commentary", "music"]), "🔊 Audio")
+            ["all", "dub", "commentary", "music"]), T("discovery.extras.tabs.audio"))
         
         layout.addWidget(self.tabs)
 

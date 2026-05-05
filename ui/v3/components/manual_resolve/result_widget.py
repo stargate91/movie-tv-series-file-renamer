@@ -1,6 +1,7 @@
 from PySide6.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QLabel
 from PySide6.QtCore import Qt, QSize
 from ui.v3.styles.theme import Theme
+from core.i18n import T
 
 class ResultItemWidget(QWidget):
     """
@@ -32,13 +33,15 @@ class ResultItemWidget(QWidget):
         text_layout = QVBoxLayout()
         text_layout.setSpacing(2)
         
-        title = QLabel(self.data.get('title', 'Unknown'))
+        title = QLabel(self.data.get('title', T("common.unknown")))
         title.setStyleSheet(f"font-weight: 700; color: {Theme.TEXT_MAIN}; font-size: 14px;")
         text_layout.addWidget(title)
         
-        meta_text = m_type.capitalize()
+        meta_text = T(f"common.types.{m_type}") if T(f"common.types.{m_type}") != f"common.types.{m_type}" else m_type.capitalize()
         if self.data.get('year'): meta_text += f" • {self.data['year']}"
-        if self.data.get('episode_count'): meta_text += f" • {self.data['episode_count']} episodes"
+        if self.data.get('episode_count'): 
+            count = self.data['episode_count']
+            meta_text += f" • {T('common.episodes', count=count)}"
         
         meta = QLabel(meta_text)
         meta.setStyleSheet(f"color: {Theme.TEXT_MUTED}; font-size: 12px;")

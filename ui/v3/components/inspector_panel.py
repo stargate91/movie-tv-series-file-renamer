@@ -7,6 +7,7 @@ from .inspector.poster_carousel import PosterCarousel
 from .inspector.media_section import MediaSection
 from .inspector.technical_section import TechnicalSection
 from .inspector.data_sheet import DataSheetDialog
+from core.i18n import T
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +52,7 @@ class InspectorPanel(QFrame):
         layout.addWidget(self.tech_section)
 
         # 4. Check Data Button
-        self.data_btn = QPushButton("📋 Check Full Data")
+        self.data_btn = QPushButton(T("discovery.inspector.check_data"))
         self.data_btn.setFixedHeight(40)
         self.data_btn.setCursor(Qt.PointingHandCursor)
         self.data_btn.setStyleSheet(f"""

@@ -6,6 +6,7 @@ from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLineEdit, QWi
 from PySide6.QtGui import QPixmap
 
 from ui.v3.styles.theme import Theme
+from core.i18n import T
 from ui.v3.components.image_loader import ImageDownloader
 from .manual_resolve.searcher import SearchWorker
 from .manual_resolve.tv_selector import TVMetadataSelector
@@ -26,7 +27,7 @@ class BatchResolveDialog(QDialog):
         self.search_worker = None
         self.nav_stack = [] 
 
-        self.setWindowTitle(f"Batch Identification ({len(selected_files)} files)")
+        self.setWindowTitle(T("discovery.batch_resolve.title", count=len(selected_files)))
         self.setMinimumSize(1100, 800)
         self.setStyleSheet(Theme.get_main_stylesheet())
         
@@ -45,7 +46,7 @@ class BatchResolveDialog(QDialog):
         left_layout = QVBoxLayout(left_pane)
         left_layout.setContentsMargins(0, 0, 0, 0)
         
-        lbl = QLabel("1. Arrange Order:")
+        lbl = QLabel(T("discovery.batch_resolve.arrange_order"))
         lbl.setStyleSheet("font-weight: bold; font-size: 14px;")
         left_layout.addWidget(lbl)
         
@@ -55,7 +56,7 @@ class BatchResolveDialog(QDialog):
         self.file_list.setStyleSheet(Theme.get_sidebar_list_style())
         left_layout.addWidget(self.file_list)
         
-        hint = QLabel("Drag & drop to set sequence for parts/episodes.")
+        hint = QLabel(T("discovery.batch_resolve.drag_hint"))
         hint.setWordWrap(True)
         hint.setStyleSheet(f"color: {Theme.TEXT_DIM}; font-size: 11px;")
         left_layout.addWidget(hint)
@@ -67,13 +68,13 @@ class BatchResolveDialog(QDialog):
         
         # Header / Nav
         nav_box = QHBoxLayout()
-        self.back_btn = QPushButton("← Back")
+        self.back_btn = QPushButton(T("discovery.batch_resolve.back"))
         self.back_btn.setObjectName("SecondaryButton")
         self.back_btn.setFixedWidth(80)
         self.back_btn.setVisible(False)
         self.back_btn.clicked.connect(self._on_back)
         
-        self.nav_label = QLabel("Search Results")
+        self.nav_label = QLabel(T("discovery.batch_resolve.search_results"))
         self.nav_label.setStyleSheet(f"font-size: 18px; font-weight: 700; color: {Theme.TEXT_MAIN};")
         
         nav_box.addWidget(self.back_btn)
@@ -84,11 +85,11 @@ class BatchResolveDialog(QDialog):
         # Search Tools
         search_box = QHBoxLayout()
         self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("Search Movie or Series...")
+        self.search_input.setPlaceholderText(T("discovery.batch_resolve.search_placeholder"))
         self.search_input.setFixedHeight(40)
         self.search_input.returnPressed.connect(self._on_search_clicked)
         
-        self.search_btn = QPushButton("Search")
+        self.search_btn = QPushButton(T("discovery.batch_resolve.search_btn"))
         self.search_btn.setFixedHeight(40)
         self.search_btn.setFixedWidth(100)
         self.search_btn.clicked.connect(self._on_search_clicked)
@@ -111,7 +112,7 @@ class BatchResolveDialog(QDialog):
         right_pane.addLayout(content_row)
         
         # Footer Action
-        self.action_btn = QPushButton("Identify All Files")
+        self.action_btn = QPushButton(T("discovery.batch_resolve.action_btn_default"))
         self.action_btn.setFixedHeight(50)
         self.action_btn.setEnabled(False)
         self.action_btn.setStyleSheet(Theme.get_primary_button_style())
@@ -125,12 +126,12 @@ class BatchResolveDialog(QDialog):
         panel.setStyleSheet(f"background: {Theme.SURFACE_DARK}; border: 1px solid {Theme.BORDER}; border-radius: 12px;")
         layout = QVBoxLayout(panel)
         
-        self.preview_poster = QLabel("No Selection")
+        self.preview_poster = QLabel(T("discovery.batch_resolve.no_selection"))
         self.preview_poster.setAlignment(Qt.AlignCenter)
         self.preview_poster.setFixedSize(200, 300)
         self.preview_poster.setStyleSheet(f"background-color: {Theme.SURFACE}; border-radius: 8px;")
         
-        self.preview_title = QLabel("Select a result")
+        self.preview_title = QLabel(T("discovery.batch_resolve.select_result"))
         self.preview_title.setWordWrap(True)
         self.preview_title.setStyleSheet(f"font-weight: 800; font-size: 15px; color: {Theme.TEXT_MAIN};")
         
@@ -172,15 +173,15 @@ class BatchResolveDialog(QDialog):
             self.search_worker.terminate()
 
         self.results_list.clear()
-        self.results_list.addItem("Searching...")
+        self.results_list.addItem(T("discovery.batch_resolve.searching"))
         
         if mode == "search":
             self.nav_stack = []
             self.back_btn.setVisible(False)
-            self.nav_label.setText("Search Results")
+            self.nav_label.setText(T("discovery.batch_resolve.search_results"))
         else:
             self.back_btn.setVisible(True)
-            self.nav_label.setText(title or "Browsing...")
+            self.nav_label.setText(title or T("discovery.batch_resolve.searching")) # Or Browsing
 
         # We always search for both for batch
         self.search_worker = SearchWorker(self.engine, query, None, 'both', mode, parent_id, season_num)
@@ -211,10 +212,14 @@ class BatchResolveDialog(QDialog):
         
         # Update Action Text
         mtype = res['media_type']
-        if mtype == 'movie': self.action_btn.setText(f"Identify All as Movie: {res['title']}")
-        elif mtype == 'tv': self.action_btn.setText(f"Link All to Series: {res['title']} (Review)")
-        elif mtype == 'season': self.action_btn.setText(f"Link All to Season {res['season_number']} (Review)")
-        elif mtype == 'episode': self.action_btn.setText(f"Identify All as Episode S{res['season_number']}E{res['episode_number']} (Parts)")
+        if mtype == 'movie': 
+            self.action_btn.setText(T("discovery.batch_resolve.identify_movie", title=res['title']))
+        elif mtype == 'tv': 
+            self.action_btn.setText(T("discovery.batch_resolve.link_series", title=res['title']))
+        elif mtype == 'season': 
+            self.action_btn.setText(T("discovery.batch_resolve.link_season", number=res['season_number']))
+        elif mtype == 'episode': 
+            self.action_btn.setText(T("discovery.batch_resolve.identify_episode", s=res['season_number'], e=res['episode_number']))
 
         # Update Preview
         self.preview_title.setText(res['title'])
@@ -226,7 +231,7 @@ class BatchResolveDialog(QDialog):
         if res.get('poster_path'):
             self._load_poster(res['poster_path'])
         else:
-            self.preview_poster.setText("No Poster")
+            self.preview_poster.setText(T("discovery.batch_resolve.no_poster"))
 
     def _on_item_double_clicked(self, item):
         res = item.data(Qt.UserRole)
@@ -319,7 +324,7 @@ class BatchResolveDialog(QDialog):
 
         try:
             self.engine.db.files.bulk_update_files(updates_list)
-            QMessageBox.information(self, "Success", f"Identified {len(updates_list)} files.")
+            QMessageBox.information(self, T("common.success"), T("discovery.batch_resolve.success_msg", count=len(updates_list)))
             self.accept()
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"Failed: {e}")
+            QMessageBox.critical(self, T("common.error"), f"Failed: {e}")

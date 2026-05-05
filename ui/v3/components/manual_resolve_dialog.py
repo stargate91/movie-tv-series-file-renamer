@@ -31,7 +31,7 @@ class ManualResolveDialog(QDialog):
         self.nav_stack = [] # History of (mode, parent_id, season_num, title)
         self.multi_match_mode = False
 
-        self.setWindowTitle(f"Manual Resolve: {self.file_name}")
+        self.setWindowTitle(T("discovery.manual_resolve.title", filename=self.file_name))
         self.setMinimumSize(850, 750)
         self.setStyleSheet(Theme.get_main_stylesheet())
         
@@ -112,7 +112,7 @@ class ManualResolveDialog(QDialog):
         self.results_list.itemDoubleClicked.connect(self._on_item_double_clicked)
         res_col.addWidget(self.results_list)
         
-        self.action_btn = QPushButton(T("manual_resolve.match_btn"))
+        self.action_btn = QPushButton(T("discovery.manual_resolve.save_btn"))
         self.action_btn.setFixedHeight(45)
         self.action_btn.setEnabled(False)
         self.action_btn.setStyleSheet(Theme.get_primary_button_style())
@@ -147,7 +147,7 @@ class ManualResolveDialog(QDialog):
         self.preview_poster.setFixedSize(250, 375)
         self.preview_poster.setStyleSheet(f"background-color: {Theme.SURFACE}; border-radius: 8px;")
         
-        self.preview_title = QLabel(T("manual_resolve.select_result"))
+        self.preview_title = QLabel(T("discovery.manual_resolve.select_result"))
         self.preview_title.setWordWrap(True)
         self.preview_title.setStyleSheet(f"font-weight: 800; font-size: 16px; color: {Theme.TEXT_MAIN};")
         
@@ -213,7 +213,7 @@ class ManualResolveDialog(QDialog):
             self.search_worker.terminate()
 
         self.results_list.clear()
-        self.results_list.addItem("Searching API...")
+        self.results_list.addItem(T("discovery.manual_resolve.searching"))
         self.action_btn.setEnabled(False)
         
         if mode == "search":
@@ -247,7 +247,8 @@ class ManualResolveDialog(QDialog):
             self.results_list.setItemWidget(item, widget)
             
         if not results:
-            self.results_list.addItem(T("manual_resolve.no_matches"))
+            self.results_list.addItem(T("discovery.manual_resolve.no_results"))
+            return
 
     def _on_selection_changed(self):
         items = self.results_list.selectedItems()
@@ -300,10 +301,12 @@ class ManualResolveDialog(QDialog):
             self.action_btn.setText(T("manual_resolve.match_btn"))
 
     def _on_action_clicked(self):
-        if not self.selected_media: return
+        if not self.selected_media and not self.basket:
+            QMessageBox.warning(self, T("discovery.manual_resolve.no_selection_title"), T("discovery.manual_resolve.no_selection_msg"))
+            return
+        m = self.selected_media
         vals = self.tv_selector.get_values()
         
-        m = self.selected_media
         s = m.get('season_number', vals['season'])
         e = m.get('episode_number', vals['episode'])
         
@@ -332,6 +335,7 @@ class ManualResolveDialog(QDialog):
         if not self.basket: return
         self.engine.db.files.clear_match(self.file_id)
         
+        updates_list = []
         all_episodes = []
         last_s, last_type = None, None
         
@@ -355,8 +359,12 @@ class ManualResolveDialog(QDialog):
         # Update final file tags for multi-episode support
         if all_episodes:
             ep_val = str(all_episodes[0]) if len(all_episodes) == 1 else str(sorted(list(set(all_episodes))))
-            self.engine.db.files.update_file(self.file_id, fn_season=last_s, fn_episode=ep_val, fn_media_type=last_type)
-        self.accept()
+            try:
+                self.engine.db.files.bulk_update_files(updates_list)
+                QMessageBox.information(self, T("common.success"), T("discovery.manual_resolve.success_msg", filename=self.file_name))
+                self.accept()
+            except:
+                pass
 
     def _load_poster(self, poster_path):
         import os

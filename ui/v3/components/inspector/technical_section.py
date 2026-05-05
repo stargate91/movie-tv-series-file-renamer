@@ -1,6 +1,7 @@
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame, QGridLayout
 from PySide6.QtCore import Qt
 from ui.v3.styles.theme import Theme
+from core.i18n import T
 
 class TechnicalSection(QWidget):
     """
@@ -15,7 +16,7 @@ class TechnicalSection(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(8)
 
-        header = QLabel("TECHNICAL")
+        header = QLabel(T("discovery.inspector.sections.technical_header"))
         header.setStyleSheet(f"font-weight: 800; font-size: 10px; color: {Theme.TEXT_DIM}; letter-spacing: 1.5px;")
         layout.addWidget(header)
 
@@ -27,7 +28,12 @@ class TechnicalSection(QWidget):
         grid.setColumnStretch(1, 1)
 
         self.labels = {}
-        fields = [("RES", "RES"), ("CODEC", "CODEC"), ("AUDIO", "AUDIO"), ("SIZE", "SIZE")]
+        fields = [
+            ("RES", T("discovery.inspector.fields.resolution")), 
+            ("CODEC", T("discovery.inspector.fields.codec")), 
+            ("AUDIO", T("discovery.inspector.fields.audio")), 
+            ("SIZE", T("discovery.inspector.fields.size"))
+        ]
         for i, (key, label) in enumerate(fields):
             l_key = QLabel(label)
             l_key.setStyleSheet(f"color: {Theme.TEXT_DIM}; font-size: 9px; font-weight: 800; letter-spacing: 1px; border: none;")

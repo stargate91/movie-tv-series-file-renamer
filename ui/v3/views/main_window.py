@@ -10,6 +10,7 @@ from ui.v3.views.history_page import HistoryPage
 from ui.v3.components.sidebar import Sidebar
 from ui.v3.workers.scan_worker import ScanWorker
 from core.engine.manager import RenamerEngineV3
+from core.i18n import T
 
 class MainWindowV3(QMainWindow):
     def __init__(self):
@@ -22,7 +23,7 @@ class MainWindowV3(QMainWindow):
         
         self.active_workers = [] # Prevent ScanWorker GC crash
         
-        self.setWindowTitle("RENDA - Smart Media Organizer")
+        self.setWindowTitle(f"{T('app.name')} - {T('app.subtitle')}")
         self.setMinimumSize(1100, 700)
         self.setStyleSheet(Theme.get_main_stylesheet())
         
@@ -79,7 +80,7 @@ class MainWindowV3(QMainWindow):
         if not start_dir or not os.path.exists(start_dir):
             start_dir = os.path.expanduser("~")
             
-        folder = QFileDialog.getExistingDirectory(self, "Select Media Directory", start_dir)
+        folder = QFileDialog.getExistingDirectory(self, T("discovery.messages.select_dir"), start_dir)
         if folder:
             self._start_scan(folder)
 
@@ -92,7 +93,7 @@ class MainWindowV3(QMainWindow):
         self.discovery_page.progress_bar.show()
         self.discovery_page.status_info.show()
         self.discovery_page.progress_bar.setValue(0)
-        self.discovery_page.status_info.setText("Initializing...")
+        self.discovery_page.status_info.setText(T("discovery.messages.initializing"))
         
         # 3. Create and Start Worker
         self.worker = ScanWorker(self.engine, path)
