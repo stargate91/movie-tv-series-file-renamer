@@ -1,3 +1,4 @@
+from PySide6.QtWidgets import QWidget, QHBoxLayout, QLabel, QComboBox, QSpinBox
 from PySide6.QtCore import Qt, Signal, QEvent
 from core.i18n import T
 
