@@ -262,7 +262,7 @@ class EditFileDialog(QDialog):
             videos = self.engine.db.files.get_files_by_category('video')
             videos = sorted(videos, key=lambda x: x['id'], reverse=True)
             self.combo_parent.clear()
-        self.combo_parent.addItem(T("edit_file.parent_select"), None)
+            self.combo_parent.addItem(T("edit_file.parent_select"), None)
             for v in videos:
                 self.combo_parent.addItem(v['file_name'], v['id'])
             

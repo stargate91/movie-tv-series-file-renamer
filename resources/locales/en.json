@@ -365,6 +365,14 @@
             }
         }
     },
+    "edit_file": {
+        "title": "Edit Properties: {filename}",
+        "sections": {
+            "classification": "📁 Classification",
+            "details": "📝 Details"
+        },
+        "fields": {
+            "primary_role": "Primary Role:",
             "type": "Type:",
             "season": "Season:",
             "episode": "Episode:",
