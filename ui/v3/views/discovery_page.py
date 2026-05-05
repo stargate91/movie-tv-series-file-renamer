@@ -1,17 +1,25 @@
 import os
 import logging
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLineEdit, QApplication,
-                             QLabel, QFrame, QPushButton, QProgressBar, QMessageBox, QTabWidget)
+                             QLabel, QFrame, QPushButton, QProgressBar, QMessageBox, QTabWidget, QFileDialog)
 from PySide6.QtGui import QPixmap
 from PySide6.QtCore import Qt, Signal, QTimer
 
 from ui.v3.styles.theme import Theme
+from ui.v3.components.discovery_table import DiscoveryTable
 from ui.v3.components.inspector_panel import InspectorPanel
+from ui.v3.components.edit_file_dialog import EditFileDialog
+from ui.v3.components.batch_operations_dialog import BatchOperationsDialog
+from ui.v3.components.batch_resolve_dialog import BatchResolveDialog
 from ui.v3.components.manual_resolve_dialog import ManualResolveDialog
 from ui.v3.components.preview_dialog import PreviewDialog
-from ui.v3.components.discovery_table import DiscoveryTable
 from ui.v3.components.notification_bar import NotificationBar
-from ui.v3.workers.discovery_workers import DataLoader, PosterPrefetcher, RenameWorker, PlanWorker, DropProcessor, UndoWorker
+from ui.v3.workers.discovery_workers import DataLoader, PosterPrefetcher, RenameWorker, PlanWorker, DropProcessor, UndoWorker, SyncWorker
+
+# Modular Views
+from ui.v3.components.discovery.review_view import ReviewView
+from ui.v3.components.discovery.dropped_view import DroppedView
+from ui.v3.components.discovery.extras_view import ExtrasView
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +30,7 @@ class DiscoveryPage(QWidget):
         self.loader = None
         self.poster_worker = None
         self.active_workers = [] 
+        self.last_batch_id = None
         self._init_ui()
         QTimer.singleShot(100, self.refresh_data)
 
@@ -30,7 +39,7 @@ class DiscoveryPage(QWidget):
         layout.setContentsMargins(30, 30, 30, 30)
         layout.setSpacing(20)
 
-        # Header Row
+        # 1. Header
         header = QHBoxLayout()
         title = QLabel("Discovery Console")
         title.setStyleSheet(f"font-size: 28px; font-weight: 800; color: {Theme.TEXT_MAIN};")
@@ -44,6 +53,7 @@ class DiscoveryPage(QWidget):
         self.scan_new_btn = QPushButton("Scan Directory")
         self.scan_new_btn.setFixedWidth(140)
         self.scan_new_btn.setStyleSheet(Theme.get_secondary_button_style())
+        self.scan_new_btn.clicked.connect(self._on_manual_scan_triggered)
 
         refresh_btn = QPushButton("Refresh List")
         refresh_btn.setFixedWidth(120)
@@ -54,494 +64,455 @@ class DiscoveryPage(QWidget):
         header.addStretch()
         header.addWidget(self.search_box)
         header.addWidget(self.scan_new_btn)
-        header.addWidget(refresh_btn)
+        self.refresh_btn = refresh_btn
+        header.addWidget(self.refresh_btn)
         layout.addLayout(header)
 
-        # Tab Widget
-        self.tabs = QTabWidget()
-        self.tabs.setStyleSheet(f"""
-            QTabWidget::pane {{ border: 1px solid {Theme.BORDER}; border-radius: 8px; background: {Theme.SURFACE_DARK}; }}
-            QTabBar::tab {{ background: {Theme.SURFACE}; color: {Theme.TEXT_MUTED}; padding: 12px 24px; border: 1px solid {Theme.BORDER}; border-bottom: none; border-radius: 8px 8px 0 0; font-weight: 700; font-size: 13px; margin-right: 4px; }}
-            QTabBar::tab:selected {{ background: {Theme.SURFACE_DARK}; color: {Theme.PRIMARY}; border-bottom: 2px solid {Theme.PRIMARY}; }}
-            QTabBar::tab:hover {{ background: {Theme.SURFACE_LIGHT}; color: {Theme.TEXT_MAIN}; }}
+        # 2. Main Tabs (Modular)
+        self.main_tabs = QTabWidget()
+        self.main_tabs.setStyleSheet(f"""
+            QTabWidget::pane {{ border: none; background: transparent; }}
+            QTabBar::tab {{ background: {Theme.SURFACE}; color: {Theme.TEXT_MUTED}; padding: 12px 24px; border-radius: 8px 8px 0 0; font-weight: 700; margin-right: 4px; }}
+            QTabBar::tab:selected {{ background: {Theme.SURFACE_LIGHT}; color: {Theme.PRIMARY}; border-bottom: 2px solid {Theme.PRIMARY}; }}
         """)
-        
-        # Create Tables for each tab
-        self.tables = {
-            "review": DiscoveryTable(),
-            "movies": DiscoveryTable(),
-            "shows": DiscoveryTable(),
-            "extras": DiscoveryTable(),
-            "dropped": DiscoveryTable(),
-            "trash": DiscoveryTable()
-        }
 
-        for key, table in self.tables.items():
-            self._setup_table_signals(table)
+        self.review_view = ReviewView(self.engine)
+        self.conflicts_view = DiscoveryTable()
+        self.extras_view = ExtrasView(self.engine)
+        self.dropped_view = DroppedView(self.engine)
+        self.trash_view = DiscoveryTable()
 
-        self.tabs.addTab(self.tables["review"], "📥 Review")
-        self.tabs.addTab(self.tables["movies"], "🎬 Movies")
-        self.tabs.addTab(self.tables["shows"], "📺 TV Shows")
-        
-        # Extras Tab with Sub-filters
-        extras_container = QWidget()
-        extras_layout = QVBoxLayout(extras_container)
-        extras_layout.setContentsMargins(10, 10, 10, 10)
-        extras_layout.setSpacing(10)
-        
-        sub_filter_layout = QHBoxLayout()
-        sub_filter_layout.setSpacing(8)
-        self.extra_filters = {}
-        for label, val in [("All", "all"), ("Bonus Videos", "extra"), ("Images", "image"), ("Metadatas", "metadata"), ("Subtitles", "subtitle")]:
-            btn = QPushButton(label)
-            btn.setCheckable(True)
-            btn.setAutoExclusive(True)
-            if val == "all": btn.setChecked(True)
-            btn.setStyleSheet(Theme.get_sub_chip_style())
-            btn.clicked.connect(lambda checked=False, v=val: self._on_extra_subfilter_changed(v))
-            sub_filter_layout.addWidget(btn)
-            self.extra_filters[val] = btn
-        sub_filter_layout.addStretch()
-        
-        extras_layout.addLayout(sub_filter_layout)
-        extras_layout.addWidget(self.tables["extras"], 1)
-        
-        # Dropped Tab (Zsilip)
-        self.dropped_container = QWidget()
-        dropped_layout = QVBoxLayout(self.dropped_container)
-        dropped_layout.setContentsMargins(10, 10, 10, 10)
-        dropped_layout.setSpacing(10)
-        
-        dropped_actions = QHBoxLayout()
-        self.import_all_btn = QPushButton("🚀 Import All to Library")
-        self.import_all_btn.setStyleSheet(Theme.get_primary_button_style())
-        self.import_all_btn.clicked.connect(self._on_import_all)
-        
-        self.import_sel_btn = QPushButton("📥 Import Selected")
-        self.import_sel_btn.setStyleSheet(Theme.get_secondary_button_style())
-        self.import_sel_btn.clicked.connect(self._on_import_selected)
-        
-        self.clear_dropped_btn = QPushButton("🧹 Clear List")
-        self.clear_dropped_btn.setStyleSheet(Theme.get_danger_button_style())
-        self.clear_dropped_btn.clicked.connect(self._on_clear_dropped)
-        
-        dropped_actions.addWidget(self.import_all_btn)
-        dropped_actions.addWidget(self.import_sel_btn)
-        dropped_actions.addStretch()
-        dropped_actions.addWidget(self.clear_dropped_btn)
-        
-        dropped_layout.addLayout(dropped_actions)
-        dropped_layout.addWidget(self.tables["dropped"], 1)
-        
-        self.tabs.addTab(self.tables["review"], "📥 Review")
-        self.tabs.addTab(self.tables["movies"], "🎬 Movies")
-        self.tabs.addTab(self.tables["shows"], "📺 TV Shows")
-        self.tabs.addTab(extras_container, "📎 Extras")
-        self.tabs.addTab(self.dropped_container, "📦 Dropped")
-        self.tabs.addTab(self.tables["trash"], "🗑️ Trash")
-        
-        # Main content split
+        self.main_tabs.addTab(self.review_view, "🔍 Library Review")
+        self.main_tabs.addTab(self.conflicts_view, "⚔️ Conflicts")
+        self.main_tabs.addTab(self.extras_view, "📎 Extras")
+        self.main_tabs.addTab(self.dropped_view, "📦 Dropped")
+        self.main_tabs.addTab(self.trash_view, "🗑️ Trash")
+
+        # Connect internal signals
+        self.dropped_view.refresh_requested.connect(self.refresh_data)
+        for view in [self.review_view, self.conflicts_view, self.extras_view, self.dropped_view, self.trash_view]:
+            # Wire table signals to main page handlers
+            if isinstance(view, DiscoveryTable):
+                self._setup_table_signals(view)
+            elif hasattr(view, 'tables'):
+                for table in view.tables.values(): self._setup_table_signals(table)
+            elif hasattr(view, 'table'): self._setup_table_signals(view.table)
+
+        # 3. Content Layout (Tabs + Inspector)
         content_layout = QHBoxLayout()
         content_layout.setSpacing(0)
-        content_layout.addWidget(self.tabs, 7)
+        content_layout.addWidget(self.main_tabs, 7)
         
         self.inspector = InspectorPanel()
         content_layout.addWidget(self.inspector, 3)
         layout.addLayout(content_layout)
 
-        # Drop Overlay
-        self.drop_overlay = QFrame(self)
-        self.drop_overlay.setObjectName("DropOverlay")
-        self.drop_overlay.setStyleSheet(f"""
-            #DropOverlay {{
-                background-color: {Theme.PRIMARY}cc;
-                border: 3px dashed white;
-                border-radius: 20px;
-            }}
-        """)
-        self.drop_overlay.hide()
-        overlay_layout = QVBoxLayout(self.drop_overlay)
-        overlay_label = QLabel("🚀 Drop files to Ingest into Library")
-        overlay_label.setStyleSheet("color: white; font-size: 24px; font-weight: 800;")
-        overlay_label.setAlignment(Qt.AlignCenter)
-        overlay_layout.addWidget(overlay_label)
-        
-        self.setAcceptDrops(True)
+        # 4. Progress & Batch Bars
+        self._init_status_elements(layout)
 
-        # Progress bar
-        self.progress_bar = QProgressBar()
-        self.progress_bar.setFixedHeight(4)
-        self.progress_bar.setTextVisible(False)
-        self.progress_bar.setStyleSheet(f"QProgressBar {{ background: transparent; border: none; }} QProgressBar::chunk {{ background: {Theme.PRIMARY}; }}")
-        self.progress_bar.hide()
-        
-        self.status_info = QLabel("")
-        self.status_info.setStyleSheet(f"color: {Theme.TEXT_MUTED}; font-size: 11px; font-weight: 600;")
-        self.status_info.setAlignment(Qt.AlignCenter)
-        self.status_info.hide()
-        
-        layout.addWidget(self.status_info)
-        layout.addWidget(self.progress_bar)
-
-        # Batch Action Bar
-        self.batch_bar = QFrame()
-        self.batch_bar.setFixedHeight(60)
-        self.batch_bar.setStyleSheet(f"background: {Theme.PRIMARY}; border-radius: 12px;")
-        bb_layout = QHBoxLayout(self.batch_bar)
-        bb_layout.setContentsMargins(20, 0, 20, 0)
-        
-        self.batch_label = QLabel("0 items selected")
-        self.batch_label.setStyleSheet("color: white; font-weight: 700; font-size: 14px; border: none;")
-        
-        clear_batch_btn = QPushButton("🧹 Clear Match")
-        clear_batch_btn.setFixedWidth(130)
-        clear_batch_btn.setStyleSheet("background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.4); padding: 8px 12px; font-weight: 700; border-radius: 6px;")
-        clear_batch_btn.clicked.connect(self._on_batch_clear)
-
-        bb_layout.addWidget(self.batch_label)
-        bb_layout.addStretch()
-        bb_layout.addWidget(clear_batch_btn)
-        self.batch_bar.hide()
-        layout.addWidget(self.batch_bar)
-
-        # Final rename button
+        # 5. Apply Button
         self.apply_btn = QPushButton("Apply Renames")
         self.apply_btn.setFixedHeight(50)
         self.apply_btn.setStyleSheet(Theme.get_primary_button_style())
         self.apply_btn.clicked.connect(self._on_apply_clicked)
         layout.addWidget(self.apply_btn)
 
-        # Notification Bar (Snackbar)
+        # Notification & Overlays
         self.notif_bar = NotificationBar(self)
         self.notif_bar.undo_requested.connect(self._on_undo_requested)
+        self._init_drop_overlay()
 
-        # Shortcuts
-        from PySide6.QtGui import QShortcut, QKeySequence
-        QShortcut(QKeySequence("Ctrl+A"), self).activated.connect(self._on_select_all)
-        QShortcut(QKeySequence.Delete, self).activated.connect(self._on_delete_pressed)
+    def _init_status_elements(self, layout):
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setFixedHeight(14)
+        self.progress_bar.setTextVisible(True)
+        self.progress_bar.setAlignment(Qt.AlignCenter)
+        self.progress_bar.setStyleSheet(f"""
+            QProgressBar {{ 
+                background: {Theme.SURFACE_LIGHT}; 
+                border: 1px solid {Theme.BORDER}; 
+                border-radius: 7px; 
+                text-align: center;
+                color: white;
+                font-weight: 800;
+                font-size: 10px;
+            }} 
+            QProgressBar::chunk {{ 
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 {Theme.PRIMARY}, stop:1 {Theme.ACCENT});
+                border-radius: 6px; 
+            }}
+        """)
+        self.progress_bar.hide()
+        
+        self.status_info = QLabel("")
+        self.status_info.setStyleSheet(f"color: {Theme.TEXT_MUTED}; font-size: 11px; font-weight: 600;")
+        self.status_info.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        self.status_info.hide()
+        
+        # Abort Button (styled more subtly, placed away from the center)
+        self.abort_btn = QPushButton("Abort Operation")
+        self.abort_btn.setFixedSize(110, 24)
+        self.abort_btn.setCursor(Qt.PointingHandCursor)
+        self.abort_btn.setStyleSheet(f"""
+            QPushButton {{ 
+                background: {Theme.ERROR}15; 
+                color: {Theme.ERROR}; 
+                border: 1px solid {Theme.ERROR}44; 
+                border-radius: 4px; 
+                font-size: 10px; 
+                font-weight: 700; 
+            }}
+            QPushButton:hover {{ background: {Theme.ERROR}; color: white; }}
+        """)
+        self.abort_btn.clicked.connect(self._on_abort_clicked)
+        self.abort_btn.hide()
 
-    def dragEnterEvent(self, event):
-        if event.mimeData().hasUrls():
-            self.drop_overlay.show()
-            event.acceptProposedAction()
+        # Status & Abort Row
+        status_row = QHBoxLayout()
+        status_row.addWidget(self.status_info)
+        status_row.addStretch()
+        status_row.addWidget(self.abort_btn)
+        
+        # Progress Container
+        self.progress_container = QWidget()
+        self.progress_container.hide()
+        p_layout = QVBoxLayout(self.progress_container)
+        p_layout.setContentsMargins(0, 0, 0, 0)
+        p_layout.setSpacing(8)
+        
+        p_layout.addLayout(status_row)
+        p_layout.addWidget(self.progress_bar)
+        
+        layout.addWidget(self.progress_container)
 
-    def dragLeaveEvent(self, event):
+        self.batch_bar = QFrame()
+        self.batch_bar.setFixedHeight(60)
+        self.batch_bar.setStyleSheet(f"background: {Theme.PRIMARY}; border-radius: 12px;")
+        bb_layout = QHBoxLayout(self.batch_bar)
+        bb_layout.setContentsMargins(20, 0, 20, 0)
+        self.batch_label = QLabel("0 items selected")
+        self.batch_label.setStyleSheet("color: white; font-weight: 700; font-size: 14px; border: none;")
+        self.batch_action_btn = QPushButton("🚀 Batch Operations")
+        self.batch_action_btn.setStyleSheet(f"background: white; color: {Theme.PRIMARY}; padding: 8px 16px; font-weight: 800; border-radius: 6px;")
+        self.batch_action_btn.clicked.connect(self._on_batch_actions_requested)
+        
+        self.batch_clear_btn = QPushButton("🔄 Clear Metadata")
+        self.batch_clear_btn.setStyleSheet(f"background: transparent; color: white; border: 1px solid {Theme.WARNING}; padding: 8px 16px; font-weight: 700; border-radius: 6px;")
+        self.batch_clear_btn.clicked.connect(self._on_batch_clear_requested)
+
+        self.batch_ignore_btn = QPushButton("🗑️ Ignore Selection")
+        self.batch_ignore_btn.setStyleSheet(f"background: transparent; color: white; border: 1px solid {Theme.ERROR}; padding: 8px 16px; font-weight: 700; border-radius: 6px;")
+        self.batch_ignore_btn.clicked.connect(self._on_batch_ignore_requested)
+
+        self.batch_identify_btn = QPushButton("🪄 Batch Identify")
+        self.batch_identify_btn.setStyleSheet(f"background: {Theme.SURFACE}22; color: white; border: 1px solid white; padding: 8px 16px; font-weight: 700; border-radius: 6px;")
+        self.batch_identify_btn.clicked.connect(self._on_batch_identify_requested)
+
+        bb_layout.addWidget(self.batch_label)
+        bb_layout.addStretch()
+        bb_layout.addWidget(self.batch_clear_btn)
+        bb_layout.addSpacing(6)
+        bb_layout.addWidget(self.batch_ignore_btn)
+        bb_layout.addSpacing(10)
+        bb_layout.addWidget(self.batch_identify_btn)
+        bb_layout.addSpacing(6)
+        bb_layout.addWidget(self.batch_action_btn)
+        self.batch_bar.hide()
+        layout.addWidget(self.batch_bar)
+
+    def _init_drop_overlay(self):
+        self.drop_overlay = QFrame(self)
+        self.drop_overlay.setObjectName("DropOverlay")
+        self.drop_overlay.setStyleSheet(f"#DropOverlay {{ background-color: {Theme.PRIMARY}cc; border: 3px dashed white; border-radius: 20px; }}")
         self.drop_overlay.hide()
+        overlay_layout = QVBoxLayout(self.drop_overlay)
+        overlay_label = QLabel("🚀 Drop files to Ingest into Library")
+        overlay_label.setStyleSheet("color: white; font-size: 24px; font-weight: 800;")
+        overlay_label.setAlignment(Qt.AlignCenter)
+        overlay_layout.addWidget(overlay_label)
+        self.setAcceptDrops(True)
 
-    def dropEvent(self, event):
-        self.drop_overlay.hide()
-        urls = event.mimeData().urls()
-        paths = [u.toLocalFile() for u in urls if u.isLocalFile()]
-        
-        if paths:
-            self.progress_bar.show()
-            self.progress_bar.setRange(0, 0)
-            
-            # Switch to Dropped tab immediately
-            self.tabs.setCurrentIndex(4) # Dropped tab
-            
-            self.drop_worker = DropProcessor(self.engine, paths)
-            self.drop_worker.progress.connect(lambda p, t: self.progress_bar.setValue(p))
-            self.drop_worker.finished.connect(self.refresh_data)
-            self.drop_worker.start()
+    def _on_search_changed(self, text):
+        self.review_view.tables['review'].apply_filters("all", text)
+        self.review_view.tables['movies'].apply_filters("all", text)
+        self.review_view.tables['shows'].apply_filters("all", text)
+        self.conflicts_view.apply_filters("conflicts", text)
+        for table in self.extras_view.tables.values():
+            table.apply_filters("all", text)
+        self.dropped_view.table.apply_filters("all", text)
+        self.trash_view.apply_filters("ignored", text)
 
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
-        self.drop_overlay.setGeometry(self.rect())
-
-    def _on_select_all(self):
-        table = self._get_active_table()
-        if not table: return
-        
-        # Select ONLY visible rows
-        table.clearSelection()
-        for row in range(table.rowCount()):
-            if not table.isRowHidden(row):
-                table.selectRow(row)
-
-    def _on_delete_pressed(self):
-        table = self._get_active_table()
-        if not table: return
-        selected = table.selectedItems()
-        if not selected: return
-        
-        idx = self.tabs.currentIndex()
-        is_dropped_tab = (idx == 4) # 4 is the Dropped tab index
-        
-        unique_ids = set()
-        for item in selected:
-            id_item = table.item(item.row(), 1)
-            if id_item: unique_ids.add(id_item.data(Qt.UserRole))
-            
-        if not unique_ids: return
-        
-        # Confirm for batch action
-        action_name = "Remove" if is_dropped_tab else "Ignore"
-        if len(unique_ids) > 5:
-            res = QMessageBox.question(self, action_name, f"{action_name} {len(unique_ids)} files?")
-            if res != QMessageBox.Yes: return
-
-        if is_dropped_tab:
-            # Physical delete from DB for dropped items
-            with self.engine.db._get_connection() as conn:
-                for fid in unique_ids:
-                    conn.execute("DELETE FROM media_files WHERE id = ?", (fid,))
-                    conn.execute("DELETE FROM file_media_links WHERE file_id = ?", (fid,))
-        else:
-            # Normal ignore for library items
-            for fid in unique_ids:
-                f_data = self.engine.db.get_file_by_id(fid)
-                if f_data:
-                    curr_status = f_data.get('match_status', 'PENDING')
-                    self.engine.db.update_file(fid, match_status='IGNORED', previous_match_status=curr_status)
-        
-        self.refresh_data()
-
-    def _setup_table_signals(self, table):
-        table.itemSelectionChanged.connect(self._on_selection_changed)
-        table.fix_requested.connect(self._on_fix_requested)
-        table.open_folder_requested.connect(self._on_open_folder_requested)
-        table.ignore_requested.connect(self._on_ignore_requested)
-        table.clear_match_requested.connect(self._on_clear_match_requested)
-        table.restore_requested.connect(self._on_restore_requested)
+    def _get_active_table(self):
+        idx = self.main_tabs.currentIndex()
+        if idx == 0: return self.review_view.get_active_table()
+        if idx == 1: return self.conflicts_view
+        if idx == 2: return self.extras_view.get_active_table()
+        if idx == 3: return self.dropped_view.table
+        if idx == 4: return self.trash_view
+        return None
 
     def refresh_data(self):
         if self.loader and self.loader.isRunning(): return
+        self.progress_container.show()
         self.progress_bar.show()
-        self.progress_bar.setRange(0, 0)
+        self.status_info.show()
+        self.status_info.setText("Refreshing library...")
+        self.abort_btn.hide()
+        self.progress_bar.setRange(0, 0) # Indeterminate for simple DB read
         self.loader = DataLoader(self.engine)
         self.loader.data_ready.connect(self._on_data_ready)
         self.loader.start()
 
+    def _on_manual_scan_triggered(self):
+        from PySide6.QtWidgets import QFileDialog
+        
+        # Disable button immediately to prevent double-triggers during dialog
+        self.scan_new_btn.setEnabled(False)
+        
+        default_path = self.engine.config.settings.default_scan_path
+        if not default_path or not os.path.exists(default_path):
+            default_path = os.path.expanduser("~")
+            
+        path = QFileDialog.getExistingDirectory(self, "Select Directory to Scan", default_path)
+        if not path:
+            self.scan_new_btn.setEnabled(True)
+            return
+        
+        # Save as default if it's the first time or if requested (optional logic, but let's keep it simple)
+        if not self.engine.config.settings.default_scan_path:
+            self.engine.config.settings.default_scan_path = path
+            self.engine.config.save()
+
+        self.progress_container.show()
+        self.progress_bar.show()
+        self.abort_btn.show()
+        self.abort_btn.setEnabled(True)
+        self.status_info.show()
+        self._set_controls_enabled(False)
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(0)
+        self.status_info.setText("Starting discovery pipeline...")
+        
+        self.sync_worker = SyncWorker(self.engine, path)
+        self.sync_worker.progress.connect(self._on_worker_progress)
+        self.sync_worker.finished.connect(self._on_sync_finished)
+        self.sync_worker.start()
+
+    def _on_sync_finished(self):
+        self.status_info.setText("Discovery complete. Loading list...")
+        self.abort_btn.hide()
+        self._set_controls_enabled(True)
+        self.refresh_data()
+
     def _on_data_ready(self, videos, poster_paths):
+        self.progress_container.hide()
         self.progress_bar.hide()
-        
-        # Split data by categories
-        split_data = {
-            "review": [],
-            "movies": [],
-            "shows": [],
-            "extras": [],
-            "dropped": [],
-            "trash": []
-        }
-        
+
+        # 1. Detect Collisions (Skip Ignored files for collision detection)
+        name_map = {} # target_name -> [vids]
         for v in videos:
+            if v.get('match_status', '').upper() == 'IGNORED':
+                continue
+                
+            target = v.get('_new_name')
+            if target and target != "-":
+                if target not in name_map: name_map[target] = []
+                name_map[target].append(v)
+        
+        # 2. Split Data
+        split_data = {"review": [], "movies": [], "shows": [], "extras": [], "dropped": [], "trash": [], "conflicts": []}
+        
+        # Track which IDs are already handled as conflicts to avoid duplication
+        conflict_ids = set()
+        for target, vids in name_map.items():
+            if len(vids) > 1:
+                for v in vids:
+                    # Mark as conflict for the table renderer
+                    v['_is_conflict'] = True 
+                    split_data["conflicts"].append(v)
+                    conflict_ids.add(v['id'])
+
+        for v in videos:
+            if v['id'] in conflict_ids:
+                continue # Already in conflicts
+                
             status = v.get('match_status', 'pending').upper()
             mtype = v.get('_media_type_from_db') or v.get('fn_media_type')
             cat = v.get('category', 'video')
-            is_manual = v.get('is_manual', 0)
             
-            if status == 'IGNORED':
-                split_data["trash"].append(v)
-            elif is_manual:
-                split_data["dropped"].append(v)
-            elif cat != 'video':
-                split_data["extras"].append(v)
+            if status == 'IGNORED': split_data["trash"].append(v)
+            elif v.get('is_manual'): split_data["dropped"].append(v)
+            elif cat != 'video': split_data["extras"].append(v)
             elif status == 'MATCHED':
-                if mtype == 'movie':
-                    split_data["movies"].append(v)
-                else:
-                    split_data["shows"].append(v)
-            else:
-                # PENDING, MULTIPLE, UNCERTAIN, NO_MATCH
-                split_data["review"].append(v)
+                if mtype == 'movie': split_data["movies"].append(v)
+                else: split_data["shows"].append(v)
+            else: split_data["review"].append(v)
         
-        # Fill each table
-        for key, data in split_data.items():
-            self.tables[key].fill_data(data)
-            
-        # Prefetch posters
+        # Sort conflicts by target name to keep them grouped
+        split_data["conflicts"].sort(key=lambda x: x.get('_new_name', ''))
+        
+        self.review_view.fill_data(split_data)
+        self.conflicts_view.fill_data(split_data["conflicts"], is_conflicts=True)
+        self.extras_view.fill_data(split_data["extras"])
+        self.dropped_view.fill_data(split_data["dropped"])
+        self.trash_view.fill_data(split_data["trash"])
+        
         if poster_paths:
             self.poster_worker = PosterPrefetcher(self.engine, poster_paths)
             self.poster_worker.start()
 
-    def _on_import_all(self):
-        """Move all dropped files to the permanent library."""
-        with self.engine.db._get_connection() as conn:
-            conn.execute("UPDATE media_files SET is_manual = 0 WHERE is_manual = 1")
-        self.refresh_data()
-        self.tabs.setCurrentIndex(0) # Back to Review
+    # --- Table Event Handlers ---
+    def _setup_table_signals(self, table):
+        table.itemSelectionChanged.connect(self._on_selection_changed)
+        table.fix_requested.connect(self._on_fix_requested)
+        table.manual_edit_requested.connect(self._on_manual_edit_requested)
+        table.open_folder_requested.connect(self._on_open_folder_requested)
+        table.ignore_requested.connect(self._on_ignore_requested)
+        table.batch_ignore_requested.connect(self._on_batch_ignore_requested)
+        table.clear_match_requested.connect(self._on_clear_match_requested)
+        table.restore_requested.connect(self._on_restore_requested)
 
-    def _on_import_selected(self):
-        """Move only selected dropped files to the permanent library."""
-        table = self.tables["dropped"]
-        selected = table.selectedItems()
-        unique_ids = set(table.item(item.row(), 1).data(Qt.UserRole) for item in selected)
-        
-        for fid in unique_ids:
-            self.engine.db.update_file(fid, is_manual=0)
-        
-        self.refresh_data()
-
-    def _on_clear_dropped(self):
-        """Delete dropped files from the DB (but not from disk)."""
-        res = QMessageBox.question(self, "Clear List", "Clear all items from the Dropped list?\n(Files will remain on your computer)")
-        if res == QMessageBox.Yes:
-            with self.engine.db._get_connection() as conn:
-                # 1. Clear candidates for these files
-                conn.execute("DELETE FROM match_candidates WHERE file_id IN (SELECT id FROM media_files WHERE is_manual = 1)")
-                # 2. Clear links for these files
-                conn.execute("DELETE FROM file_media_links WHERE file_id IN (SELECT id FROM media_files WHERE is_manual = 1)")
-                # 3. Finally delete the files
-                conn.execute("DELETE FROM media_files WHERE is_manual = 1")
-                conn.commit()
-            self.refresh_data()
-
-    def _on_extra_subfilter_changed(self, val):
-        self.tables["extras"].apply_filters(val, self.search_box.text())
-
-    def _on_search_changed(self, text):
-        for table in self.tables.values():
-            # Note: apply_filters in DiscoveryTable doesn't know about our tab mode,
-            # but it will still filter the items IT has.
-            # We pass 'all' because the data is already pre-split.
-            table.apply_filters("all", text)
-
-    def _get_active_table(self):
-        idx = self.tabs.currentIndex()
-        mapping = {
-            0: "review",
-            1: "movies",
-            2: "shows",
-            3: "extras",
-            4: "dropped",
-            5: "trash"
-        }
-        key = mapping.get(idx)
-        return self.tables.get(key)
+    def _load_poster(self, poster_path):
+        if not poster_path: return None
+        # Local cache path logic (mirrors LibraryManager)
+        # discovery_page.py is in ui/v3/views/ (4 levels deep from root)
+        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+        local_path = os.path.join(base_dir, 'data', 'cache', 'posters', poster_path.lstrip('/'))
+        if os.path.exists(local_path):
+            return QPixmap(local_path)
+        return None
 
     def _on_selection_changed(self):
         table = self._get_active_table()
         if not table: return
-        
         selected = table.selectedItems()
         if not selected:
             self.inspector.set_empty()
             self.batch_bar.hide()
             return
 
-        # Use the first selected row for the inspector
         row = selected[0].row()
         file_id = table.item(row, 1).data(Qt.UserRole)
         file_data = self.engine.db.get_file_by_id(file_id)
-        
         if file_data:
             self.inspector.update_tech_info(file_data)
             self.inspector.update_status(file_data.get('match_status', 'pending').upper())
             
-            links = self.engine.db.get_links_for_file(file_id)
+            # Fetch links (Check parent for extras)
+            target_id = file_data.get('parent_file_id') or file_id
+            links = self.engine.db.media.get_links_for_file(target_id)
+            
             if links:
-                media = self.engine.db.get_media_item_by_id(links[0]['media_item_id'])
+                media = self.engine.db.media.get_media_item_by_id(links[0]['media_item_id'])
                 if media:
                     self.inspector.update_from_data(media)
-                    # Load posters
-                    self._load_tv_posters(
-                        series_path=media.get('poster_path'),
-                        season_path=None, # TODO: fetch season if available
-                        episode_path=None
-                    )
-            else:
-                self.inspector.title_label.setText(file_data['file_name'])
-                self.inspector.poster_carousel.clear()
+                    
+                    if media.get('media_type') == 'tv':
+                        # TV Show Layered Posters
+                        series_pix = self._load_poster(media.get('poster_path'))
+                        season_pix = None
+                        all_episode_pix = []
+                        
+                        all_episodes_data = []
+                        season_data = None
+                        
+                        # Collect all episodes from all links
+                        for link in links:
+                            if link.get('tv_episode_id'):
+                                ep_data = self.engine.db.media.get_episode_by_id(link['tv_episode_id'])
+                                if ep_data:
+                                    all_episodes_data.append(ep_data)
+                                    pix = self._load_poster(ep_data.get('still_path'))
+                                    if pix: all_episode_pix.append(pix)
+                                    
+                                    if not season_data:
+                                        season_data = self.engine.db.media.get_season_for_episode(link['tv_episode_id'])
+                        
+                        # Fallback: if no episode link or season not found, try to guess season from filename
+                        if not season_data:
+                            try:
+                                s_num = file_data.get('fn_season') if file_data.get('fn_season') is not None else file_data.get('fd_season')
+                                if s_num is not None:
+                                    season_data = self.engine.db.media.get_season_by_number(media['id'], int(s_num))
+                                    if season_data:
+                                        season_pix = self._load_poster(season_data.get('poster_path'))
+                            except: pass
+                        elif not season_pix:
+                            season_pix = self._load_poster(season_data.get('poster_path'))
 
-        # Batch Bar
+                        self.inspector.poster_carousel.set_tv_posters(series_pix, season_pix, *all_episode_pix)
+                        if all_episodes_data:
+                            self.inspector.update_episode_info(all_episodes_data, season_data)
+                        elif season_data:
+                            # Show at least season info if no episode
+                            self.inspector.update_episode_info([], season_data)
+                    else:
+                        # Movie Poster
+                        pix = self._load_poster(media.get('poster_path'))
+                        self.inspector.poster_carousel.set_single_poster(pix)
+            else:
+                # No Match: Check Candidates (Uncertain/Multiple)
+                status = file_data.get('match_status', 'pending').upper()
+                candidates = self.engine.db.matches.get_candidates(target_id)
+                
+                if candidates and status == 'UNCERTAIN':
+                    # Show first candidate's poster for Uncertain
+                    pix = self._load_poster(candidates[0].get('poster_path'))
+                    self.inspector.poster_carousel.set_single_poster(pix)
+                    self.inspector.title_label.setText(f"Candidate: {candidates[0]['title']}")
+                else:
+                    self.inspector.title_label.setText(file_data['file_name'])
+                    self.inspector.poster_carousel.clear()
+
         unique_rows = set(item.row() for item in selected)
-        count = len(unique_rows)
-        if count > 1:
-            self.batch_label.setText(f"{count} items selected")
+        if len(unique_rows) > 1:
+            self.batch_label.setText(f"{len(unique_rows)} items selected")
             self.batch_bar.show()
         else:
             self.batch_bar.hide()
 
-    def _load_tv_posters(self, series_path=None, season_path=None, episode_path=None):
-        pixmaps = []
-        root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-        cache_dir = os.path.join(root, 'data', 'cache', 'posters')
-        for path in [series_path, season_path, episode_path]:
-            if not path:
-                pixmaps.append(None)
-                continue
-            local_path = os.path.join(cache_dir, path.lstrip('/'))
-            if os.path.exists(local_path):
-                pixmap = QPixmap(local_path)
-                pixmaps.append(pixmap if not pixmap.isNull() else None)
-            else:
-                pixmaps.append(None)
-        
-        self.inspector.poster_carousel.set_tv_posters(
-            series_pix=pixmaps[0],
-            season_pix=pixmaps[1],
-            episode_pix=pixmaps[2]
-        )
-
-    def _on_fix_requested(self, vid):
-        dialog = ManualResolveDialog(self.engine, vid)
-        if dialog.exec():
-            # Refresh specifically this row across all tables (it might move tabs!)
-            self.refresh_data() 
-
-    def _on_ignore_requested(self, file_id):
-        f_data = self.engine.db.get_file_by_id(file_id)
-        if f_data:
-            if f_data.get('is_manual') == 1:
-                with self.engine.db._get_connection() as conn:
-                    conn.execute("DELETE FROM media_files WHERE id = ?", (file_id,))
-                    conn.execute("DELETE FROM file_media_links WHERE file_id = ?", (file_id,))
-            else:
-                curr_status = f_data.get('match_status', 'PENDING')
-                self.engine.db.update_file(file_id, match_status='IGNORED', previous_match_status=curr_status)
-        self.refresh_data()
-
-    def _on_restore_requested(self, file_id, row_idx):
-        f_data = self.engine.db.get_file_by_id(file_id)
-        target_status = 'PENDING'
-        if f_data and f_data.get('previous_match_status'):
-            target_status = f_data['previous_match_status']
-            
-        self.engine.db.update_file(file_id, match_status=target_status)
-        self.refresh_data()
-
-    def _on_clear_match_requested(self, file_id):
-        self.engine.db.update_file(file_id, match_status='PENDING')
-        # Also clear links
-        with self.engine.db._get_connection() as conn:
-            conn.execute("DELETE FROM file_media_links WHERE file_id = ?", (file_id,))
-        self.refresh_data()
-
-    def _on_open_folder_requested(self, path):
-        import subprocess
-        folder = os.path.dirname(path)
-        if os.path.exists(folder):
-            subprocess.Popen(f'explorer /select,"{os.path.normpath(path)}"')
-
-    def _on_batch_clear(self):
-        table = self._get_active_table()
-        selected = table.selectedItems()
-        unique_ids = set(table.item(item.row(), 1).data(Qt.UserRole) for item in selected)
-        
-        for fid in unique_ids:
-            self.engine.db.update_file(fid, match_status='PENDING')
-            with self.engine.db._get_connection() as conn:
-                conn.execute("DELETE FROM file_media_links WHERE file_id = ?", (fid,))
-        
-        self.refresh_data()
-
+    # --- Rename Flow ---
     def _on_apply_clicked(self):
+        # 1. Check for Conflicts first
+        conflicts = [f for f in self.engine.db.files.get_all_files() if f.get('match_status') == 'conflict']
+        if conflicts:
+            QMessageBox.warning(self, "Conflicts Detected", 
+                f"You have {len(conflicts)} name collisions that must be resolved first.\n\n"
+                "Please go to the 'Conflicts' tab and use 'Batch Operations' to assign unique Parts or Editions.")
+            self.main_tabs.setCurrentIndex(1) # Switch to Conflicts tab
+            return
+
+        self._set_controls_enabled(False)
+        self.progress_container.show()
         self.progress_bar.show()
-        self.progress_bar.setRange(0, 0)
-        
+        self.abort_btn.show()
+        self.status_info.show()
+        self.status_info.setText("Generating rename plan...")
+        self.progress_bar.setRange(0, 0) # Indeterminate for plan generation
         self.plan_worker = PlanWorker(self.engine)
         self.plan_worker.plan_ready.connect(self._on_plan_ready)
         self.plan_worker.start()
 
     def _on_plan_ready(self, plan):
-        self.progress_bar.hide()
+        self.progress_container.hide()
+        
         if not plan:
+            self._set_controls_enabled(True)
             QMessageBox.information(self, "Rename", "No files ready for renaming.")
             return
-            
-        dialog = PreviewDialog(plan)
+
+        # 2. Check for Plan-level collisions (e.g. folder name overlaps)
+        plan_conflicts = [item for item in plan if item.get('status') == 'collision']
+        if plan_conflicts:
+            self._set_controls_enabled(True)
+            QMessageBox.warning(self, "Conflicts Detected", 
+                f"The rename plan has {len(plan_conflicts)} name collisions.\n\n"
+                "This usually happens when multiple files result in the same target filename.\n"
+                "Please fix these in the 'Conflicts' tab before proceeding.")
+            self.main_tabs.setCurrentIndex(1)
+            return
+
+        dialog = PreviewDialog(plan, self)
         if dialog.exec():
             self.progress_bar.show()
             self.status_info.show()
@@ -549,47 +520,178 @@ class DiscoveryPage(QWidget):
             self.worker.progress.connect(self._on_worker_progress)
             self.worker.finished.connect(self._on_rename_finished)
             self.worker.start()
+        else:
+            # Re-enable if user cancelled
+            self._set_controls_enabled(True)
 
     def _on_worker_progress(self, val, text):
-        self.progress_bar.setRange(0, 100)
+        if self.progress_bar.minimum() != 0 or self.progress_bar.maximum() != 100:
+            self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(val)
         self.status_info.setText(text)
+        # Force UI update if needed
+        self.progress_bar.repaint()
 
     def _on_rename_finished(self, results):
-        self.progress_bar.hide()
+        self.progress_container.hide()
         self.status_info.hide()
+        self.abort_btn.hide()
+        self._set_controls_enabled(True)
         
-        leftovers = results.get('leftovers', {})
-        if leftovers:
-            from ui.v3.components.cleanup_dialog import CleanupDialog
-            dialog = CleanupDialog(self, leftovers, self.engine)
-            dialog.exec()
+        success = results.get('success', 0)
+        self.last_batch_id = results.get('batch_id')
+        
+        if success > 0:
+            msg = f"✅ {success} files renamed successfully."
+            self.notif_bar.show_message(msg, batch_id=results.get('batch_id'), show_undo=True)
             
-        if results.get('success', 0) > 0:
-            msg = f"✅ {results['success']} files renamed successfully."
-            self.notif_bar.show_message(msg, batch_id=results.get('batch_id'))
-        elif results.get('failed', 0) > 0:
-            QMessageBox.critical(self, "Error", f"Renaming failed for {results['failed']} files.")
+        if results.get('failed', 0) > 0:
+            QMessageBox.warning(self, "Rename Errors", f"Failed to rename {results['failed']} files.")
             
         self.refresh_data()
+
+    def _on_abort_clicked(self):
+        self.abort_btn.setEnabled(False)
+        self.status_info.setText("Aborting... please wait.")
+        # Signal all possible workers
+        for attr in ['sync_worker', 'worker', 'undo_worker']:
+            w = getattr(self, attr, None)
+            if w and w.isRunning():
+                w.stop()
+
+    def _set_controls_enabled(self, enabled):
+        """Enables or disables main action buttons to prevent conflicting operations."""
+        self.scan_new_btn.setEnabled(enabled)
+        self.refresh_btn.setEnabled(enabled)
+        self.apply_btn.setEnabled(enabled)
+        self.main_tabs.setEnabled(enabled) # Also lock tabs for safety
 
     def _on_undo_requested(self, batch_id):
-        self.progress_bar.show()
-        self.status_info.show()
-        self.progress_bar.setRange(0, 0)
+        if not batch_id: return
         
-        self.undo_worker = UndoWorker(self.engine, batch_id)
-        self.undo_worker.progress.connect(self._on_worker_progress)
-        self.undo_worker.finished.connect(self._on_undo_finished)
-        self.undo_worker.start()
+        if QMessageBox.question(self, "Undo Rename", "Are you sure you want to revert the last renaming operation?") == QMessageBox.Yes:
+            self._set_controls_enabled(False)
+            self.progress_container.show()
+            self.progress_bar.show()
+            self.progress_bar.setRange(0, 100)
+            self.status_info.show()
+            self.status_info.setText("Reverting renames...")
+            
+            self.undo_worker = UndoWorker(self.engine, batch_id)
+            self.undo_worker.progress.connect(self._on_worker_progress)
+            self.undo_worker.finished.connect(self._on_undo_finished)
+            self.undo_worker.start()
 
-    def _on_undo_finished(self, success, failed, errors):
+    def _on_undo_finished(self, results):
+        self.progress_container.hide()
         self.progress_bar.hide()
         self.status_info.hide()
-        if success > 0:
-            self.notif_bar.show_message(f"⏪ Restored {success} files to original state.", duration=4000)
+        self._set_controls_enabled(True)
+        self.last_batch_id = None
         
-        if failed > 0:
-            QMessageBox.warning(self, "Undo Partial", f"Could not restore {failed} files.\nErrors: {', '.join(errors[:3])}")
-            
+        success = results.get('success', 0)
+        if success > 0:
+            self.notif_bar.show_message(f"Successfully reverted {success} files.", type='success')
+        
+        if results.get('failed', 0) > 0:
+             QMessageBox.warning(self, "Undo Errors", f"Failed to revert {results['failed']} files.\n\n" + "\n".join(results.get('errors', [])))
+             
         self.refresh_data()
+
+    def _on_fix_requested(self, vid):
+        if vid.get('category') == 'video':
+            if ManualResolveDialog(self.engine, vid).exec(): self.refresh_data()
+        else:
+            from ui.v3.components.edit_file_dialog import EditFileDialog
+            if EditFileDialog(self, self.engine, vid).exec(): 
+                self.refresh_data()
+
+    def _on_manual_edit_requested(self, vid):
+        from ui.v3.components.edit_file_dialog import EditFileDialog
+        if EditFileDialog(self, self.engine, vid).exec(): 
+            self.refresh_data()
+
+    def _on_ignore_requested(self, file_id):
+        self.engine.db.update_file(file_id, match_status='IGNORED')
+        self.refresh_data()
+
+    def _on_restore_requested(self, file_id, row_idx):
+        self.engine.db.update_file(file_id, match_status='PENDING')
+        self.refresh_data()
+
+    def _on_clear_match_requested(self, file_id):
+        self.engine.db.matches.clear_all_for_file(file_id)
+        self.refresh_data()
+
+    def _on_open_folder_requested(self, path):
+        import subprocess
+        if os.path.exists(os.path.dirname(path)):
+            subprocess.Popen(f'explorer /select,"{os.path.normpath(path)}"')
+
+    def _on_batch_identify_requested(self):
+        table = self._get_active_table()
+        if not table: return
+        ids = table.get_selected_ids()
+        if not ids: return
+        
+        selected = [self.engine.db.files.get_file_by_id(fid) for fid in ids]
+        selected = [f for f in selected if f]
+        
+        if BatchResolveDialog(self.engine, selected, self).exec():
+            self.refresh_data()
+
+    def _on_batch_actions_requested(self):
+        table = self._get_active_table()
+        if not table: return
+        ids = table.get_selected_ids()
+        if not ids: return
+
+        selected = [self.engine.db.files.get_file_by_id(fid) for fid in ids]
+        selected = [f for f in selected if f]
+        
+        if BatchOperationsDialog(self.engine, selected, self).exec():
+            self.refresh_data()
+
+    def _on_batch_ignore_requested(self):
+        table = self._get_active_table()
+        if not table: return
+        ids = table.get_selected_ids()
+        if not ids: return
+        
+        if QMessageBox.question(self, "Ignore Selection", 
+            f"Are you sure you want to ignore {len(ids)} selected files?") == QMessageBox.Yes:
+            for fid in ids:
+                self.engine.db.files.update_file(fid, match_status='IGNORED')
+            self.refresh_data()
+
+    def _on_batch_clear_requested(self):
+        table = self._get_active_table()
+        if not table: return
+        ids = table.get_selected_ids()
+        if not ids: return
+        
+        if QMessageBox.question(self, "Clear Metadata", 
+            f"Are you sure you want to clear metadata for {len(ids)} selected files?") == QMessageBox.Yes:
+            for fid in ids:
+                self.engine.db.matches.clear_all_for_file(fid)
+            self.refresh_data()
+
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasUrls():
+            self.drop_overlay.show()
+            event.acceptProposedAction()
+
+    def dragLeaveEvent(self, event): self.drop_overlay.hide()
+
+    def dropEvent(self, event):
+        self.drop_overlay.hide()
+        paths = [u.toLocalFile() for u in event.mimeData().urls() if u.isLocalFile()]
+        if paths:
+            self.main_tabs.setCurrentIndex(2) # Dropped tab
+            self.drop_worker = DropProcessor(self.engine, paths)
+            self.drop_worker.finished.connect(self.refresh_data)
+            self.drop_worker.start()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self.drop_overlay.setGeometry(self.rect())

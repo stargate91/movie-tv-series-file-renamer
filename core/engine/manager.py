@@ -37,14 +37,17 @@ class RenamerEngineV3:
         2. Collect technical data & internal tags
         3. Resolve against APIs (TMDB/OMDb)
         """
-        if cb: cb("Scanning directory...", 0, 100)
-        self.scanner.scan_directory(path)
+        if cb: 
+            if cb("Scanning directory...", 0, 100) is False: return False
+        if self.scanner.scan_directory(path, progress_callback=lambda msg, cur, tot: cb(msg, (cur/tot * 20), 100) if cb else None) is False: return False
         
-        if cb: cb("Collecting metadata (FFmpeg/GuessIt)...", 20, 100)
-        self.collector.collect_all(cb=lambda msg, cur, tot: cb(msg, 20 + (cur/tot * 30), 100) if cb else None)
+        if cb: 
+            if cb("Collecting metadata (FFmpeg/GuessIt)...", 20, 100) is False: return False
+        if self.collector.collect_all(progress_callback=lambda msg, cur, tot: cb(msg, 20 + (cur/tot * 30), 100) if cb else None) is False: return False
         
-        if cb: cb("Identifying media with APIs...", 50, 100)
-        self.resolver.resolve_all(cb=lambda msg, cur, tot: cb(msg, 50 + (cur/tot * 50), 100) if cb else None)
+        if cb: 
+            if cb("Identifying media with APIs...", 50, 100) is False: return False
+        if self.resolver.resolve_all(progress_callback=lambda msg, cur, tot: cb(msg, 50 + (cur/tot * 50), 100) if cb else None) is False: return False
         
         if cb: cb("Pipeline complete.", 100, 100)
         return True
@@ -55,7 +58,7 @@ class RenamerEngineV3:
         """
         if not file_ids:
             # Fetch only successfully MATCHED video files that are not deleted or already renamed
-            videos = self.db.get_files_by_category('video')
+            videos = self.db.files.get_files_by_category('video')
             file_ids = [v['id'] for v in videos if (v.get('status') or '').upper() not in ('DELETED', 'RENAMED') 
                         and (v.get('match_status') or '').upper() == 'MATCHED']
             
@@ -64,11 +67,8 @@ class RenamerEngineV3:
             for fid in file_ids:
                 all_ids.append(fid)
                 # Extras are included if their parent is matched, unless the extra itself is ignored
-                extras = self.db._get_connection().execute(
-                    "SELECT id FROM media_files WHERE parent_file_id = ? AND UPPER(match_status) != 'IGNORED' AND UPPER(status) NOT IN ('DELETED', 'RENAMED')", 
-                    (fid,)
-                ).fetchall()
-                all_ids.extend([e['id'] for e in extras])
+                extras = self.db.files.get_children(fid)
+                all_ids.extend([e['id'] for e in extras if (e.get('match_status') or '').upper() != 'IGNORED'])
             file_ids = all_ids
 
         return self.executor.create_plan(file_ids)
@@ -89,10 +89,4 @@ class RenamerEngineV3:
         """
         Returns recent rename history.
         """
-        with self.db._get_connection() as conn:
-            return conn.execute("""
-                SELECT rh.*, mf.file_name 
-                FROM rename_history rh
-                JOIN media_files mf ON rh.file_id = mf.id
-                ORDER BY timestamp DESC LIMIT ?
-            """, (limit,)).fetchall()
+        return self.db.history.get_recent(limit)

@@ -49,43 +49,7 @@ class PreviewDialog(QDialog):
         
         layout.addLayout(header_layout)
 
-        # Filters Section
-        filter_layout = QHBoxLayout()
-        filter_layout.setSpacing(10)
-        
-        self.current_filter = "All"
-        self.filter_buttons = []
-        
-        filters = ["All", "Collision Movies", "Collision Episodes", "Ready", "Extra Collisions", "Extra Ready"]
-        for f in filters:
-            btn = QPushButton(f)
-            btn.setCheckable(True)
-            btn.setCursor(Qt.PointingHandCursor)
-            btn.setFixedHeight(30)
-            if f == "All": btn.setChecked(True)
-            
-            btn.setStyleSheet(f"""
-                QPushButton {{
-                    background: {Theme.SURFACE_DARK};
-                    border: 1px solid {Theme.BORDER};
-                    border-radius: 15px;
-                    padding: 0 15px;
-                    color: {Theme.TEXT_DIM};
-                    font-weight: bold;
-                    font-size: 11px;
-                }}
-                QPushButton:checked {{
-                    background: {Theme.PRIMARY};
-                    border: 1px solid {Theme.PRIMARY};
-                    color: white;
-                }}
-            """)
-            btn.clicked.connect(lambda checked, text=f: self._set_filter(text))
-            self.filter_buttons.append(btn)
-            filter_layout.addWidget(btn)
-            
-        filter_layout.addStretch()
-        layout.addLayout(filter_layout)
+        layout.addLayout(header_layout)
         layout.addSpacing(10)
 
         # List Header
@@ -211,53 +175,11 @@ class PreviewDialog(QDialog):
             item_layout.addWidget(arrow)
             
             # Right Side (New)
-            if is_collision:
-                resolve_layout = QHBoxLayout()
-                resolve_layout.setSpacing(5)
-                edit = QLineEdit(new_basename)
-                edit.setStyleSheet(f"background: {Theme.SURFACE_DARK}; border: 1px solid {Theme.BORDER}; color: {Theme.TEXT_MAIN}; padding: 4px; font-family: monospace;")
-                
-                # Up / Down buttons for reordering within the collision group
-                btn_up = QPushButton("▲")
-                btn_up.setCursor(Qt.PointingHandCursor)
-                btn_up.setFixedSize(24, 24)
-                btn_up.setStyleSheet(f"background: {Theme.SURFACE_LIGHT}; color: white; border-radius: 4px; font-size: 10px;")
-                btn_up.clicked.connect(lambda checked=False, idx=i: self._reorder_collision(idx, -1))
-                
-                btn_down = QPushButton("▼")
-                btn_down.setCursor(Qt.PointingHandCursor)
-                btn_down.setFixedSize(24, 24)
-                btn_down.setStyleSheet(f"background: {Theme.SURFACE_LIGHT}; color: white; border-radius: 4px; font-size: 10px;")
-                btn_down.clicked.connect(lambda checked=False, idx=i: self._reorder_collision(idx, 1))
-                
-                btn = QPushButton("Manual")
-                btn.setCursor(Qt.PointingHandCursor)
-                btn.setStyleSheet(f"background: {Theme.PRIMARY}; color: white; padding: 4px 10px; border-radius: 4px; font-weight: bold;")
-                btn.clicked.connect(lambda checked=False, idx=i, e=edit: self._resolve_collision(idx, e.text()))
-                
-                btn_auto = QPushButton("Auto-Part")
-                btn_auto.setCursor(Qt.PointingHandCursor)
-                btn_auto.setToolTip("Automatically append Part 1, Part 2, etc. to all conflicting files with this name.")
-                btn_auto.setStyleSheet(f"background: {Theme.WARNING}; color: white; padding: 4px 10px; border-radius: 4px; font-weight: bold;")
-                btn_auto.clicked.connect(lambda checked=False, p=item['proposed_path']: self._auto_part_group(p))
-                
-                if item.get('category', 'video') != 'video':
-                    btn_auto.setEnabled(False)
-                    btn_auto.setToolTip("Auto-Part is only available for video files.")
-                    btn_auto.setStyleSheet(f"background: {Theme.SURFACE_LIGHT}; color: {Theme.TEXT_DIM}; padding: 4px 10px; border-radius: 4px; font-weight: bold;")
-                    
-                resolve_layout.addWidget(btn_up)
-                resolve_layout.addWidget(btn_down)
-                resolve_layout.addWidget(edit, 1)
-                resolve_layout.addWidget(btn)
-                resolve_layout.addWidget(btn_auto)
-                item_layout.addLayout(resolve_layout, 6)
-            else:
-                color = Theme.SUCCESS if item['action'] == 'rename' else Theme.ERROR
-                new_lbl = QLabel(new_name)
-                new_lbl.setWordWrap(True)
-                new_lbl.setStyleSheet(f"color: {color}; font-family: monospace; font-size: 13px; font-weight: 700;")
-                item_layout.addWidget(new_lbl, 6)
+            color = Theme.SUCCESS if item['action'] == 'rename' else Theme.ERROR
+            new_lbl = QLabel(new_name)
+            new_lbl.setWordWrap(True)
+            new_lbl.setStyleSheet(f"color: {color}; font-family: monospace; font-size: 13px; font-weight: 700;")
+            item_layout.addWidget(new_lbl, 6)
                 
             # Add a global Remove button to the far right for EVERY item
             btn_remove = QPushButton("🗑")
@@ -335,84 +257,13 @@ class PreviewDialog(QDialog):
         footer_btns.addWidget(apply_btn)
         self.footer_layout.addLayout(footer_btns)
 
-    def _resolve_collision(self, idx, new_filename):
-        import os
-        item = self.plan[idx]
-        if not item['proposed_path']: return
-        
-        dir_name = os.path.dirname(item['proposed_path'])
-        item['proposed_path'] = os.path.join(dir_name, new_filename)
-        
-        self._recheck_collisions()
-
-    def _reorder_collision(self, idx, direction):
-        """Moves an item up (-1) or down (1) within its collision group."""
-        item = self.plan[idx]
-        proposed = item.get('proposed_path', '').lower()
-        if not proposed: return
-        
-        # Find all indices in self.plan that share this proposed path
-        group_indices = [i for i, p in enumerate(self.plan) if p.get('proposed_path', '').lower() == proposed]
-        
-        try:
-            group_pos = group_indices.index(idx)
-        except ValueError:
-            return
-            
-        target_pos = group_pos + direction
-        if 0 <= target_pos < len(group_indices):
-            # Swap in self.plan
-            target_idx = group_indices[target_pos]
-            self.plan[idx], self.plan[target_idx] = self.plan[target_idx], self.plan[idx]
-            
-            # Rebuild UI
-            self._build_list()
-
-    def _auto_part_group(self, proposed_path):
-        # Find all items colliding on this path
-        group = [item for item in self.plan if item.get('proposed_path', '').lower() == proposed_path.lower()]
-        
-        if len(group) > 1 and self.parent() and hasattr(self.parent(), 'engine'):
-            resolver = self.parent().engine.collision_resolver
-            resolver.force_resolve_group(group)
-            self._recheck_collisions()
-
     def _remove_item(self, item):
-        """Removes an item completely from the plan. Also acts as a way to resolve collisions."""
+        """Removes an item completely from the plan."""
         try:
             self.plan.remove(item)
-            # Recheck collisions because removing an item might make another colliding item safe!
-            self._recheck_collisions()
+            self._build_list()
         except ValueError:
             pass
-
-    def _recheck_collisions(self):
-        # Build path map to find duplicates
-        path_map = {}
-        for item in self.plan:
-            if item['action'] == 'skip' or not item['proposed_path']: continue
-            path = item['proposed_path'].lower()
-            if path not in path_map: path_map[path] = []
-            path_map[path].append(item)
-            
-        # Update statuses
-        for path, items in path_map.items():
-            if len(items) > 1:
-                for p in items: p['status'] = 'collision'
-            else:
-                for p in items: p['status'] = 'manual_resolved' # or safe
-                
-        # Rebuild UI
-        self._build_list()
-
-    def _set_filter(self, text):
-        self.current_filter = text
-        for btn in self.filter_buttons:
-            if btn.text() != text:
-                btn.setChecked(False)
-            else:
-                btn.setChecked(True)
-        self._filter_items(self.search_input.text())
 
     def _filter_items(self, text):
         query = text.lower()
@@ -424,25 +275,7 @@ class PreviewDialog(QDialog):
             
         for widget, item, old, new in self.item_widgets:
             matches_text = query in old or query in new
-            
-            status = item.get('status', 'safe')
-            is_collision = status == 'collision'
-            cat = item.get('category', 'video')
-            media_type = item.get('media_type', 'unknown')
-            
-            matches_filter = True
-            if self.current_filter == "Collision Movies":
-                matches_filter = is_collision and cat == 'video' and media_type == 'movie'
-            elif self.current_filter == "Collision Episodes":
-                matches_filter = is_collision and cat == 'video' and media_type == 'episode'
-            elif self.current_filter == "Ready":
-                matches_filter = not is_collision and cat == 'video'
-            elif self.current_filter == "Extra Collisions":
-                matches_filter = is_collision and cat != 'video'
-            elif self.current_filter == "Extra Ready":
-                matches_filter = not is_collision and cat != 'video'
-                
-            widget.setVisible(matches_text and matches_filter)
+            widget.setVisible(matches_text)
             
         if container:
             container.layout().setEnabled(True)

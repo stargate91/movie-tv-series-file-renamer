@@ -87,14 +87,7 @@ class CleanupDialog(QDialog):
         for dir_path, files in self.leftovers.items():
             # 1. Törlés az adatbázisból
             try:
-                conn = self.engine.db._get_connection()
-                # Törlünk minden olyan rekordot, ami ebben a mappában van
-                like_pattern = f"{dir_path}{os.sep}%"
-                conn.execute("DELETE FROM media_files WHERE current_path LIKE ?", (like_pattern,))
-                # És ha pont maga a mappa lenne (bár mappákat nem tárolunk media_files-ként)
-                conn.execute("DELETE FROM media_files WHERE current_path = ?", (dir_path,))
-                conn.commit()
-                conn.close()
+                self.engine.db.files.delete_by_path_prefix(dir_path)
             except Exception as e:
                 logger.error(f"Failed to clean DB for {dir_path}: {e}")
 

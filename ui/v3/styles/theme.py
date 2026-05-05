@@ -34,6 +34,7 @@ class Theme:
         'PENDING':   '#64748B',
         'LINKED':    '#3B82F6',
         'ORPHANED':  '#F59E0B',
+        'CONFLICT':  '#EC4899', # Pink for visual distinction
     }
     
     @staticmethod
@@ -217,22 +218,39 @@ class Theme:
         QComboBox {{
             background-color: {Theme.SURFACE};
             border: 1px solid {Theme.BORDER};
-            border-radius: 6px;
-            padding: 5px 10px;
+            border-radius: 8px;
+            padding: 8px 35px 8px 12px; /* Increased right padding for arrow */
             color: {Theme.TEXT_MAIN};
         }}
         QComboBox:hover {{
             border-color: {Theme.PRIMARY};
         }}
         QComboBox::drop-down {{
-            border: none;
+            subcontrol-origin: padding;
+            subcontrol-position: top right;
             width: 30px;
+            border-left: 1px solid {Theme.BORDER};
+            border-top-right-radius: 8px;
+            border-bottom-right-radius: 8px;
+        }}
+        QComboBox::down-arrow {{
+            image: url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiM5NGEzYjgiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHBvbHlsaW5lIHBvaW50cz0iNiA5IDEyIDE1IDE4IDkiPjwvcG9seWxpbmU+PC9zdmc+);
+            width: 16px;
+            height: 16px;
+        }}
+        QComboBox QLineEdit {{
+            background: transparent;
+            border: none;
+            color: {Theme.TEXT_MAIN};
+            padding: 0;
+            margin: 0;
         }}
         QComboBox QAbstractItemView {{
             background-color: {Theme.SURFACE};
             border: 1px solid {Theme.BORDER};
             selection-background-color: {Theme.PRIMARY};
             color: {Theme.TEXT_MAIN};
+            padding: 5px;
             outline: none;
         }}
 
@@ -600,6 +618,25 @@ class Theme:
             }}
             QPushButton:hover {{
                 background-color: {Theme.PRIMARY_HOVER};
+            }}
+            QPushButton:disabled {{
+                background-color: {Theme.SURFACE_LIGHT};
+                color: {Theme.TEXT_DIM};
+            }}
+        """
+
+    @staticmethod
+    def get_success_button_style():
+        return f"""
+            QPushButton {{
+                background-color: {Theme.SUCCESS}; 
+                color: white; 
+                font-weight: 800; 
+                font-size: 15px;
+                border-radius: 12px;
+            }}
+            QPushButton:hover {{
+                background-color: {Theme.STATUS_COLORS['MATCHED']};
             }}
             QPushButton:disabled {{
                 background-color: {Theme.SURFACE_LIGHT};

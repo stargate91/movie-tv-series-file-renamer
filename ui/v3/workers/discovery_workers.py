@@ -14,7 +14,8 @@ class DataLoader(QThread):
 
     def run(self):
         try:
-            raw_videos = self.engine.db.get_files_by_category('video', 'extra', 'subtitle', 'audio', 'image', 'metadata', 'unknown')
+            # Use FileRepository
+            raw_videos = self.engine.db.files.get_files_by_category('video', 'extra', 'subtitle', 'audio', 'image', 'metadata', 'unknown')
             # Filter out files that are already completed (renamed) or deleted
             videos = [v for v in raw_videos if v.get('status') not in ('renamed', 'deleted')]
             
@@ -34,13 +35,25 @@ class DataLoader(QThread):
                         
                     # Fetch links (use parent_id if extra)
                     target_id = vid.get('parent_file_id') or vid['id']
-                    links = self.engine.db.get_links_for_file(target_id)
+                    # Use MediaRepository
+                    links = self.engine.db.media.get_links_for_file(target_id)
                     if links:
-                        media = self.engine.db.get_media_item_by_id(links[0]['media_item_id'])
+                        link = links[0]
+                        # Use MediaRepository
+                        media = self.engine.db.media.get_media_item_by_id(link['media_item_id'])
                         if media:
                             vid['_media_type_from_db'] = media.get('media_type')
                             if media.get('poster_path'):
                                 poster_paths.append(media['poster_path'])
+                                
+                            # Pre-fetch Season and Episode posters for TV
+                            if media.get('media_type') == 'tv' and link.get('tv_episode_id'):
+                                ep = self.engine.db.media.get_episode_by_id(link['tv_episode_id'])
+                                if ep and ep.get('still_path'):
+                                    poster_paths.append(ep['still_path'])
+                                season = self.engine.db.media.get_season_for_episode(link['tv_episode_id'])
+                                if season and season.get('poster_path'):
+                                    poster_paths.append(season['poster_path'])
                 except:
                     pass
 
@@ -60,7 +73,8 @@ class PosterPrefetcher(QThread):
         for path in self.poster_paths:
             if not path: continue
             try:
-                self.engine.db.api_cache.get_poster(path)
+                # Use LibraryManager which has the download logic
+                self.engine.resolver.library.pre_download_poster(path)
             except:
                 pass
 
@@ -73,17 +87,45 @@ class RenameWorker(QThread):
         super().__init__()
         self.engine = engine
         self.plan = plan
+        self._is_cancelled = False
+
+    def stop(self):
+        self._is_cancelled = True
 
     def run(self):
         try:
             def cb(curr, total, path):
+                if self._is_cancelled: return False
                 pct = int((curr / total) * 100)
                 self.progress.emit(pct, f"Moving: {os.path.basename(path)}")
+                return True
 
             results = self.engine.executor.execute_plan(self.plan, progress_callback=cb)
             self.finished.emit(results)
         except Exception as e:
             self.finished.emit({'success': 0, 'failed': 1, 'skipped': 0, 'deleted': 0, 'errors': [str(e)]})
+
+class UndoWorker(QThread):
+    """Handles reversing a rename batch in the background."""
+    finished = Signal(dict)
+    progress = Signal(int, str)
+
+    def __init__(self, engine, batch_id):
+        super().__init__()
+        self.engine = engine
+        self.batch_id = batch_id
+
+    def run(self):
+        try:
+            def cb(curr, total, path):
+                pct = int((curr / total) * 100)
+                self.progress.emit(pct, f"Restoring: {os.path.basename(path)}")
+                return True
+
+            success, failed, errors = self.engine.executor.undo_batch(self.batch_id, progress_callback=cb)
+            self.finished.emit({'success': success, 'failed': failed, 'errors': errors})
+        except Exception as e:
+            self.finished.emit({'success': 0, 'failed': 1, 'errors': [str(e)]})
 
 class PlanWorker(QThread):
     """Handles the heavy lifting of generating the rename plan."""
@@ -139,7 +181,7 @@ class DropProcessor(QThread):
                 self.progress.emit(int((i / total) * 100), f"Ingesting: {os.path.basename(abs_path)}")
                 
                 # 2. Duplicate check
-                existing = self.engine.db.get_file_by_path(abs_path)
+                existing = self.engine.db.files.get_file_by_path(abs_path)
                 if existing: continue
                 
                 # 3. Basic Scan & DB Insert (with is_manual=1)
@@ -167,14 +209,47 @@ class UndoWorker(QThread):
         super().__init__()
         self.engine = engine
         self.batch_id = batch_id
+        self._is_cancelled = False
+
+    def stop(self):
+        self._is_cancelled = True
 
     def run(self):
         try:
             def cb(curr, total, path):
+                if self._is_cancelled: return False
                 pct = int((curr / total) * 100)
                 self.progress.emit(pct, f"Restoring: {os.path.basename(path)}")
+                return True
 
             success, failed, errors = self.engine.executor.undo_batch(self.batch_id, progress_callback=cb)
             self.finished.emit(success, failed, errors)
         except Exception as e:
             self.finished.emit(0, 1, [str(e)])
+
+class SyncWorker(QThread):
+    """Handles the full discovery pipeline: Scan -> Collect -> Resolve."""
+    progress = Signal(int, str)
+    finished = Signal()
+
+    def __init__(self, engine, path):
+        super().__init__()
+        self.engine = engine
+        self.path = path
+        self._is_cancelled = False
+
+    def stop(self):
+        self._is_cancelled = True
+
+    def run(self):
+        try:
+            def cb(msg, cur, tot):
+                if self._is_cancelled: return False
+                self.progress.emit(int(cur), msg)
+                return True
+            
+            self.engine.full_scan_and_resolve(self.path, cb=cb)
+            self.finished.emit()
+        except Exception as e:
+            logger.error(f"SyncWorker Error: {e}")
+            self.finished.emit()

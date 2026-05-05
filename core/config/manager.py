@@ -150,7 +150,7 @@ class ConfigManager:
         settings_dict = asdict(self.settings)
         for k, v in settings_dict.items():
             # Store values as JSON strings to preserve types (ints, bools)
-            self.db.set_setting(k, json.dumps(v))
+            self.db.settings.set(k, json.dumps(v))
         logger.info("Settings saved to LibraryDB user_settings.")
 
     def to_dict(self) -> dict:
@@ -159,7 +159,7 @@ class ConfigManager:
 
     def _load(self) -> None:
         """Load settings from SQLite if available, fallback to environment variables."""
-        all_settings = self.db.get_all_settings()
+        all_settings = self.db.settings.get_all()
         
         # Mapping for API keys in .env
         env_mapping = {
@@ -173,7 +173,11 @@ class ConfigManager:
             if fld.name in all_settings:
                 try:
                     val = json.loads(all_settings[fld.name])
-                    if val: # Only set if not empty
+                    # Only set if not empty and not a placeholder
+                    placeholders = {"your_omdb_key_here", "your_tmdb_key_here", "your_tmdb_token_here", ""}
+                    if val and val not in placeholders:
+                        if isinstance(val, str) and fld.name in env_mapping:
+                            val = val.strip()
                         setattr(self.settings, fld.name, val)
                         continue
                 except Exception:
@@ -183,4 +187,4 @@ class ConfigManager:
             if fld.name in env_mapping:
                 env_val = os.getenv(env_mapping[fld.name])
                 if env_val:
-                    setattr(self.settings, fld.name, env_val)
+                    setattr(self.settings, fld.name, env_val.strip())
