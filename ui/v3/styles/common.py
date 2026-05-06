@@ -81,9 +81,11 @@ class CommonStyles:
             background-color: {Palette.SURFACE_LIGHT};
             color: {Palette.TEXT_MAIN};
             border: 1px solid {Palette.BORDER};
-            padding: 4px 8px;
-            font-size: 11px;
+            padding: 10px 15px;
+            text-align: left;
+            font-size: 13px;
             font-weight: 600;
+            border-radius: 8px;
         }}
         
         QPushButton#SecondaryButton:hover {{

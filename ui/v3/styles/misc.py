@@ -165,6 +165,10 @@ class MiscStyles:
         return "background: transparent; border: none;"
 
     @staticmethod
+    def get_scroll_area_transparent_style():
+        return MiscStyles.get_scroll_area_style()
+
+    @staticmethod
     def get_inner_tab_widget_style():
         return f"""
             QTabWidget::pane {{ border: 1px solid {Palette.BORDER}; border-radius: 8px; background: {Palette.SURFACE}; }}

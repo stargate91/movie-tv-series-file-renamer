@@ -118,7 +118,7 @@ class DiscoveryTable(QTableWidget):
                 raw_cat = vid.get('category', 'unknown') or 'unknown'
                 
                 if raw_cat != 'video':
-                    if status != 'CONFLICT':
+                    if status not in ('CONFLICT', 'IGNORED'):
                         status = 'LINKED' if vid.get('parent_file_id') else 'ORPHANED'
                 
                 # 0. Status
@@ -189,30 +189,42 @@ class DiscoveryTable(QTableWidget):
                     primary_btn.setStyleSheet(Theme.get_discovery_action_btn_style(variant))
                     primary_btn.clicked.connect(lambda checked=False, v=vid: self.fix_requested.emit(v))
                 
-                if primary_btn:
+                if status == 'IGNORED':
+                    # Special Trash View: Just Restore and Open Folder, no Edit/Fix or Overflow
+                    # 1. Restore
                     actions_layout.addWidget(primary_btn)
-                
-                # --- 2. Base Edit Button (Meta 2) ---
-                edit_btn = QPushButton("✏️")
-                edit_btn.setToolTip(T("discovery.actions.edit"))
-                edit_btn.setFixedSize(54, 46)
-                edit_btn.setCursor(Qt.PointingHandCursor)
-                edit_btn.setStyleSheet(Theme.get_discovery_action_btn_style('neutral'))
-                edit_btn.clicked.connect(lambda checked=False, v=vid: self._on_manual_edit_clicked(v))
-                actions_layout.addWidget(edit_btn)
-                
+                    
+                    # 2. Open Folder
+                    open_btn = QPushButton("📂")
+                    open_btn.setToolTip(T("discovery.actions.open_folder"))
+                    open_btn.setFixedSize(54, 46)
+                    open_btn.setCursor(Qt.PointingHandCursor)
+                    open_btn.setStyleSheet(Theme.get_discovery_action_btn_style('neutral'))
+                    open_btn.clicked.connect(lambda checked=False, p=vid['current_path']: self.open_folder_requested.emit(p))
+                    actions_layout.addWidget(open_btn)
+                else:
+                    # Regular View logic
+                    if primary_btn:
+                        actions_layout.addWidget(primary_btn)
+                    
+                    # --- 2. Base Edit Button (Only for videos) ---
+                    if raw_cat == 'video':
+                        edit_btn = QPushButton("✏️")
+                        edit_btn.setToolTip(T("discovery.actions.edit"))
+                        edit_btn.setFixedSize(54, 46)
+                        edit_btn.setCursor(Qt.PointingHandCursor)
+                        edit_btn.setStyleSheet(Theme.get_discovery_action_btn_style('neutral'))
+                        edit_btn.clicked.connect(lambda checked=False, v=vid: self._on_manual_edit_clicked(v))
+                        actions_layout.addWidget(edit_btn)
 
-
-
-
-                # --- 3. Overflow Menu (...) ---
-                overflow_btn = QPushButton("•••")
-                overflow_btn.setToolTip(T("common.more"))
-                overflow_btn.setFixedSize(54, 46)
-                overflow_btn.setCursor(Qt.PointingHandCursor)
-                overflow_btn.setStyleSheet(Theme.get_discovery_action_btn_style('neutral'))
-                overflow_btn.clicked.connect(lambda checked=False, b=overflow_btn, v=vid: self._show_row_menu(b, v))
-                actions_layout.addWidget(overflow_btn)
+                    # --- 3. Overflow Menu (...) ---
+                    overflow_btn = QPushButton("•••")
+                    overflow_btn.setToolTip(T("common.more"))
+                    overflow_btn.setFixedSize(54, 46)
+                    overflow_btn.setCursor(Qt.PointingHandCursor)
+                    overflow_btn.setStyleSheet(Theme.get_discovery_action_btn_style('neutral'))
+                    overflow_btn.clicked.connect(lambda checked=False, b=overflow_btn, v=vid: self._show_row_menu(b, v))
+                    actions_layout.addWidget(overflow_btn)
 
                 actions_layout.addStretch()
                 self.setCellWidget(i, 4, actions_widget)
@@ -231,9 +243,9 @@ class DiscoveryTable(QTableWidget):
 
     def _show_row_menu(self, button, vid):
         """Shows the overflow menu for a specific row's button."""
-        self._show_actions_menu(button.mapToGlobal(button.rect().bottomLeft()), vid)
+        self._show_actions_menu(button.mapToGlobal(button.rect().bottomLeft()), vid, is_context=False)
 
-    def _show_actions_menu(self, global_pos, vid=None):
+    def _show_actions_menu(self, global_pos, vid=None, is_context=True):
         """Renders the overflow/context menu."""
         if not vid:
             # Try to get vid from current selection if not provided
@@ -256,57 +268,71 @@ class DiscoveryTable(QTableWidget):
         # Apply a clean dark style to the menu
         menu.setStyleSheet(Theme.get_context_menu_style())
         
-        # --- PRIMARY ACTIONS (Fix / Edit) ---
-        if status != 'IGNORED':
+        if status == 'IGNORED':
+            # Trash Context Menu: Minimal
             is_multi = len(set(item.row() for item in self.selectedItems())) > 1
             
-            # 1. API Fix / Identify
-            if raw_cat == 'video':
-                label = T("discovery.actions.batch_identify") if is_multi else T("discovery.actions.fix")
-                icon = "🪄" if is_multi else "🛠️"
-                fix_act = menu.addAction(f"{icon}  {label}")
+            restore_act = menu.addAction("📥  " + T("discovery.actions.restore"))
+            restore_act.triggered.connect(lambda: self.restore_requested.emit(file_id, 0))
+            
+            if not is_multi:
+                menu.addSeparator()
+                open_act = menu.addAction("📂  " + T("discovery.actions.open_folder"))
+                if path:
+                    open_act.triggered.connect(lambda: self.open_folder_requested.emit(path))
+                else:
+                    open_act.setEnabled(False)
+        else:
+            # --- PRIMARY ACTIONS (Only shown in Right-Click context menu to avoid redundancy with row buttons) ---
+            if is_context:
+                is_multi = len(set(item.row() for item in self.selectedItems())) > 1
+                
+                # 1. API Fix / Identify
+                if raw_cat == 'video':
+                    label = T("discovery.actions.batch_identify") if is_multi else T("discovery.actions.fix")
+                    icon = "🪄" if is_multi else "🛠️"
+                    fix_act = menu.addAction(f"{icon}  {label}")
+                    
+                    if is_multi:
+                        fix_act.triggered.connect(self.batch_identify_requested.emit)
+                    elif vid:
+                        fix_act.triggered.connect(lambda: self.fix_requested.emit(vid))
+                    else:
+                        # Try to find vid from selected row
+                        fix_act.triggered.connect(lambda: self.fix_requested.emit({'id': file_id, 'category': 'video'}))
+                
+                # 2. Manual Edit (For all)
+                edit_label = T("discovery.actions.batch_actions") if is_multi else T("discovery.actions.edit")
+                edit_icon = "🪄" if is_multi else "✏️"
+                edit_act = menu.addAction(f"{edit_icon}  {edit_label}")
                 
                 if is_multi:
-                    fix_act.triggered.connect(self.batch_identify_requested.emit)
+                    edit_act.triggered.connect(self.batch_edit_requested.emit)
                 elif vid:
-                    fix_act.triggered.connect(lambda: self.fix_requested.emit(vid))
+                    edit_act.triggered.connect(lambda: self._on_manual_edit_clicked(vid))
                 else:
-                    fix_act.triggered.connect(lambda: self.fix_requested.emit({'id': file_id, 'category': 'video'}))
-            
-            # 2. Manual Edit (For all)
-            edit_label = T("discovery.actions.batch_actions") if is_multi else T("discovery.actions.edit")
-            edit_icon = "🪄" if is_multi else "✏️"
-            edit_act = menu.addAction(f"{edit_icon}  {edit_label}")
-            
-            if is_multi:
-                edit_act.triggered.connect(self.batch_edit_requested.emit)
-            elif vid:
-                edit_act.triggered.connect(lambda: self._on_manual_edit_clicked(vid))
+                    edit_act.triggered.connect(lambda: self._on_manual_edit_clicked({'id': file_id}))
+                
+                menu.addSeparator()
+
+            # 3. Folder Action
+            open_act = menu.addAction("📂  " + T("discovery.actions.open_folder"))
+            if path:
+                open_act.triggered.connect(lambda: self.open_folder_requested.emit(path))
             else:
-                edit_act.triggered.connect(lambda: self._on_manual_edit_clicked({'id': file_id}))
+                open_act.setEnabled(False)
+                
+            # 4. Clear Match Action (Only for videos)
+            if raw_cat == 'video':
+                clear_act = menu.addAction("🔄  " + T("discovery.actions.clear_match"))
+                clear_act.setEnabled(status == 'MATCHED')
+                clear_act.triggered.connect(lambda: self.clear_match_requested.emit(file_id))
             
             menu.addSeparator()
-
-        # 3. Folder Action
-        open_act = menu.addAction("📂  " + T("discovery.actions.open_folder"))
-        if path:
-            open_act.triggered.connect(lambda: self.open_folder_requested.emit(path))
-        else:
-            open_act.setEnabled(False)
             
-        # 4. Clear Match Action (Only for videos)
-        if raw_cat == 'video':
-            clear_act = menu.addAction("🔄  " + T("discovery.actions.clear_match"))
-            clear_act.setEnabled(status == 'MATCHED')
-            clear_act.triggered.connect(lambda: self.clear_match_requested.emit(file_id))
-        
-        menu.addSeparator()
-        
-        # 3. Ignore / Restore Action
-        ignore_label = T("discovery.actions.restore") if status == 'IGNORED' else T("discovery.actions.ignore")
-        ignore_icon = "📥" if status == 'IGNORED' else "🗑️"
-        ignore_act = menu.addAction(f"{ignore_icon}  {ignore_label}")
-        ignore_act.triggered.connect(lambda: self.restore_requested.emit(file_id, 0) if status == 'IGNORED' else self.ignore_requested.emit(file_id))
+            # 5. Ignore Action
+            ignore_act = menu.addAction("🗑️  " + T("discovery.actions.ignore"))
+            ignore_act.triggered.connect(lambda: self.ignore_requested.emit(file_id))
         
         menu.exec(global_pos)
 
@@ -351,7 +377,8 @@ class DiscoveryTable(QTableWidget):
                 # Update Status
                 status = file_data.get('match_status', 'pending').upper()
                 if file_data.get('category') != 'video':
-                    status = 'LINKED' if file_data.get('parent_file_id') else 'ORPHANED'
+                    if status not in ('CONFLICT', 'IGNORED'):
+                        status = 'LINKED' if file_data.get('parent_file_id') else 'ORPHANED'
                 
                 status_item = self.item(row, 0)
                 if status_item:
@@ -419,3 +446,9 @@ class DiscoveryTable(QTableWidget):
             self.selectAll()
         else:
             super().keyPressEvent(event)
+
+    def contextMenuEvent(self, event):
+        """Triggers the context menu on right click."""
+        item = self.itemAt(event.pos())
+        if item:
+            self._show_actions_menu(event.globalPos(), is_context=True)

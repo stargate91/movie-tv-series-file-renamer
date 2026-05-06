@@ -2,7 +2,7 @@ import logging
 import json
 from PySide6.QtCore import Qt, QSize, Signal, Slot
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLineEdit, QWidget,
-                             QScrollArea, QSpinBox, QMessageBox, QComboBox)
+                             QScrollArea, QSpinBox, QMessageBox, QComboBox, QPushButton, QLabel, QFrame, QListWidget)
 from PySide6.QtGui import QPixmap
 
 from ui.v3.styles.theme import Theme

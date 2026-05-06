@@ -18,6 +18,9 @@ class Sidebar(QFrame):
         self._init_ui()
 
     def _init_ui(self):
+        from PySide6.QtGui import QDesktopServices
+        from PySide6.QtCore import QUrl, QCoreApplication
+        
         layout = QVBoxLayout(self)
         layout.setContentsMargins(15, 25, 15, 25)
         layout.setSpacing(10)
@@ -33,30 +36,45 @@ class Sidebar(QFrame):
         layout.addWidget(subtitle)
         layout.addSpacing(20)
 
-        # 2. Navigation Buttons
+        # 2. Navigation Area (Top)
         self.btn_dash = self._create_nav_btn(T("sidebar.dashboard"), 0, True)
         self.btn_lib = self._create_nav_btn(T("sidebar.library"), 1)
         self.btn_hist = self._create_nav_btn(T("sidebar.history"), 3)
         self.btn_sett = self._create_nav_btn(T("sidebar.settings"), 4)
-
+        
         layout.addWidget(self.btn_dash)
         layout.addWidget(self.btn_lib)
         layout.addWidget(self.btn_hist)
+        layout.addWidget(self.btn_sett)
+        
+        # 3. Support Button (Part of Navigation)
+        self.btn_support = QPushButton(T("sidebar.support"))
+        self.btn_support.setStyleSheet(Theme.get_support_button_style())
+        self.btn_support.setFixedHeight(45)
+        self.btn_support.setCursor(Qt.PointingHandCursor)
+        self.btn_support.clicked.connect(lambda: QDesktopServices.openUrl(QUrl("https://buymeacoffee.com/majtika")))
+        layout.addWidget(self.btn_support)
+
         layout.addStretch()
 
-        # 3. Bottom Actions
-        self.btn_restart = QPushButton(f"  {T('sidebar.restart')}")
+        # 4. System Actions (Bottom)
+        self.btn_restart = QPushButton(T('sidebar.restart'))
         self.btn_restart.setObjectName("SecondaryButton")
-        self.btn_restart.setFixedHeight(40)
+        self.btn_restart.setFixedHeight(45)
         self.btn_restart.setCursor(Qt.PointingHandCursor)
         self.btn_restart.clicked.connect(self.restart_requested.emit)
         
+        self.btn_quit = QPushButton(T('common.quit'))
+        self.btn_quit.setObjectName("SecondaryButton") # Reuse styling
+        self.btn_quit.setFixedHeight(45)
+        self.btn_quit.setCursor(Qt.PointingHandCursor)
+        self.btn_quit.clicked.connect(QCoreApplication.quit)
+        
         layout.addWidget(self.btn_restart)
-        layout.addSpacing(10)
-        layout.addWidget(self.btn_sett)
+        layout.addWidget(self.btn_quit)
 
     def _create_nav_btn(self, text, index, active=False):
-        btn = QPushButton(f"  {text}")
+        btn = QPushButton(text)
         btn.setObjectName("NavButton")
         btn.setCheckable(True)
         btn.setAutoExclusive(True)

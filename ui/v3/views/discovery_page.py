@@ -1,7 +1,7 @@
 import os
 import logging
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLineEdit, QApplication,
-                             QLabel, QFrame, QPushButton, QProgressBar, QMessageBox, QTabWidget, QFileDialog)
+                             QLabel, QFrame, QPushButton, QProgressBar, QMessageBox, QTabWidget, QFileDialog, QMenu)
 from PySide6.QtGui import QPixmap
 from PySide6.QtCore import Qt, Signal, QTimer
 
@@ -168,24 +168,37 @@ class DiscoveryPage(QWidget):
         self.batch_action_btn = QPushButton(f"  {T('discovery.actions.batch_actions')}")
         self.batch_action_btn.setStyleSheet(Theme.get_batch_button_style('primary'))
         self.batch_action_btn.clicked.connect(self._on_batch_actions_requested)
-        
-        self.batch_clear_btn = QPushButton(T("discovery.batch.clear"))
-        self.batch_clear_btn.setStyleSheet(Theme.get_batch_button_style('clear'))
-        self.batch_clear_btn.clicked.connect(self._on_batch_clear_requested)
-
-        self.batch_ignore_btn = QPushButton(T("discovery.batch.ignore"))
-        self.batch_ignore_btn.setStyleSheet(Theme.get_batch_button_style('ignore'))
-        self.batch_ignore_btn.clicked.connect(self._on_batch_ignore_requested)
-
         self.batch_identify_btn = QPushButton(T("discovery.batch.identify"))
         self.batch_identify_btn.setStyleSheet(Theme.get_batch_button_style('identify'))
         self.batch_identify_btn.clicked.connect(self._on_batch_identify_requested)
 
+        self.batch_restore_btn = QPushButton(T("discovery.actions.restore"))
+        self.batch_restore_btn.setStyleSheet(Theme.get_batch_button_style('success'))
+        self.batch_restore_btn.clicked.connect(self._on_batch_restore_requested)
+        self.batch_restore_btn.hide()
+
+        # 3. Overflow Menu for Destructive Actions
+        self.batch_more_btn = QPushButton("•••")
+        self.batch_more_btn.setToolTip(T("common.more"))
+        self.batch_more_btn.setFixedSize(54, 40)
+        self.batch_more_btn.setCursor(Qt.PointingHandCursor)
+        self.batch_more_btn.setStyleSheet(Theme.get_discovery_action_btn_style('neutral'))
+        
+        self.batch_menu = QMenu(self)
+        self.batch_menu.setStyleSheet(Theme.get_context_menu_style())
+        
+        clear_act = self.batch_menu.addAction(T("discovery.batch.clear"))
+        clear_act.triggered.connect(self._on_batch_clear_requested)
+        
+        ignore_act = self.batch_menu.addAction(T("discovery.batch.ignore"))
+        ignore_act.triggered.connect(self._on_batch_ignore_requested)
+        
+        self.batch_more_btn.setMenu(self.batch_menu)
+
         bb_layout.addWidget(self.batch_label)
         bb_layout.addStretch()
-        bb_layout.addWidget(self.batch_clear_btn)
-        bb_layout.addSpacing(6)
-        bb_layout.addWidget(self.batch_ignore_btn)
+        bb_layout.addWidget(self.batch_restore_btn)
+        bb_layout.addWidget(self.batch_more_btn)
         bb_layout.addSpacing(10)
         bb_layout.addWidget(self.batch_identify_btn)
         bb_layout.addSpacing(6)
@@ -443,14 +456,18 @@ class DiscoveryPage(QWidget):
         if len(unique_rows) > 1:
             self.batch_label.setText(T("discovery.messages.items_selected", count=len(unique_rows)))
             
-            # Update Ignore/Restore button based on current tab
+            # Special Trash View logic for Batch Bar
             is_trash = self.main_tabs.currentIndex() == 4
             if is_trash:
-                self.batch_ignore_btn.setText(T("discovery.actions.restore"))
-                self.batch_ignore_btn.setStyleSheet(Theme.get_batch_button_style('restore'))
+                self.batch_identify_btn.hide()
+                self.batch_action_btn.hide()
+                self.batch_more_btn.hide()
+                self.batch_restore_btn.show()
             else:
-                self.batch_ignore_btn.setText(T("discovery.batch.ignore"))
-                self.batch_ignore_btn.setStyleSheet(Theme.get_batch_button_style('ignore'))
+                self.batch_identify_btn.show()
+                self.batch_action_btn.show()
+                self.batch_more_btn.show()
+                self.batch_restore_btn.hide()
                 
             self.batch_bar.show()
         else:
@@ -579,6 +596,19 @@ class DiscoveryPage(QWidget):
              QMessageBox.warning(self, T("discovery.messages.undo_errors_title"), T("discovery.messages.undo_errors_msg", count=results['failed']) + "\n\n" + "\n".join(results.get('errors', [])))
              
         self.refresh_data()
+
+    def _on_batch_restore_requested(self):
+        """Moves all selected items from Trash back to Review."""
+        table = self._get_active_table()
+        if not table: return
+        
+        file_ids = table.get_selected_file_ids()
+        if not file_ids: return
+        
+        if QMessageBox.question(self, T("discovery.actions.restore"), T("discovery.messages.batch_restore_confirm", count=len(file_ids))) == QMessageBox.Yes:
+            for fid in file_ids:
+                self.engine.db.files.update_file(fid, {'match_status': 'pending'})
+            self.refresh_data()
 
     def _on_fix_requested(self, vid):
         # Ensure we have full file data

@@ -34,3 +34,21 @@ class NavigationStyles:
     @staticmethod
     def get_settings_content_style():
         return "background: transparent; border: none;"
+
+    @staticmethod
+    def get_support_button_style():
+        return """
+            QPushButton {
+                background: #FFDD00;
+                color: #000000;
+                border: none;
+                border-radius: 8px;
+                font-weight: 800;
+                font-size: 13px;
+                padding: 10px 15px;
+                text-align: left;
+            }
+            QPushButton:hover {
+                background: #FFC400;
+            }
+        """

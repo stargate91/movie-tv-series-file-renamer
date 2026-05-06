@@ -2,6 +2,10 @@ from ..palette import Palette
 
 class ListStyles:
     @staticmethod
+    def get_sidebar_list_style():
+        return ListStyles.get_list_widget_style()
+
+    @staticmethod
     def get_list_widget_style():
         return f"""
             QListWidget {{

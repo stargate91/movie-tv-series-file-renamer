@@ -8,7 +8,8 @@
         "library": "Renaming Workspace",
         "history": "History",
         "settings": "Settings",
-        "restart": "Restart App"
+        "restart": "Restart App",
+        "support": "☕ Buy me a Coffee"
     },
     "greeting": {
         "morning": "Good morning",
@@ -550,6 +551,7 @@
         "undo": "Undo",
         "close": "Close",
         "unknown": "Unknown",
-        "operation_successful": "Operation successful"
+        "operation_successful": "Operation successful",
+        "quit": "Quit App"
     }
 }
