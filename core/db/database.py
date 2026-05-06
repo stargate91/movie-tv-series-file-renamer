@@ -86,6 +86,8 @@ class LibraryDB:
                     poster_path TEXT,
                     details_json TEXT,
                     fetched_languages TEXT,
+                    networks TEXT,
+                    collection TEXT,
                     last_updated DATETIME
                 )
             """)
@@ -137,6 +139,7 @@ class LibraryDB:
                     edition TEXT,
                     is_manual INTEGER DEFAULT 0,
                     target_language TEXT,
+                    part TEXT,
                     FOREIGN KEY(parent_file_id) REFERENCES media_files(id)
                 )
             """)

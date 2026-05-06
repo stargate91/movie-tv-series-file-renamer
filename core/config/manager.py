@@ -69,6 +69,9 @@ class AppSettings:
     create_movie_folder: bool = True
     movie_folder_template: str = "{Title} ({Year})"
     
+    create_collection_folder: bool = False
+    collection_folder_template: str = "{Collection}"
+    
     create_show_folder: bool = True
     show_folder_template: str = "{ShowTitle}"
     create_season_folder: bool = True

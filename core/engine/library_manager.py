@@ -79,6 +79,7 @@ class LibraryManager:
         type = existing.get('type', "") if existing else ""
         imdb_id = result.get('imdb_id', '') or (existing.get('imdb_id') if existing else "")
         networks = result.get('networks') or (existing.get('networks') if existing else "")
+        collection = result.get('collection') or (existing.get('collection') if existing else "")
         
         full_data = None
         try:
@@ -151,6 +152,9 @@ class LibraryManager:
                 if full_data.get('networks'):
                     networks = ", ".join([n['name'] for n in full_data['networks']])
                 
+                if full_data.get('belongs_to_collection'):
+                    collection = full_data['belongs_to_collection'].get('name')
+                
                 if not imdb_id:
                     imdb_id = full_data.get('imdb_id') or full_data.get('external_ids', {}).get('imdb_id', '')
 
@@ -198,7 +202,7 @@ class LibraryManager:
             'last_air_date': last_air_date, 'number_of_episodes': number_of_episodes,
             'number_of_seasons': number_of_seasons, 'languages': languages,
             'status': status, 'type': type, 'fetched_languages': fetched_languages,
-            'networks': networks
+            'networks': networks, 'collection': collection
         }
         item_id = self.db.media.upsert_media_item(**media_data)
         self._enriched_ids.add(tmdb_id)

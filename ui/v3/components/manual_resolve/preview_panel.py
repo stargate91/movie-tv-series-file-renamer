@@ -54,6 +54,9 @@ class PreviewPanel(QFrame):
         if network:
             meta += f"\n{network}"
             
+        if res.get('collection'):
+            meta += f"\nCollection: {res['collection']}"
+            
         self.meta.setText(meta)
         self.overview.setText(res.get('overview', ""))
         

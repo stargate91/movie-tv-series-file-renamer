@@ -3,6 +3,7 @@ v3.1 Formatter: Orchestrates filename generation and path construction.
 """
 
 import os
+import re
 import logging
 from core.engine.tag_builder import TagBuilder
 from core.engine.template_engine import TemplateEngine
@@ -144,15 +145,24 @@ class Formatter:
             context = self.tags.build_context(file_data, links, settings.custom_variable, lang)
             folders = []
             
-            if media_type == 'movie' and settings.create_movie_folder:
-                folders.append(self._apply_template(settings.movie_folder_template, context))
+            if media_type == 'movie':
+                if settings.create_collection_folder and context.get('Collection'):
+                    tpl_coll = self._apply_template(settings.collection_folder_template, context)
+                    folders.extend([f.strip() for f in re.split(r'[\\/]', tpl_coll) if f.strip()])
+                
+                if settings.create_movie_folder:
+                    tpl_res = self._apply_template(settings.movie_folder_template, context)
+                    folders.extend([f.strip() for f in re.split(r'[\\/]', tpl_res) if f.strip()])
             elif media_type == 'tv':
                 if settings.create_show_folder:
-                    folders.append(self._apply_template(settings.show_folder_template, context))
+                    tpl_res = self._apply_template(settings.show_folder_template, context)
+                    folders.extend([f.strip() for f in re.split(r'[\\/]', tpl_res) if f.strip()])
                 if settings.create_season_folder:
-                    folders.append(self._apply_template(settings.season_folder_template, context))
+                    tpl_res = self._apply_template(settings.season_folder_template, context)
+                    folders.extend([f.strip() for f in re.split(r'[\\/]', tpl_res) if f.strip()])
                 if settings.create_episode_folder:
-                    folders.append(self._apply_template(settings.episode_folder_template, context))
+                    tpl_res = self._apply_template(settings.episode_folder_template, context)
+                    folders.extend([f.strip() for f in re.split(r'[\\/]', tpl_res) if f.strip()])
         
         folders = [self.engine.sanitize_filename(f) for f in folders]
         target_dir = os.path.join(base_dir, *folders) if folders else base_dir

@@ -162,7 +162,7 @@ class FileRepository(BaseRepository):
             LEFT JOIN file_media_links l ON f.id = l.file_id
             LEFT JOIN media_items m ON l.media_item_id = m.id
             LEFT JOIN tv_episodes e ON l.tv_episode_id = e.id
-            LEFT JOIN tv_seasons s ON l.tv_season_id = s.id
+            LEFT JOIN tv_seasons s ON e.season_id = s.id
             WHERE f.category IN ({placeholders}) 
               AND f.status NOT IN ('renamed', 'deleted')
         """

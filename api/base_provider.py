@@ -15,6 +15,7 @@ class ProviderResult:
     rating: Optional[float] = None
     vote_count: Optional[int] = None
     networks: Optional[str] = None
+    collection: Optional[str] = None
     
     def to_dict(self):
         return {k: v for k, v in self.__dict__.items() if v is not None}

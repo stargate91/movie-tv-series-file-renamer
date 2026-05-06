@@ -93,6 +93,10 @@ class TMDBClient(BaseClient, BaseMediaProvider):
         networks = None
         if raw.get('networks'):
             networks = ", ".join([n['name'] for n in raw['networks']])
+        
+        collection = None
+        if raw.get('belongs_to_collection'):
+            collection = raw['belongs_to_collection'].get('name')
             
         return ProviderResult(
             tmdb_id=str(raw.get('id')),
@@ -103,7 +107,8 @@ class TMDBClient(BaseClient, BaseMediaProvider):
             poster_path=raw.get('poster_path'),
             overview=raw.get('overview'),
             rating=raw.get('vote_average'),
-            networks=networks
+            networks=networks,
+            collection=collection
         )
 
     def get_by_external_id(self, external_id: str, source: str = "imdb_id", language: str = "en-US") -> Optional[ProviderResult]:

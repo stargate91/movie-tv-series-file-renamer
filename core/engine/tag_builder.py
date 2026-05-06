@@ -196,6 +196,7 @@ class TagBuilder:
             "Languages": m.get('languages', ""),
             "ReleaseDate": m.get('release_date') or m.get('first_air_date', ""),
             "Network": m.get('networks', ""),
+            "Collection": m.get('collection', ""),
         })
 
     def _add_tv_tags(self, context, media_data, file_data, language="en-US"):
