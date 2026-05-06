@@ -40,22 +40,17 @@ class SettingsPage(QWidget):
         # 1. Left Sidebar Navigation
         sidebar = QFrame()
         sidebar.setFixedWidth(240)
-        sidebar.setStyleSheet(f"background: {Theme.SURFACE}; border-right: 1px solid {Theme.BORDER};")
+        sidebar.setStyleSheet(Theme.get_settings_sidebar_style())
         sidebar_layout = QVBoxLayout(sidebar)
         sidebar_layout.setContentsMargins(20, 30, 20, 30)
         sidebar_layout.setSpacing(10)
 
         title = QLabel(T("settings.title"))
-        title.setStyleSheet(f"font-size: 24px; font-weight: 800; color: {Theme.TEXT_MAIN}; margin-bottom: 20px;")
+        title.setStyleSheet(Theme.get_settings_title_style())
         sidebar_layout.addWidget(title)
 
         self.nav_list = QListWidget()
-        self.nav_list.setStyleSheet(f"""
-            QListWidget {{ background: transparent; border: none; }}
-            QListWidget::item {{ color: {Theme.TEXT_MUTED}; padding: 12px 15px; border-radius: 8px; font-weight: 600; margin-bottom: 4px; }}
-            QListWidget::item:selected {{ background: {Theme.SURFACE_LIGHT}; color: {Theme.PRIMARY}; }}
-            QListWidget::item:hover:!selected {{ background: {Theme.SURFACE_DARK}; color: {Theme.TEXT_MAIN}; }}
-        """)
+        self.nav_list.setStyleSheet(Theme.get_settings_nav_list_style())
         
         items = [
             (T("settings.tabs.general"), 0),
@@ -98,7 +93,7 @@ class SettingsPage(QWidget):
             scroll = QScrollArea()
             scroll.setWidgetResizable(True)
             scroll.setFrameShape(QFrame.NoFrame)
-            scroll.setStyleSheet(f"background: {Theme.SURFACE_DARK};")
+            scroll.setStyleSheet(Theme.get_settings_content_style())
             scroll.setWidget(tab)
             self.content_stack.addWidget(scroll)
             

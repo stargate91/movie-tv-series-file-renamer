@@ -19,7 +19,7 @@ class MainWindowV3(QMainWindow):
         
         # Initialize i18n
         from core.i18n import Translator
-        Translator().set_language(self.engine.config.settings.app_language)
+        Translator().load_locale(self.engine.config.settings.app_language)
         
         self.active_workers = [] # Prevent ScanWorker GC crash
         

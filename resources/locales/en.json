@@ -5,7 +5,7 @@
     },
     "sidebar": {
         "dashboard": "Dashboard",
-        "library": "Library",
+        "library": "Renaming Workspace",
         "history": "History",
         "settings": "Settings",
         "restart": "Restart App"
@@ -33,70 +33,103 @@
         }
     },
     "discovery": {
-        "title": "Discovery Console",
-        "search_placeholder": "Search files...",
+        "title": "Renaming Workspace",
+        "search_placeholder": "Find a file by name...",
         "tabs": {
-            "library": "🔍 Library Review",
-            "conflicts": "⚔️ Conflicts",
-            "extras": "📎 Extras",
-            "dropped": "📦 Dropped",
+            "library": "🔍 Review Center",
+            "conflicts": "⚔️ Name Clashes",
+            "extras": "📎 Attached Files",
+            "dropped": "📦 Just Ingested",
             "trash": "🗑️ Trash"
         },
         "table": {
             "status": "STATUS",
-            "original_name": "ORIGINAL NAME",
-            "type": "TYPE",
-            "new_name": "NEW NAME PREVIEW",
+            "original_name": "ORIGINAL FILENAME",
+            "type": "MEDIA TYPE",
+            "new_name": "PROPOSED NEW NAME",
             "actions": "ACTIONS"
         },
         "actions": {
-            "apply": "Apply Renames",
-            "batch_identify": "Batch Identify",
-            "batch_actions": "Batch Operations",
-            "scan_new": "Scan Directory",
+            "apply": "Execute Renames",
+            "batch_identify": "Smart Identify All",
+            "batch_actions": "Manual Batch Edit",
+            "scan_new": "Find More Files",
             "refresh": "Refresh List",
-            "fix": "Resolve Conflict",
-            "edit": "Edit Metadata",
-            "restore": "Restore to Library",
-            "ignore": "Ignore File",
-            "open_folder": "Open Folder",
-            "clear_match": "Clear Metadata Match"
+            "fix": "Solve Clash",
+            "edit": "Edit Info",
+            "restore": "Put back to Review",
+            "ignore": "Move to Trash",
+            "open_folder": "Show in Folder",
+            "clear_match": "Reset Identification"
         },
         "dropped": {
-            "import_all": "🚀 Import All to Library",
-            "import_selected": "📥 Import Selected",
-            "clear_list": "🧹 Clear List",
-            "clear_confirm_title": "Clear List",
-            "clear_confirm_msg": "Clear all items from the Dropped list?\n(Files will remain on disk)"
+            "import_all": "🚀 Move All to Review",
+            "import_selected": "📥 Move Selected",
+            "clear_list": "🧹 Empty List",
+            "clear_confirm_title": "Empty Ingested List",
+            "clear_confirm_msg": "This will clear the list of recently found files.\n(Your physical files are safe and won't be touched!)"
         },
         "messages": {
-            "rename_success": "Successfully renamed {count} files.",
-            "rename_success_notif": "✅ {count} files renamed successfully.",
-            "rename_empty": "No files ready for renaming.",
-            "rename_errors_title": "Rename Errors",
-            "rename_errors_msg": "Failed to rename {count} files.",
-            "conflicts_title": "Conflicts Detected",
-            "conflicts_msg": "The rename plan has {count} name collisions.\n\nPlease fix these in the 'Conflicts' tab before proceeding.",
-            "undo_success": "Successfully reverted {count} files.",
-            "undo_confirm": "Are you sure you want to revert the last renaming operation?",
-            "undo_reverting": "Reverting renames...",
-            "undo_errors_title": "Undo Errors",
-            "undo_errors_msg": "Failed to revert {count} files.",
-            "ignore_confirm": "Are you sure you want to ignore {count} selected files?",
-            "clear_confirm": "Are you sure you want to clear metadata for {count} selected files?",
-            "collision_detected": "{count} COLLISIONS DETECTED",
-            "collision_tooltip": "Please resolve collisions before executing.",
-            "aborting": "Aborting... please wait.",
-            "initializing": "Initializing...",
-            "refreshing": "Refreshing library...",
-            "generating_plan": "Generating rename plan...",
-            "loading_list": "Discovery complete. Loading list...",
-            "starting_pipeline": "Starting discovery pipeline...",
-            "items_selected": "{count} items selected",
-            "global_conflicts_title": "Conflicts Detected",
-            "global_conflicts_msg": "You have {count} name collisions that must be resolved first.\n\nPlease go to the 'Conflicts' tab and use 'Batch Operations' to assign unique Parts or Editions.",
-            "select_dir": "Select Directory to Scan",
-            "drop_ingest": "🚀 Drop files to Ingest into Library"
+            "rename_success": "Success! {count} files were renamed.",
+            "rename_success_notif": "✅ All set! {count} files renamed.",
+            "rename_empty": "Nothing to rename right now.",
+            "rename_errors_title": "Oops! Something went wrong",
+            "rename_errors_msg": "We couldn't rename {count} files. Check the details.",
+            "conflicts_title": "Name Clashes Detected",
+            "conflicts_msg": "Wait! {count} files would end up with the same name.\n\nPlease fix these in the 'Name Clashes' tab before we proceed.",
+            "undo_success": "Done! {count} files were reverted.",
+            "undo_confirm": "Do you want to undo the last batch and put the original names back?",
+            "undo_reverting": "Putting original names back...",
+            "undo_errors_title": "Revert Errors",
+            "undo_errors_msg": "We couldn't revert {count} files.",
+            "ignore_confirm": "Move {count} files to the Trash?",
+            "restore_confirm": "Move {count} files back to the Review Center?",
+            "clear_confirm": "Are you sure you want to reset the identification for {count} files?",
+            "collision_detected": "{count} NAME CLASHES",
+            "collision_tooltip": "Please give these unique names (e.g. Part 1, Part 2) before executing.",
+            "aborting": "Stopping... please wait a moment.",
+            "initializing": "Getting things ready...",
+            "refreshing": "Updating your list...",
+            "generating_plan": "Calculating new names...",
+            "loading_list": "Almost done! Loading files...",
+            "starting_pipeline": "Starting to look for files...",
+            "items_selected": "{count} files selected",
+            "global_conflicts_title": "Resolution Needed",
+            "global_conflicts_msg": "You have {count} files with identical proposed names.\n\nHead over to the 'Name Clashes' tab and use 'Manual Batch Edit' to add Part numbers or Edition tags.",
+            "select_dir": "Choose a folder to organize",
+            "drop_ingest": "🚀 Drag & Drop files here to start organizing",
+            "abort_btn": "Stop Now",
+            "candidate_prefix": "Possible Match: {title}"
+        },
+        "extras": {
+            "tabs": {
+                "bonus": "🎁 Bonus / Extras",
+                "images": "🖼️ Images / Posters",
+                "metadata": "📝 Metadata / NFO",
+                "subtitles": "📄 Subtitles",
+                "audio": "🔊 Audio Tracks"
+            },
+            "subtypes": {
+                "all": "All",
+                "sample": "Sample",
+                "trailer": "Trailer",
+                "behind the scenes": "Behind the Scenes",
+                "deleted": "Deleted Scenes",
+                "interview": "Interview",
+                "featurette": "Featurette",
+                "poster": "Poster",
+                "fanart": "Fanart",
+                "background": "Background",
+                "banner": "Banner",
+                "thumb": "Thumbnail",
+                "logo": "Logo",
+                "disc": "Disc Art",
+                "forced": "Forced",
+                "full": "Full",
+                "dub": "Dubbed",
+                "commentary": "Commentary",
+                "music": "Music / Score"
+            }
         },
         "batch_operations": {
             "title": "Batch Operations ({count} files)",
@@ -167,7 +200,26 @@
             "save_btn": "Save Identification",
             "no_selection_title": "No Selection",
             "no_selection_msg": "Please select a media item to associate with this file.",
-            "success_msg": "File '{filename}' manually identified."
+            "success_msg": "File '{filename}' manually identified.",
+            "select_result": "Select a result",
+            "browsing": "Browsing...",
+            "candidates_found": "{count} Candidates Found",
+            "no_selection": "No Selection",
+            "basket": "Selected Items:",
+            "clear": "Clear",
+            "confirm_all": "Confirm All",
+            "no_poster": "No Poster",
+            "add_basket": "Add to Basket",
+            "match_btn": "Match & Save",
+            "type_label": "Type: {type}",
+            "tv_options": "📺 TV Identification Options",
+            "match_depth": "Match Depth:",
+            "depth": {
+                "series": "Series Level Only",
+                "season": "Series + Season",
+                "sequential": "Series + Season + Sequential Episodes"
+            },
+            "link_sequential": "Link to S{s}E{e} (Sequential Start)"
         },
         "batch": {
             "clear": "🔄 Clear Metadata",
@@ -199,10 +251,21 @@
                 "title": "Title",
                 "original_title": "Original Title",
                 "tagline": "Tagline",
+                "type": "Type:",
+                "edition": "Edition:",
                 "director": "Director",
                 "cast": "Cast",
                 "release_date": "Release Date",
-                "genres": "Genres"
+                "genres": "Genres",
+                "tmdb_id": "TMDB ID:",
+                "imdb_id": "IMDb ID:",
+                "season_name": "Season Name:",
+                "season_num": "Season #:",
+                "season_air_date": "Season Air Date:",
+                "episode_divider": "──── Episode {count} ────",
+                "episode_title": "Episode Title:",
+                "air_date": "Air Date:",
+                "overview": "Overview:"
             },
             "data_sheet": {
                 "title": "📋 Data Sheet",
@@ -330,8 +393,7 @@
                 "season_tpl": "Season Folder Template",
                 "select_dir": "Select Directory"
             }
-        }
-    },
+        },
         "api": {
             "header": "API Configuration",
             "sections": {
@@ -361,7 +423,8 @@
                 "wipe_btn": "Wipe Local Database",
                 "wipe_confirm_title": "Wipe Database",
                 "wipe_confirm_msg": "Are you sure? This will clear all discovery data and history.",
-                "wipe_success": "Database has been wiped."
+                "wipe_success": "Database has been wiped.",
+                "wipe_error_msg": "Failed to wipe database:"
             }
         }
     },
@@ -452,6 +515,7 @@
         "none": "None",
         "type": "Type:",
         "types": {
+            "both": "Both (Movie/TV)",
             "movie": "Movie",
             "tv": "TV Show",
             "video": "Video",
@@ -465,7 +529,15 @@
             "de": "German",
             "fr": "French",
             "it": "Italian",
-            "es": "Spanish"
+            "es": "Spanish",
+            "hu": "Hungarian",
+            "eng": "English",
+            "hun": "Hungarian",
+            "ger": "German",
+            "fra": "French",
+            "spa": "Spanish",
+            "ita": "Italian",
+            "jpn": "Japanese"
         },
         "ok": "OK",
         "cancel": "Cancel",
@@ -476,6 +548,8 @@
         "loading": "Loading...",
         "success": "Success",
         "undo": "Undo",
+        "close": "Close",
+        "unknown": "Unknown",
         "operation_successful": "Operation successful"
     }
 }

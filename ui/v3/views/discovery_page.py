@@ -43,7 +43,7 @@ class DiscoveryPage(QWidget):
         # 1. Header
         header = QHBoxLayout()
         title = QLabel(T("discovery.title"))
-        title.setStyleSheet(f"font-size: 28px; font-weight: 800; color: {Theme.TEXT_MAIN};")
+        title.setStyleSheet(Theme.get_page_header_style())
         
         self.search_box = QLineEdit()
         self.search_box.setPlaceholderText(T("discovery.search_placeholder"))
@@ -71,11 +71,7 @@ class DiscoveryPage(QWidget):
 
         # 2. Main Tabs (Modular)
         self.main_tabs = QTabWidget()
-        self.main_tabs.setStyleSheet(f"""
-            QTabWidget::pane {{ border: none; background: transparent; }}
-            QTabBar::tab {{ background: {Theme.SURFACE}; color: {Theme.TEXT_MUTED}; padding: 12px 24px; border-radius: 8px 8px 0 0; font-weight: 700; margin-right: 4px; }}
-            QTabBar::tab:selected {{ background: {Theme.SURFACE_LIGHT}; color: {Theme.PRIMARY}; border-bottom: 2px solid {Theme.PRIMARY}; }}
-        """)
+        self.main_tabs.setStyleSheet(Theme.get_tab_widget_style())
 
         self.review_view = ReviewView(self.engine)
         self.conflicts_view = DiscoveryTable()
@@ -128,43 +124,19 @@ class DiscoveryPage(QWidget):
         self.progress_bar.setFixedHeight(14)
         self.progress_bar.setTextVisible(True)
         self.progress_bar.setAlignment(Qt.AlignCenter)
-        self.progress_bar.setStyleSheet(f"""
-            QProgressBar {{ 
-                background: {Theme.SURFACE_LIGHT}; 
-                border: 1px solid {Theme.BORDER}; 
-                border-radius: 7px; 
-                text-align: center;
-                color: white;
-                font-weight: 800;
-                font-size: 10px;
-            }} 
-            QProgressBar::chunk {{ 
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 {Theme.PRIMARY}, stop:1 {Theme.ACCENT});
-                border-radius: 6px; 
-            }}
-        """)
+        self.progress_bar.setStyleSheet(Theme.get_progress_bar_detailed_style())
         self.progress_bar.hide()
         
         self.status_info = QLabel("")
-        self.status_info.setStyleSheet(f"color: {Theme.TEXT_MUTED}; font-size: 11px; font-weight: 600;")
+        self.status_info.setStyleSheet(Theme.get_status_label_style())
         self.status_info.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         self.status_info.hide()
         
         # Abort Button (styled more subtly, placed away from the center)
-        self.abort_btn = QPushButton("Abort Operation")
+        self.abort_btn = QPushButton(T("discovery.messages.abort_btn"))
         self.abort_btn.setFixedSize(110, 24)
         self.abort_btn.setCursor(Qt.PointingHandCursor)
-        self.abort_btn.setStyleSheet(f"""
-            QPushButton {{ 
-                background: {Theme.ERROR}15; 
-                color: {Theme.ERROR}; 
-                border: 1px solid {Theme.ERROR}44; 
-                border-radius: 4px; 
-                font-size: 10px; 
-                font-weight: 700; 
-            }}
-            QPushButton:hover {{ background: {Theme.ERROR}; color: white; }}
-        """)
+        self.abort_btn.setStyleSheet(Theme.get_abort_button_style())
         self.abort_btn.clicked.connect(self._on_abort_clicked)
         self.abort_btn.hide()
 
@@ -188,25 +160,25 @@ class DiscoveryPage(QWidget):
 
         self.batch_bar = QFrame()
         self.batch_bar.setFixedHeight(60)
-        self.batch_bar.setStyleSheet(f"background: {Theme.PRIMARY}; border-radius: 12px;")
+        self.batch_bar.setStyleSheet(Theme.get_batch_bar_style())
         bb_layout = QHBoxLayout(self.batch_bar)
         bb_layout.setContentsMargins(20, 0, 20, 0)
-        self.batch_label = QLabel("0 items selected")
-        self.batch_label.setStyleSheet("color: white; font-weight: 700; font-size: 14px; border: none;")
-        self.batch_action_btn = QPushButton("🚀 Batch Operations")
-        self.batch_action_btn.setStyleSheet(f"background: white; color: {Theme.PRIMARY}; padding: 8px 16px; font-weight: 800; border-radius: 6px;")
+        self.batch_label = QLabel(T("discovery.messages.items_selected", count=0))
+        self.batch_label.setStyleSheet(Theme.get_batch_label_style())
+        self.batch_action_btn = QPushButton(f"  {T('discovery.actions.batch_actions')}")
+        self.batch_action_btn.setStyleSheet(Theme.get_batch_button_style('primary'))
         self.batch_action_btn.clicked.connect(self._on_batch_actions_requested)
         
         self.batch_clear_btn = QPushButton(T("discovery.batch.clear"))
-        self.batch_clear_btn.setStyleSheet(f"background: transparent; color: white; border: 1px solid {Theme.WARNING}; padding: 8px 16px; font-weight: 700; border-radius: 6px;")
+        self.batch_clear_btn.setStyleSheet(Theme.get_batch_button_style('clear'))
         self.batch_clear_btn.clicked.connect(self._on_batch_clear_requested)
 
         self.batch_ignore_btn = QPushButton(T("discovery.batch.ignore"))
-        self.batch_ignore_btn.setStyleSheet(f"background: transparent; color: white; border: 1px solid {Theme.ERROR}; padding: 8px 16px; font-weight: 700; border-radius: 6px;")
+        self.batch_ignore_btn.setStyleSheet(Theme.get_batch_button_style('ignore'))
         self.batch_ignore_btn.clicked.connect(self._on_batch_ignore_requested)
 
         self.batch_identify_btn = QPushButton(T("discovery.batch.identify"))
-        self.batch_identify_btn.setStyleSheet(f"background: {Theme.SURFACE}22; color: white; border: 1px solid white; padding: 8px 16px; font-weight: 700; border-radius: 6px;")
+        self.batch_identify_btn.setStyleSheet(Theme.get_batch_button_style('identify'))
         self.batch_identify_btn.clicked.connect(self._on_batch_identify_requested)
 
         bb_layout.addWidget(self.batch_label)
@@ -224,11 +196,11 @@ class DiscoveryPage(QWidget):
     def _init_drop_overlay(self):
         self.drop_overlay = QFrame(self)
         self.drop_overlay.setObjectName("DropOverlay")
-        self.drop_overlay.setStyleSheet(f"#DropOverlay {{ background-color: {Theme.PRIMARY}cc; border: 3px dashed white; border-radius: 20px; }}")
+        self.drop_overlay.setStyleSheet(Theme.get_drop_overlay_style())
         self.drop_overlay.hide()
         overlay_layout = QVBoxLayout(self.drop_overlay)
         overlay_label = QLabel(T("discovery.messages.drop_ingest"))
-        overlay_label.setStyleSheet("color: white; font-size: 24px; font-weight: 800;")
+        overlay_label.setStyleSheet(Theme.get_drop_overlay_label_style())
         overlay_label.setAlignment(Qt.AlignCenter)
         overlay_layout.addWidget(overlay_label)
         self.setAcceptDrops(True)
@@ -370,6 +342,8 @@ class DiscoveryPage(QWidget):
         table.open_folder_requested.connect(self._on_open_folder_requested)
         table.ignore_requested.connect(self._on_ignore_requested)
         table.batch_ignore_requested.connect(self._on_batch_ignore_requested)
+        table.batch_identify_requested.connect(self._on_batch_identify_requested)
+        table.batch_edit_requested.connect(self._on_batch_actions_requested)
         table.clear_match_requested.connect(self._on_clear_match_requested)
         table.restore_requested.connect(self._on_restore_requested)
 
@@ -460,14 +434,24 @@ class DiscoveryPage(QWidget):
                     # Show first candidate's poster for Uncertain
                     pix = self._load_poster(candidates[0].get('poster_path'))
                     self.inspector.poster_carousel.set_single_poster(pix)
-                    self.inspector.title_label.setText(f"Candidate: {candidates[0]['title']}")
+                    self.inspector.title_label.setText(T("discovery.messages.candidate_prefix", title=candidates[0]['title']))
                 else:
                     self.inspector.title_label.setText(file_data['file_name'])
                     self.inspector.poster_carousel.clear()
 
         unique_rows = set(item.row() for item in selected)
-        if unique_rows:
+        if len(unique_rows) > 1:
             self.batch_label.setText(T("discovery.messages.items_selected", count=len(unique_rows)))
+            
+            # Update Ignore/Restore button based on current tab
+            is_trash = self.main_tabs.currentIndex() == 4
+            if is_trash:
+                self.batch_ignore_btn.setText(T("discovery.actions.restore"))
+                self.batch_ignore_btn.setStyleSheet(Theme.get_batch_button_style('restore'))
+            else:
+                self.batch_ignore_btn.setText(T("discovery.batch.ignore"))
+                self.batch_ignore_btn.setStyleSheet(Theme.get_batch_button_style('ignore'))
+                
             self.batch_bar.show()
         else:
             self.batch_bar.hide()
@@ -597,6 +581,11 @@ class DiscoveryPage(QWidget):
         self.refresh_data()
 
     def _on_fix_requested(self, vid):
+        # Ensure we have full file data
+        if 'file_name' not in vid:
+            vid = self.engine.db.get_file_by_id(vid['id'])
+            if not vid: return
+
         if vid.get('category') == 'video':
             if ManualResolveDialog(self.engine, vid).exec(): self.refresh_data()
         else:
@@ -605,6 +594,11 @@ class DiscoveryPage(QWidget):
                 self.refresh_data()
 
     def _on_manual_edit_requested(self, vid):
+        # Ensure we have full file data
+        if 'file_name' not in vid:
+            vid = self.engine.db.get_file_by_id(vid['id'])
+            if not vid: return
+
         from ui.v3.components.edit_file_dialog import EditFileDialog
         if EditFileDialog(self, self.engine, vid).exec(): 
             self.refresh_data()
@@ -656,10 +650,14 @@ class DiscoveryPage(QWidget):
         ids = table.get_selected_ids()
         if not ids: return
         
-        if QMessageBox.question(self, T("discovery.actions.ignore"), 
-            T("discovery.messages.ignore_confirm", count=len(ids))) == QMessageBox.Yes:
+        is_trash = self.main_tabs.currentIndex() == 4
+        action_title = T("discovery.actions.restore") if is_trash else T("discovery.actions.ignore")
+        confirm_msg = T("discovery.messages.restore_confirm", count=len(ids)) if is_trash else T("discovery.messages.ignore_confirm", count=len(ids))
+        
+        if QMessageBox.question(self, action_title, confirm_msg) == QMessageBox.Yes:
             for fid in ids:
-                self.engine.db.files.update_file(fid, match_status='IGNORED')
+                new_status = 'PENDING' if is_trash else 'IGNORED'
+                self.engine.db.files.update_file(fid, match_status=new_status)
             self.refresh_data()
 
     def _on_batch_clear_requested(self):

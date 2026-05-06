@@ -34,7 +34,7 @@ class ResultItemWidget(QWidget):
         text_layout.setSpacing(2)
         
         title = QLabel(self.data.get('title', T("common.unknown")))
-        title.setStyleSheet(f"font-weight: 700; color: {Theme.TEXT_MAIN}; font-size: 14px;")
+        title.setStyleSheet(Theme.get_result_item_title_style())
         text_layout.addWidget(title)
         
         meta_text = T(f"common.types.{m_type}") if T(f"common.types.{m_type}") != f"common.types.{m_type}" else m_type.capitalize()
@@ -44,7 +44,7 @@ class ResultItemWidget(QWidget):
             meta_text += f" • {T('common.episodes', count=count)}"
         
         meta = QLabel(meta_text)
-        meta.setStyleSheet(f"color: {Theme.TEXT_MUTED}; font-size: 12px;")
+        meta.setStyleSheet(Theme.get_result_item_meta_style())
         text_layout.addWidget(meta)
         
         layout.addLayout(text_layout)

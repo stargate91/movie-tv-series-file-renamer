@@ -70,11 +70,11 @@ class DashboardPage(QWidget):
         layout.setAlignment(Qt.AlignLeft)
 
         t_lbl = QLabel(title)
-        t_lbl.setStyleSheet("font-size: 20px; font-weight: bold; color: white;")
+        t_lbl.setStyleSheet(Theme.get_card_title_style())
         
         d_lbl = QLabel(description)
         d_lbl.setWordWrap(True)
-        d_lbl.setStyleSheet("color: #aaa; margin-bottom: 20px;")
+        d_lbl.setStyleSheet(Theme.get_card_description_style() + " margin-bottom: 20px;")
         
         btn = QPushButton(title)
         btn.setFixedSize(160, 45)
@@ -97,7 +97,7 @@ class DashboardPage(QWidget):
         layout.setContentsMargins(30, 30, 30, 30)
         
         t_lbl = QLabel(T("dashboard.stats.overview_title"))
-        t_lbl.setStyleSheet("font-size: 20px; font-weight: bold; color: white;")
+        t_lbl.setStyleSheet(Theme.get_card_title_style())
         
         # Example stats (would be dynamic in a real scenario)
         stats_layout = QVBoxLayout()
@@ -112,8 +112,8 @@ class DashboardPage(QWidget):
 
         m_lbl = QLabel(T("dashboard.stats.movies_indexed", count=m_count))
         s_lbl = QLabel(T("dashboard.stats.series_indexed", count=s_count))
-        m_lbl.setStyleSheet("color: #888;")
-        s_lbl.setStyleSheet("color: #888;")
+        m_lbl.setStyleSheet(Theme.get_card_description_style())
+        s_lbl.setStyleSheet(Theme.get_card_description_style())
         
         layout.addWidget(t_lbl)
         layout.addSpacing(15)

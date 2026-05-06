@@ -25,20 +25,7 @@ class BaseSettingsTab(QWidget):
         edit.setText(value)
         edit.setPlaceholderText(placeholder)
         edit.setFixedHeight(40)
-        edit.setStyleSheet(f"""
-            QLineEdit {{
-                background: {Theme.SURFACE_DARK};
-                border: 1px solid {Theme.BORDER};
-                border-radius: 6px;
-                padding: 0 10px;
-                color: {Theme.TEXT_MAIN};
-            }}
-            QLineEdit:disabled {{
-                background: {Theme.SURFACE};
-                color: {Theme.TEXT_DIM};
-                border-color: {Theme.SURFACE_LIGHT};
-            }}
-        """)
+        edit.setStyleSheet(Theme.get_settings_input_style())
         group.addWidget(edit)
         return {'layout': group, 'edit': edit}
 
@@ -53,7 +40,7 @@ class BaseSettingsTab(QWidget):
         edit.setText(value)
         edit.setReadOnly(True)
         edit.setFixedHeight(40)
-        edit.setStyleSheet(f"background: {Theme.SURFACE_DARK}; border: 1px solid {Theme.BORDER}; border-radius: 6px; padding: 0 10px;")
+        edit.setStyleSheet(Theme.get_settings_input_style())
         
         btn = QPushButton("Browse")
         btn.setObjectName("SecondaryButton")
@@ -74,22 +61,7 @@ class BaseSettingsTab(QWidget):
             btn = QPushButton(tag)
             btn.setCursor(Qt.PointingHandCursor)
             btn.setFixedHeight(26)
-            btn.setStyleSheet(f"""
-                QPushButton {{
-                    background: {Theme.SURFACE_LIGHT};
-                    border: 1px solid {Theme.BORDER};
-                    border-radius: 13px;
-                    padding: 0 12px;
-                    color: {Theme.TEXT_MAIN};
-                    font-size: 11px;
-                    font-weight: 600;
-                }}
-                QPushButton:hover {{
-                    background: {Theme.PRIMARY};
-                    border-color: {Theme.PRIMARY};
-                    color: white;
-                }}
-            """)
+            btn.setStyleSheet(Theme.get_tag_chip_style())
             btn.clicked.connect(lambda checked=False, t=tag, i=target_input: self._insert_tag(t, i))
             layout.addWidget(btn)
         return layout

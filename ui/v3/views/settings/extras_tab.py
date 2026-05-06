@@ -35,7 +35,7 @@ class ExtrasTab(BaseSettingsTab):
         for label_text, setting_key, tpl_key in types:
             row = QHBoxLayout()
             lbl = QLabel(label_text)
-            lbl.setStyleSheet("font-weight: 600;")
+            lbl.setStyleSheet(Theme.get_card_header_style())
             lbl.setFixedWidth(150)
             
             combo = QComboBox()
@@ -49,7 +49,7 @@ class ExtrasTab(BaseSettingsTab):
             self.extra_combos[setting_key] = combo
             
             tpl_input = QLineEdit(getattr(self.engine.config.settings, tpl_key, ""))
-            tpl_input.setStyleSheet(f"background: {Theme.SURFACE_DARK}; border: 1px solid {Theme.BORDER}; padding: 5px;")
+            tpl_input.setStyleSheet(Theme.get_settings_input_style())
             tpl_input.setEnabled(current_val == "rename")
             
             self.extra_templates[tpl_key] = tpl_input
@@ -70,7 +70,7 @@ class ExtrasTab(BaseSettingsTab):
         
         mode_row = QHBoxLayout()
         mode_lbl = QLabel("Folder Mode:")
-        mode_lbl.setStyleSheet("font-weight: 600;")
+        mode_lbl.setStyleSheet(Theme.get_card_header_style())
         self.extras_mode_combo = QComboBox()
         self.extras_mode_combo.setFixedWidth(200)
         self.extras_mode_combo.addItem("Next to Parent (No extra folder)", "none")

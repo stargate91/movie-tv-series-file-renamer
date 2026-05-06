@@ -23,16 +23,7 @@ class HistoryBatchCard(QFrame):
 
     def _init_ui(self):
         self.setObjectName("BatchCard")
-        self.setStyleSheet(f"""
-            #BatchCard {{
-                background: {Theme.SURFACE};
-                border: 1px solid {Theme.BORDER};
-                border-radius: 12px;
-            }}
-            #BatchCard:hover {{
-                border-color: {Theme.PRIMARY}88;
-            }}
-        """)
+        self.setStyleSheet(Theme.get_history_batch_card_style())
         
         self.main_layout = QVBoxLayout(self)
         self.main_layout.setContentsMargins(15, 15, 15, 15)
@@ -45,10 +36,10 @@ class HistoryBatchCard(QFrame):
         info_layout = QVBoxLayout()
         ts = self.items[0].get('timestamp', T("history.unknown_date"))
         date_lbl = QLabel(ts)
-        date_lbl.setStyleSheet(f"color: {Theme.TEXT_MUTED}; font-size: 11px; font-weight: 600;")
+        date_lbl.setStyleSheet(Theme.get_status_label_style())
         
         title_lbl = QLabel(T("history.renamed_count", count=len(self.items)))
-        title_lbl.setStyleSheet("color: white; font-size: 15px; font-weight: 800;")
+        title_lbl.setStyleSheet(Theme.get_preview_title_style())
         
         info_layout.addWidget(date_lbl)
         info_layout.addWidget(title_lbl)
@@ -59,27 +50,13 @@ class HistoryBatchCard(QFrame):
         # Undo Button
         self.undo_btn = QPushButton(f"🔄 {T('history.undo_btn')}")
         self.undo_btn.setCursor(Qt.PointingHandCursor)
-        self.undo_btn.setStyleSheet(f"""
-            QPushButton {{
-                background: {Theme.PRIMARY}15;
-                color: {Theme.PRIMARY};
-                border: 1px solid {Theme.PRIMARY}44;
-                border-radius: 6px;
-                padding: 6px 12px;
-                font-weight: 700;
-                font-size: 12px;
-            }}
-            QPushButton:hover {{
-                background: {Theme.PRIMARY};
-                color: white;
-            }}
-        """)
+        self.undo_btn.setStyleSheet(Theme.get_history_undo_button_style())
         self.undo_btn.clicked.connect(lambda: self.undo_requested.emit(self.batch_id))
         
         # Expand Button
         self.expand_btn = QPushButton(T("history.expand"))
         self.expand_btn.setCursor(Qt.PointingHandCursor)
-        self.expand_btn.setStyleSheet(f"color: {Theme.TEXT_DIM}; background: transparent; border: none; font-weight: 700;")
+        self.expand_btn.setStyleSheet(Theme.get_history_expand_button_style())
         self.expand_btn.clicked.connect(self.toggle_expand)
 
         header_layout.addWidget(self.undo_btn)
@@ -96,14 +73,14 @@ class HistoryBatchCard(QFrame):
         
         for item in self.items:
             row = QFrame()
-            row.setStyleSheet(f"background: {Theme.SURFACE_DARK}; border-radius: 6px;")
+            row.setStyleSheet(Theme.get_batch_card_style())
             row_layout = QHBoxLayout(row)
             
             old_name = os.path.basename(item['old_path'] or "")
             new_name = os.path.basename(item['new_path'] or "")
             
             lbl = QLabel(f"{old_name}  →  {new_name}")
-            lbl.setStyleSheet(f"color: {Theme.TEXT_DIM}; font-family: monospace; font-size: 12px;")
+            lbl.setStyleSheet(Theme.get_monospace_label_style())
             row_layout.addWidget(lbl)
             self.details_layout.addWidget(row)
             
@@ -132,9 +109,9 @@ class HistoryPage(QWidget):
         header_layout = QHBoxLayout()
         title_vbox = QVBoxLayout()
         title = QLabel(T("history.title"))
-        title.setStyleSheet("font-size: 28px; font-weight: 800; color: white;")
+        title.setStyleSheet(Theme.get_page_header_style())
         subtitle = QLabel(T("history.subtitle"))
-        subtitle.setStyleSheet(f"color: {Theme.TEXT_MUTED}; font-size: 13px;")
+        subtitle.setStyleSheet(Theme.get_card_description_style())
         title_vbox.addWidget(title)
         title_vbox.addWidget(subtitle)
         header_layout.addLayout(title_vbox)
@@ -144,16 +121,7 @@ class HistoryPage(QWidget):
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText(T("history.search_placeholder"))
         self.search_input.setFixedWidth(350)
-        self.search_input.setStyleSheet(f"""
-            QLineEdit {{
-                background: {Theme.SURFACE_DARK};
-                border: 1px solid {Theme.BORDER};
-                border-radius: 8px;
-                padding: 10px 15px;
-                color: white;
-            }}
-            QLineEdit:focus {{ border-color: {Theme.PRIMARY}; }}
-        """)
+        self.search_input.setStyleSheet(Theme.get_input_style())
         self.search_input.textChanged.connect(self._on_search_changed)
         header_layout.addWidget(self.search_input)
         
@@ -163,7 +131,7 @@ class HistoryPage(QWidget):
         self.scroll = QScrollArea()
         self.scroll.setWidgetResizable(True)
         self.scroll.setFrameShape(QFrame.NoFrame)
-        self.scroll.setStyleSheet("background: transparent;")
+        self.scroll.setStyleSheet(Theme.get_scroll_area_style())
         self.scroll.verticalScrollBar().setStyleSheet(Theme.get_scrollbar_style())
         
         self.content_container = QWidget()
@@ -187,7 +155,7 @@ class HistoryPage(QWidget):
             raw_history = self.engine.db.history.get_recent(limit=500)
             if not raw_history:
                 empty_lbl = QLabel(T("history.no_history"))
-                empty_lbl.setStyleSheet(f"color: {Theme.TEXT_DIM}; font-size: 16px;")
+                empty_lbl.setStyleSheet(Theme.get_settings_title_style())
                 empty_lbl.setAlignment(Qt.AlignCenter)
                 self.content_layout.insertWidget(0, empty_lbl)
                 return

@@ -93,7 +93,7 @@ class GeneralTab(BaseSettingsTab):
         self.size_spin.setRange(0, 10000)
         self.size_spin.setValue(self.engine.config.settings.vid_size)
         self.size_spin.setFixedWidth(100)
-        self.size_spin.setStyleSheet(f"background: {Theme.SURFACE_DARK}; border: 1px solid {Theme.BORDER}; padding: 5px;")
+        self.size_spin.setStyleSheet(Theme.get_spinbox_style())
         size_layout.addWidget(size_lbl)
         size_layout.addWidget(self.size_spin)
         size_layout.addStretch()

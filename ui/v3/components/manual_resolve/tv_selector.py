@@ -17,16 +17,7 @@ class TVMetadataSelector(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(15)
 
-        # 1. Type Toggle
-        layout.addWidget(QLabel(T("common.type")))
-        self.type_combo = QComboBox()
-        self.type_combo.addItem(T("common.types.movie"), "movie")
-        self.type_combo.addItem(T("common.types.tv"), "tv")
-        self.type_combo.setFixedWidth(110)
-        self.type_combo.currentTextChanged.connect(self._on_type_changed)
-        layout.addWidget(self.type_combo)
-
-        # 2. Season/Episode Fields
+        # 1. Season/Episode Fields (The type is now managed by the main search)
         self.tv_container = QWidget()
         tv_layout = QHBoxLayout(self.tv_container)
         tv_layout.setContentsMargins(0, 0, 0, 0)
@@ -41,6 +32,10 @@ class TVMetadataSelector(QWidget):
         tv_layout.addWidget(self.episode_spin)
 
         layout.addWidget(self.tv_container)
+        
+        # Initial visibility: Hide TV fields by default
+        self.tv_container.setVisible(False)
+        
         layout.addStretch()
 
     def _create_spin(self, min_v, max_v, special_text):
@@ -51,27 +46,12 @@ class TVMetadataSelector(QWidget):
         spin.lineEdit().installEventFilter(self)
         return spin
 
-    def _on_type_changed(self, text):
-        self.tv_container.setVisible(self.type_combo.currentData() == "tv")
-        self.type_changed.emit(self.type_combo.currentData())
-
-    def eventFilter(self, source, event):
-        """Auto-reset to 0 if field is cleared manually."""
-        if event.type() == QEvent.FocusOut:
-            if not source.text().strip():
-                if source == self.season_spin.lineEdit(): self.season_spin.setValue(0)
-                if source == self.episode_spin.lineEdit(): self.episode_spin.setValue(0)
-        return super().eventFilter(source, event)
-
-    def set_values(self, m_type, s=0, e=0):
-        idx = self.type_combo.findData(m_type)
-        if idx >= 0: self.type_combo.setCurrentIndex(idx)
+    def set_values(self, s=0, e=0):
         self.season_spin.setValue(int(s) if s else 0)
         self.episode_spin.setValue(int(e) if e else 0)
 
     def get_values(self):
         return {
-            'type': self.type_combo.currentData(),
             'season': self.season_spin.value(),
             'episode': self.episode_spin.value()
         }

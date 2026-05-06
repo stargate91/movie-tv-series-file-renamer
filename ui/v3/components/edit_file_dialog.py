@@ -46,21 +46,21 @@ class EditFileDialog(QDialog):
 
         # Unified Classification
         self.combo_classification = QComboBox()
-        self.combo_classification.addItem(T("edit_file.roles.movie"), "Movie")
-        self.combo_classification.addItem(T("edit_file.roles.episode"), "Episode")
-        self.combo_classification.addItem(T("edit_file.roles.bonus"), "Bonus Video")
+        self.combo_classification.addItem(T("edit_file.roles.movie"), "movie")
+        self.combo_classification.addItem(T("edit_file.roles.episode"), "episode")
+        self.combo_classification.addItem(T("edit_file.roles.bonus"), "bonus")
         self.combo_classification.currentIndexChanged.connect(self._on_classification_changed)
         
         # Sub-Type
         self.st_group = QWidget()
         st_lay = QVBoxLayout(self.st_group)
         st_lay.setContentsMargins(0, 5, 0, 0)
-        st_lay.addWidget(QLabel(T("edit_file.fields.type"), styleSheet="color: #94A3B8;"))
+        st_lay.addWidget(QLabel(T("edit_file.fields.type"), styleSheet=Theme.get_status_label_style()))
         self.combo_sub_type = QComboBox()
         self.combo_sub_type.setEditable(True)
         st_lay.addWidget(self.combo_sub_type)
 
-        self.cat_card.layout().addWidget(QLabel(T("edit_file.fields.primary_role"), styleSheet="font-weight: bold;"))
+        self.cat_card.layout().addWidget(QLabel(T("edit_file.fields.primary_role"), styleSheet=Theme.get_card_header_style()))
         self.cat_card.layout().addWidget(self.combo_classification)
         self.cat_card.layout().addWidget(self.combo_category) # Visible for non-video categories
         self.cat_card.layout().addWidget(self.st_group)
@@ -116,7 +116,8 @@ class EditFileDialog(QDialog):
         lang_lay.addWidget(QLabel(T("edit_file.fields.language")))
         self.combo_lang = QComboBox()
         self.combo_lang.setEditable(True)
-        self.combo_lang.addItems(["ENG", "HUN", "GER", "FRA", "SPA", "ITA", "JPN"])
+        for code in ["eng", "hun", "ger", "fra", "spa", "ita", "jpn"]:
+            self.combo_lang.addItem(T(f"common.languages.{code}"), code.upper())
         lang_lay.addWidget(self.combo_lang)
 
         # Linking
@@ -154,19 +155,16 @@ class EditFileDialog(QDialog):
 
     def _create_card(self, title):
         card = QFrame()
-        card.setStyleSheet(f"background-color: {Theme.SURFACE}; border-radius: 8px; border: 1px solid {Theme.BORDER};")
+        card.setStyleSheet(Theme.get_batch_card_style())
         layout = QVBoxLayout(card)
         layout.setContentsMargins(15, 15, 15, 15)
         layout.setSpacing(10)
         
         lbl = QLabel(title)
-        lbl.setStyleSheet("font-weight: bold; font-size: 13px; color: #E2E8F0; border: none;")
+        lbl.setStyleSheet(Theme.get_card_header_style())
         layout.addWidget(lbl)
         
-        line = QFrame()
-        line.setFrameShape(QFrame.HLine)
-        line.setStyleSheet(f"background-color: {Theme.BORDER}; max-height: 1px; border: none;")
-        layout.addWidget(line)
+        layout.addWidget(Theme.create_hline())
         return card
 
     def _load_data(self):
@@ -175,23 +173,27 @@ class EditFileDialog(QDialog):
         
         # Populate allowed categories
         self.combo_category.clear()
-        allowed = MetadataRules.get_allowed_categories(cat)
-        self.combo_category.addItems(allowed)
+        allowed_keys = MetadataRules.get_allowed_categories(cat)
+        for ck in allowed_keys:
+            label = T(f"discovery.batch_operations.options.categories.{ck}")
+            if label == f"discovery.batch_operations.options.categories.{ck}":
+                label = ck.capitalize()
+            self.combo_category.addItem(label, ck)
         
         # Set base category
-        self.combo_category.setCurrentText(MetadataRules.get_category_label(cat))
+        self._set_combo_by_data(self.combo_category, cat)
         
         # Unified classification
         if cat in ['video', 'extra']:
             self.combo_category.hide()
             self.combo_classification.show()
             if cat == 'extra':
-                self.combo_classification.setCurrentText("Bonus Video")
+                self._set_combo_by_data(self.combo_classification, "bonus")
             else:
                 if f.get('fn_media_type') == 'tv':
-                    self.combo_classification.setCurrentText("Episode")
+                    self._set_combo_by_data(self.combo_classification, "episode")
                 else:
-                    self.combo_classification.setCurrentText("Movie")
+                    self._set_combo_by_data(self.combo_classification, "movie")
         else:
             self.combo_classification.hide()
             self.combo_category.show()
@@ -205,27 +207,30 @@ class EditFileDialog(QDialog):
         self.spin_episode.setValue(int(ep_val) if str(ep_val or "").isdigit() else 0)
         self.combo_edition.setCurrentText(f.get('edition') or "")
         self.spin_part.setValue(f.get('part_number') or 0)
-        self.combo_lang.setCurrentText(f.get('language') or "ENG")
+        self._set_combo_by_data(self.combo_lang, (f.get('language') or "ENG").upper())
         
         # Update visibility
         self._update_visibility()
 
     def _on_classification_changed(self):
-        cls = self.combo_classification.currentText()
-        if cls == "Movie":
-            self.combo_category.setCurrentText("Video / Movie")
-            self.combo_media_type.setCurrentText("Movie")
-        elif cls == "Episode":
-            self.combo_category.setCurrentText("Video / Movie")
-            self.combo_media_type.setCurrentText("TV Series")
-        elif cls == "Bonus Video":
-            self.combo_category.setCurrentText("Extra / Bonus")
+        cls = self.combo_classification.currentData()
+        if cls == "movie":
+            self._set_combo_by_data(self.combo_category, "video")
+            self._set_combo_by_data(self.combo_media_type, "movie")
+        elif cls == "episode":
+            self._set_combo_by_data(self.combo_category, "video")
+            self._set_combo_by_data(self.combo_media_type, "tv")
+        elif cls == "bonus":
+            self._set_combo_by_data(self.combo_category, "extra")
         self._update_visibility()
 
+    def _set_combo_by_data(self, combo, data):
+        idx = combo.findData(data)
+        if idx >= 0: combo.setCurrentIndex(idx)
+
     def _update_visibility(self):
-        cat_label = self.combo_category.currentText()
-        cat_internal = MetadataRules.get_internal_category(cat_label)
-        media_internal = "tv" if self.combo_media_type.currentText() == "TV Series" else "movie"
+        cat_internal = self.combo_category.currentData()
+        media_internal = self.combo_media_type.currentData()
         
         visible_fields = MetadataRules.get_visible_fields(cat_internal, media_internal)
         
@@ -249,12 +254,20 @@ class EditFileDialog(QDialog):
         config = MetadataRules.get_sub_type_config(cat_internal)
         current = self.combo_sub_type.currentText()
         self.combo_sub_type.clear()
-        self.combo_sub_type.addItems(config['items'])
+        for item_key in config['items']:
+            label = T(f"discovery.extras.subtypes.{item_key}")
+            if label == f"discovery.extras.subtypes.{item_key}":
+                label = item_key.title()
+            self.combo_sub_type.addItem(label, item_key)
         
-        if not current and config['items']:
-            self.combo_sub_type.setCurrentText(config['items'][0])
+        if not current:
+            if config['default']:
+                idx = self.combo_sub_type.findData(config['default'])
+                if idx >= 0: self.combo_sub_type.setCurrentIndex(idx)
         else:
-            self.combo_sub_type.setCurrentText(current)
+            idx = self.combo_sub_type.findText(current)
+            if idx >= 0: self.combo_sub_type.setCurrentIndex(idx)
+            else: self.combo_sub_type.setCurrentText(current)
         self.combo_sub_type.blockSignals(False)
 
     def _populate_parents(self):
@@ -276,8 +289,7 @@ class EditFileDialog(QDialog):
         except: pass
 
     def _apply_changes(self):
-        cat_label = self.combo_category.currentText()
-        target_cat = MetadataRules.get_internal_category(cat_label)
+        target_cat = self.combo_category.currentData()
         
         updates = {
             'id': self.file_data['id'],
@@ -285,7 +297,7 @@ class EditFileDialog(QDialog):
         }
         
         if target_cat == 'video':
-            updates['fn_media_type'] = "tv" if self.combo_classification.currentText() == "Episode" else "movie"
+            updates['fn_media_type'] = "tv" if self.combo_classification.currentData() == "episode" else "movie"
             updates['fn_season'] = self.spin_season.value() if updates['fn_media_type'] == 'tv' else None
             updates['fn_episode'] = str(self.spin_episode.value()) if updates['fn_media_type'] == 'tv' else None
             updates['edition'] = self.combo_edition.currentText() if updates['fn_media_type'] == 'movie' else None
@@ -299,8 +311,8 @@ class EditFileDialog(QDialog):
             updates['language'] = None
             updates['match_status'] = None
         else:
-            updates['sub_category'] = self.combo_sub_type.currentText() if self.st_group.isVisible() else None
-            updates['language'] = self.combo_lang.currentText() if self.lang_group.isVisible() else None
+            updates['sub_category'] = self.combo_sub_type.currentData() if self.st_group.isVisible() else None
+            updates['language'] = self.combo_lang.currentData() if self.lang_group.isVisible() else None
             updates['parent_file_id'] = self.combo_parent.currentData() if self.link_group.isVisible() else None
 
         try:
@@ -312,5 +324,4 @@ class EditFileDialog(QDialog):
             
             self.accept()
         except Exception as e:
-            QMessageBox.critical(self, T("common.error"), f"{T('common.operation_successful')}: {e}") # Wait, error msg should be localized
-            # Let's add a generic fail msg
+            QMessageBox.critical(self, T("common.error"), f"{e}")

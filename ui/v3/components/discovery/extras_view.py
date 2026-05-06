@@ -21,12 +21,7 @@ class ExtrasView(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         
         self.tabs = QTabWidget()
-        self.tabs.setStyleSheet(f"""
-            QTabWidget::pane {{ border: 1px solid {Theme.BORDER}; border-radius: 8px; background: {Theme.SURFACE_DARK}; }}
-            QTabBar::tab {{ background: {Theme.SURFACE}; color: {Theme.TEXT_MUTED}; padding: 12px 24px; border: 1px solid {Theme.BORDER}; border-bottom: none; border-radius: 8px 8px 0 0; font-weight: 700; font-size: 13px; margin-right: 4px; }}
-            QTabBar::tab:selected {{ background: {Theme.SURFACE_DARK}; color: {Theme.PRIMARY}; border-bottom: 2px solid {Theme.PRIMARY}; }}
-            QTabBar::tab:hover {{ background: {Theme.SURFACE_LIGHT}; color: {Theme.TEXT_MAIN}; }}
-        """)
+        self.tabs.setStyleSheet(Theme.get_inner_tab_widget_style())
         
         self.tables = {
             "extra": DiscoveryTable(),
@@ -56,7 +51,8 @@ class ExtrasView(QWidget):
         filter_bar = QHBoxLayout()
         filter_bar.setSpacing(8)
         for st in subtypes:
-            btn = QPushButton(st.title())
+            label = T(f"discovery.extras.subtypes.{st}") if T(f"discovery.extras.subtypes.{st}") != f"discovery.extras.subtypes.{st}" else st.title()
+            btn = QPushButton(label)
             btn.setCheckable(True)
             if st == "all": btn.setChecked(True)
             btn.setStyleSheet(self._get_chip_style())
@@ -69,18 +65,7 @@ class ExtrasView(QWidget):
         return container
 
     def _get_chip_style(self):
-        return f"""
-            QPushButton {{
-                background: {Theme.SURFACE}; color: {Theme.TEXT_MUTED};
-                border: 1px solid {Theme.BORDER}; border-radius: 14px;
-                padding: 4px 12px; font-size: 11px; font-weight: 600;
-            }}
-            QPushButton:checked {{
-                background: {Theme.PRIMARY}20; color: {Theme.PRIMARY};
-                border-color: {Theme.PRIMARY};
-            }}
-            QPushButton:hover {{ border-color: {Theme.TEXT_MUTED}; }}
-        """
+        return Theme.get_chip_style()
 
     def _on_sub_filter_changed(self, btn, cat, subtype):
         # Uncheck others in the same bar

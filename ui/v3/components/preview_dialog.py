@@ -21,12 +21,12 @@ class PreviewDialog(QDialog):
         layout.setContentsMargins(30, 30, 30, 30)
         layout.setSpacing(20)
         
-        self.setStyleSheet(f"background-color: {Theme.BACKGROUND}; color: {Theme.TEXT_MAIN};")
+        self.setStyleSheet(Theme.get_preview_dialog_style())
 
         # Header Section
         header_layout = QHBoxLayout()
         header = QLabel(T("preview.header", count=len(self.plan)))
-        header.setStyleSheet("font-size: 22px; font-weight: 800; color: white;")
+        header.setStyleSheet(Theme.get_preview_header_style())
         header_layout.addWidget(header)
         
         header_layout.addStretch()
@@ -35,16 +35,7 @@ class PreviewDialog(QDialog):
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText(T("preview.filter_placeholder"))
         self.search_input.setFixedWidth(350)
-        self.search_input.setStyleSheet(f"""
-            QLineEdit {{
-                background: {Theme.SURFACE_DARK};
-                border: 1px solid {Theme.BORDER};
-                border-radius: 6px;
-                padding: 8px 12px;
-                color: white;
-            }}
-            QLineEdit:focus {{ border-color: {Theme.PRIMARY}; }}
-        """)
+        self.search_input.setStyleSheet(Theme.get_preview_search_input_style())
         self.search_input.textChanged.connect(self._filter_items)
         header_layout.addWidget(self.search_input)
         
@@ -55,14 +46,14 @@ class PreviewDialog(QDialog):
 
         # List Header
         list_header = QFrame()
-        list_header.setStyleSheet(f"background: {Theme.SURFACE_DARK}; border-bottom: 2px solid {Theme.BORDER};")
+        list_header.setStyleSheet(Theme.get_preview_list_header_style())
         lh_layout = QHBoxLayout(list_header)
         lh_layout.setContentsMargins(20, 10, 20, 10)
         
         l_old = QLabel(T("preview.col_current"))
         l_new = QLabel(T("preview.col_proposed"))
         for l in [l_old, l_new]:
-            l.setStyleSheet(f"font-size: 11px; font-weight: 800; color: {Theme.TEXT_DIM}; letter-spacing: 1px;")
+            l.setStyleSheet(Theme.get_preview_col_label_style())
         
         lh_layout.addWidget(l_old, 4)
         lh_layout.addSpacing(40)
@@ -72,7 +63,7 @@ class PreviewDialog(QDialog):
         self.scroll = QScrollArea()
         self.scroll.setWidgetResizable(True)
         self.scroll.setFrameShape(QFrame.NoFrame)
-        self.scroll.setStyleSheet(f"background-color: transparent;")
+        self.scroll.setStyleSheet(Theme.get_scroll_area_style())
         self.scroll.verticalScrollBar().setStyleSheet(Theme.get_scrollbar_style())
         layout.addWidget(self.scroll)
 
@@ -147,13 +138,7 @@ class PreviewDialog(QDialog):
             bg_color = "rgba(239, 68, 68, 0.05)" if is_collision else Theme.SURFACE
             border_color = Theme.ERROR if is_collision else Theme.BORDER
             
-            item_frame.setStyleSheet(f"""
-                QFrame#Row {{ 
-                    background-color: {bg_color}; 
-                    border-bottom: 1px solid {border_color};
-                }}
-                QFrame#Row:hover {{ background-color: {Theme.SURFACE_LIGHT if not is_collision else "rgba(239, 68, 68, 0.1)"}; }}
-            """)
+            item_frame.setStyleSheet(Theme.get_preview_row_style(is_collision=is_collision))
             item_layout = QHBoxLayout(item_frame)
             item_layout.setContentsMargins(20, 15, 20, 15)
             item_layout.setSpacing(20)
@@ -167,19 +152,19 @@ class PreviewDialog(QDialog):
             # Left Side (Old)
             old_lbl = QLabel(old_name)
             old_lbl.setWordWrap(True)
-            old_lbl.setStyleSheet(f"color: {Theme.TEXT_DIM}; font-family: monospace; font-size: 12px;")
+            old_lbl.setStyleSheet(Theme.get_preview_old_name_style())
             item_layout.addWidget(old_lbl, 4)
             
             # Center Arrow
             arrow = QLabel(" → ")
-            arrow.setStyleSheet(f"color: {Theme.PRIMARY}; font-weight: 900; font-size: 16px;")
+            arrow.setStyleSheet(Theme.get_preview_arrow_style())
             item_layout.addWidget(arrow)
             
             # Right Side (New)
             color = Theme.SUCCESS if item['action'] == 'rename' else Theme.ERROR
             new_lbl = QLabel(new_name)
             new_lbl.setWordWrap(True)
-            new_lbl.setStyleSheet(f"color: {color}; font-family: monospace; font-size: 13px; font-weight: 700;")
+            new_lbl.setStyleSheet(Theme.get_preview_new_name_style(color=color))
             item_layout.addWidget(new_lbl, 6)
                 
             # Add a global Remove button to the far right for EVERY item
@@ -187,10 +172,7 @@ class PreviewDialog(QDialog):
             btn_remove.setCursor(Qt.PointingHandCursor)
             btn_remove.setFixedSize(28, 28)
             btn_remove.setToolTip(T("preview.remove_tooltip"))
-            btn_remove.setStyleSheet(f"""
-                QPushButton {{ background: transparent; color: {Theme.ERROR}; font-size: 16px; border-radius: 4px; }}
-                QPushButton:hover {{ background: rgba(239, 68, 68, 0.1); }}
-            """)
+            btn_remove.setStyleSheet(Theme.get_preview_remove_btn_style())
             btn_remove.clicked.connect(lambda checked=False, p_item=item: self._remove_item(p_item))
             item_layout.addWidget(btn_remove)
             
@@ -223,7 +205,7 @@ class PreviewDialog(QDialog):
             summary_text += f" | <b style='color: {Theme.ERROR};'>{T('discovery.messages.collision_detected', count=self.collision_count)}</b>"
             
         summary = QLabel(summary_text)
-        summary.setStyleSheet(f"color: {Theme.TEXT_DIM}; font-size: 13px;")
+        summary.setStyleSheet(Theme.get_preview_summary_style())
         footer_top.addWidget(summary)
         footer_top.addStretch()
         self.footer_layout.addLayout(footer_top)
@@ -234,16 +216,7 @@ class PreviewDialog(QDialog):
         cancel_btn = QPushButton(T("common.cancel"))
         cancel_btn.setFixedSize(140, 45)
         cancel_btn.setCursor(Qt.PointingHandCursor)
-        cancel_btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: transparent;
-                border: 1px solid {Theme.BORDER};
-                color: {Theme.TEXT_MAIN};
-                border-radius: 8px;
-                font-weight: 600;
-            }}
-            QPushButton:hover {{ background-color: {Theme.SURFACE_LIGHT}; }}
-        """)
+        cancel_btn.setStyleSheet(Theme.get_preview_cancel_btn_style())
         cancel_btn.clicked.connect(self.reject)
         
         apply_btn = QPushButton(T("preview.execute"))

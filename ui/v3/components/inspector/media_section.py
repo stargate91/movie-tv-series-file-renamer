@@ -19,7 +19,7 @@ class MediaSection(QWidget):
         # 1. Title & Status Row
         title_row = QHBoxLayout()
         self.title_lbl = QLabel(T("discovery.inspector.empty.title"))
-        self.title_lbl.setStyleSheet(f"font-size: 18px; font-weight: 800; color: {Theme.TEXT_MAIN};")
+        self.title_lbl.setStyleSheet(Theme.get_inspector_title_style())
         self.title_lbl.setWordWrap(True)
         title_row.addWidget(self.title_lbl)
         layout.addLayout(title_row)
@@ -27,7 +27,7 @@ class MediaSection(QWidget):
         # 2. Year & Status Badge
         sub_row = QHBoxLayout()
         self.year_lbl = QLabel("")
-        self.year_lbl.setStyleSheet(f"font-size: 15px; color: {Theme.PRIMARY}; font-weight: 700;")
+        self.year_lbl.setStyleSheet(Theme.get_inspector_year_style())
         sub_row.addWidget(self.year_lbl)
         
         self.status_badge = QLabel("")
@@ -39,16 +39,16 @@ class MediaSection(QWidget):
 
         # 3. Episode Frame (TV specific)
         self.ep_frame = QFrame()
-        self.ep_frame.setStyleSheet(f"background-color: {Theme.SURFACE}; border-radius: 10px; border: 1px solid {Theme.BORDER};")
+        self.ep_frame.setStyleSheet(Theme.get_inspector_ep_frame_style())
         ep_layout = QVBoxLayout(self.ep_frame)
         ep_layout.setContentsMargins(14, 12, 14, 12)
         ep_layout.setSpacing(4)
 
         self.ep_id_lbl = QLabel("")
-        self.ep_id_lbl.setStyleSheet(f"font-size: 13px; color: {Theme.PRIMARY}; font-weight: 700; border: none;")
+        self.ep_id_lbl.setStyleSheet(Theme.get_inspector_ep_id_style())
         self.ep_title_lbl = QLabel("")
         self.ep_title_lbl.setWordWrap(True)
-        self.ep_title_lbl.setStyleSheet(f"font-size: 14px; color: {Theme.TEXT_MAIN}; font-weight: 600; border: none;")
+        self.ep_title_lbl.setStyleSheet(Theme.get_inspector_ep_title_style())
         
         ep_layout.addWidget(self.ep_id_lbl)
         ep_layout.addWidget(self.ep_title_lbl)
@@ -58,12 +58,12 @@ class MediaSection(QWidget):
         # 4. Overview
         self.overview_lbl = QLabel(T("discovery.inspector.empty.overview"))
         self.overview_lbl.setWordWrap(True)
-        self.overview_lbl.setStyleSheet(f"color: {Theme.TEXT_MUTED}; line-height: 1.5; font-size: 12px;")
+        self.overview_lbl.setStyleSheet(Theme.get_inspector_overview_style())
         
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.NoFrame)
-        scroll.setStyleSheet("background: transparent; border: none;")
+        scroll.setStyleSheet(Theme.get_scroll_area_style())
         scroll.setWidget(self.overview_lbl)
         layout.addWidget(scroll, 1)
 
@@ -99,13 +99,7 @@ class MediaSection(QWidget):
             return
         color = Theme.STATUS_COLORS.get(status, '#64748B')
         self.status_badge.setText(status)
-        self.status_badge.setStyleSheet(f"""
-            QLabel {{
-                color: {color}; background-color: {color}20;
-                border: 1px solid {color}50; border-radius: 12px;
-                font-weight: 800; font-size: 10px; padding: 2px 8px;
-            }}
-        """)
+        self.status_badge.setStyleSheet(Theme.get_status_badge_style(color))
         self.status_badge.show()
 
     def clear(self):

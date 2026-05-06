@@ -161,40 +161,46 @@ class Resolver:
         return 'none'
 
     def _finalize_match(self, file_id, media_item_id, res, vid, status='matched'):
-        """Links file to media and specific episodes."""
+        """Links file to media and specific episodes and synchronizes file metadata."""
+        # Ensure file metadata matches the resolved result (Movie vs TV)
+        updates = {
+            'match_status': status,
+            'fn_media_type': res['media_type']
+        }
+        
         if res['media_type'] == 'tv':
             s_val = vid.get('fn_season') if vid.get('fn_season') is not None else vid.get('fd_season')
             try: season_num = int(s_val) if s_val is not None else None
             except (ValueError, TypeError): season_num = None
             
             if season_num is not None:
+                updates['fn_season'] = season_num
                 self.library.fetch_and_store_season(res['tmdb_id'], season_num)
                 
                 ep_val = vid.get('fn_episode') if vid.get('fn_episode') is not None else vid.get('fd_episode')
                 ep_nums = self._parse_episode_numbers(ep_val)
                 
                 if ep_nums:
+                    updates['fn_episode'] = str(ep_nums) if len(ep_nums) > 1 else str(ep_nums[0])
                     linked_any = False
                     for ep_num in ep_nums:
-                        # Use MediaRepository for episodes
                         ep_row = self.db.media.get_episode_by_id_fields(media_item_id, int(season_num), int(ep_num))
                         if ep_row:
-                            # Use FileRepository to update status and MediaRepository for links
-                            self.db.files.update_file(file_id, match_status=status)
+                            self.db.files.update_file(file_id, **updates)
                             self.db.media.link_file_to_media(file_id, media_item_id, tv_episode_id=ep_row['id'])
                             linked_any = True
                     
                     if not linked_any:
-                        self.db.files.update_file(file_id, match_status=status)
+                        self.db.files.update_file(file_id, **updates)
                         self.db.media.link_file_to_media(file_id, media_item_id)
                 else:
-                    self.db.files.update_file(file_id, match_status=status)
+                    self.db.files.update_file(file_id, **updates)
                     self.db.media.link_file_to_media(file_id, media_item_id)
             else:
-                self.db.files.update_file(file_id, match_status=status)
+                self.db.files.update_file(file_id, **updates)
                 self.db.media.link_file_to_media(file_id, media_item_id)
         else:
-            self.db.files.update_file(file_id, match_status=status)
+            self.db.files.update_file(file_id, **updates)
             self.db.media.link_file_to_media(file_id, media_item_id)
 
     def _parse_episode_numbers(self, ep_val):

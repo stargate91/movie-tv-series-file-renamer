@@ -10,7 +10,7 @@ class SearchWorker(QThread):
     """
     results_found = Signal(list, str) # results, mode
 
-    def __init__(self, engine, query, year, search_type, mode="search", parent_id=None, season_num=None):
+    def __init__(self, engine, query, year, search_type, mode="search", parent_id=None, season_num=None, ep_num=None):
         super().__init__()
         self.engine = engine
         self.query = query
@@ -19,6 +19,7 @@ class SearchWorker(QThread):
         self.mode = mode
         self.parent_id = parent_id # tmdb_id of show
         self.season_num = season_num
+        self.ep_num = ep_num
 
     def run(self):
         lang = self.engine.config.settings.metadata_language
@@ -27,18 +28,25 @@ class SearchWorker(QThread):
                 # Extract S/E hints from query if any
                 s_match = re.search(r'[sS](\d+)', self.query)
                 e_match = re.search(r'[eE](\d+)', self.query)
+                
+                # Prioritize explicit parameters from UI
+                s_num = self.season_num if (self.season_num is not None and self.season_num > 0) else (int(s_match.group(1)) if s_match else None)
+                e_num = self.ep_num if (self.ep_num is not None and self.ep_num > 0) else (int(e_match.group(1)) if e_match else None)
+                
                 clean_query = re.sub(r'[sS]\d+|[eE]\d+', '', self.query).strip()
                 
                 results = self.engine.resolver.matcher.search_api(clean_query, self.year, self.search_type)
                 
                 # Auto-drill into TV episodes if hints found
-                if self.search_type == "tv" and results and (s_match or e_match):
+                if self.search_type == "tv" and results and (s_num is not None or e_num is not None):
                     best_show = results[0]
-                    s_num = int(s_match.group(1)) if s_match else None
                     if s_num is not None:
                         eps_data = self.engine.resolver.matcher.api.get_from_tmdb_season(best_show['tmdb_id'], s_num, language=lang)
                         ep_results = []
                         for ep in eps_data.get('episodes', []):
+                            if e_num is not None and ep['episode_number'] != e_num:
+                                continue
+                                
                             ep_results.append({
                                 'tmdb_id': ep['id'],
                                 'title': f"S{str(s_num).zfill(2)}E{str(ep['episode_number']).zfill(2)} - {ep['name']}",

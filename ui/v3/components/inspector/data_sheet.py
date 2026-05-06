@@ -12,17 +12,7 @@ class DataSheetDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle(T("discovery.inspector.data_sheet.title"))
         self.setMinimumSize(750, 600)
-        # ... (CSS stays same)
-        self.setStyleSheet(f"""
-            QDialog {{ background: {Theme.BACKGROUND}; }}
-            QTabWidget::pane {{ border: 1px solid {Theme.BORDER}; border-radius: 8px; background: {Theme.SURFACE_DARK}; }}
-            QTabBar::tab {{ background: {Theme.SURFACE}; color: {Theme.TEXT_MUTED}; padding: 10px 20px; border: 1px solid {Theme.BORDER}; border-bottom: none; border-radius: 6px 6px 0 0; font-weight: 600; }}
-            QTabBar::tab:selected {{ background: {Theme.SURFACE_DARK}; color: {Theme.TEXT_MAIN}; border-bottom: 2px solid {Theme.PRIMARY}; }}
-            QTextEdit {{ background: {Theme.SURFACE}; color: {Theme.TEXT_MAIN}; border: 1px solid {Theme.BORDER}; border-radius: 6px; font-family: 'Cascadia Code', 'Consolas', monospace; font-size: 12px; padding: 8px; }}
-            QTreeWidget {{ background: {Theme.SURFACE}; color: {Theme.TEXT_MAIN}; border: 1px solid {Theme.BORDER}; border-radius: 6px; }}
-            QTreeWidget::item {{ padding: 6px 0; }}
-            QHeaderView::section {{ background: {Theme.SURFACE_LIGHT}; color: {Theme.TEXT_MUTED}; font-weight: 700; border: none; padding: 8px; }}
-        """)
+        self.setStyleSheet(Theme.get_data_sheet_style())
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(20, 20, 20, 20)
@@ -62,7 +52,7 @@ class DataSheetDialog(QDialog):
         tree.setHeaderLabels([T("discovery.inspector.data_sheet.cols.property"), T("discovery.inspector.data_sheet.cols.value")])
         tree.setRootIsDecorated(False)
         tree.setAlternatingRowColors(True)
-        tree.setStyleSheet(f"QTreeWidget {{ alternate-background-color: {Theme.SURFACE_DARK}; }}")
+        tree.setStyleSheet(Theme.get_tree_style())
         header = tree.header()
         header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(1, QHeaderView.Stretch)
@@ -107,8 +97,8 @@ class DataSheetDialog(QDialog):
             ('runtime', T('discovery.inspector.fields.runtime')), 
             ('release_date', T('discovery.inspector.fields.release_date')),
             ('rating_tmdb', T('discovery.inspector.fields.rating')), 
-            ('tmdb_id', 'TMDB ID'), 
-            ('imdb_id', 'IMDb ID'),
+            ('tmdb_id', T('discovery.inspector.fields.tmdb_id')), 
+            ('imdb_id', T('discovery.inspector.fields.imdb_id')),
         ]:
             val = m.get(key)
             if val: items.append((label, str(val)))
@@ -117,14 +107,24 @@ class DataSheetDialog(QDialog):
     def _episode_to_tree(self, ep_list, season):
         items = []
         if season:
-            for key, label in [('name', 'Season Name'), ('season_number', 'Season #'), ('air_date', 'Season Air Date')]:
+            for key, label in [
+                ('name', T('discovery.inspector.fields.season_name')), 
+                ('season_number', T('discovery.inspector.fields.season_num')), 
+                ('air_date', T('discovery.inspector.fields.season_air_date'))
+            ]:
                 val = season.get(key)
                 if val: items.append((label, str(val)))
         
         if ep_list:
             for ep in ep_list:
-                items.append(('', f'──── Episode {ep.get("episode_number")} ────'))
-                for key, label in [('name', 'Episode Title'), ('season_number', 'Season'), ('episode_number', 'Episode'), ('air_date', 'Air Date'), ('overview', 'Overview')]:
+                items.append(('', T('discovery.inspector.fields.episode_divider', count=ep.get("episode_number"))))
+                for key, label in [
+                    ('name', T('discovery.inspector.fields.episode_title')), 
+                    ('season_number', T('edit_file.fields.season')), 
+                    ('episode_number', T('edit_file.fields.episode')), 
+                    ('air_date', T('discovery.inspector.fields.air_date')), 
+                    ('overview', T('discovery.inspector.fields.overview'))
+                ]:
                     val = ep.get(key)
                     if val: items.append((label, str(val)))
         return items

@@ -17,7 +17,7 @@ class BatchOperationsDialog(QDialog):
     Dialog for performing bulk operations on multiple files.
     Features a reorderable list and checkbox-based property overrides.
     """
-    def __init__(self, parent, engine, selected_files):
+    def __init__(self, engine, selected_files, parent=None):
         super().__init__(parent)
         self.engine = engine
         self.selected_files = selected_files
@@ -43,7 +43,7 @@ class BatchOperationsDialog(QDialog):
         self.left_pane_widget = QWidget()
         left_layout = QVBoxLayout(self.left_pane_widget)
         left_layout.setContentsMargins(0, 0, 0, 0)
-        left_layout.addWidget(QLabel(T("discovery.batch_operations.file_selection"), styleSheet="font-weight: bold; font-size: 14px;"))
+        left_layout.addWidget(QLabel(T("discovery.batch_operations.file_selection"), styleSheet=Theme.get_card_header_style()))
         self.list_widget = QListWidget()
         self.list_widget.setDragDropMode(QAbstractItemView.InternalMove)
         self.list_widget.setDefaultDropAction(Qt.MoveAction)
@@ -54,12 +54,12 @@ class BatchOperationsDialog(QDialog):
 
         # RIGHT PANE: Operations
         right_pane = QVBoxLayout()
-        right_pane.addWidget(QLabel(T("discovery.batch_operations.configure_props"), styleSheet="font-weight: bold; font-size: 14px;"))
+        right_pane.addWidget(QLabel(T("discovery.batch_operations.configure_props"), styleSheet=Theme.get_card_header_style()))
         
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.NoFrame)
-        scroll.setStyleSheet("background: transparent;")
+        scroll.setStyleSheet(Theme.get_scroll_area_transparent_style())
         
         scroll_content = QWidget()
         scroll_layout = QVBoxLayout(scroll_content)
@@ -82,9 +82,9 @@ class BatchOperationsDialog(QDialog):
         
         # Unified Classification
         self.combo_classification = QComboBox()
-        self.combo_classification.addItem(T("discovery.batch_operations.options.roles.movie"), "Movie")
-        self.combo_classification.addItem(T("discovery.batch_operations.options.roles.episode"), "Episode")
-        self.combo_classification.addItem(T("discovery.batch_operations.options.roles.bonus"), "Bonus Video")
+        self.combo_classification.addItem(T("discovery.batch_operations.options.roles.movie"), "movie")
+        self.combo_classification.addItem(T("discovery.batch_operations.options.roles.episode"), "episode")
+        self.combo_classification.addItem(T("discovery.batch_operations.options.roles.bonus"), "bonus")
         self.combo_classification.currentIndexChanged.connect(self._on_classification_changed)
         self.combo_classification.setEnabled(False)
         self.chk_category.toggled.connect(self.combo_classification.setEnabled)
@@ -92,7 +92,7 @@ class BatchOperationsDialog(QDialog):
         self.chk_sub_category = QCheckBox(T("discovery.batch_operations.fields.override_sub"))
         self.combo_sub_category = QComboBox()
         self.combo_sub_category.setEditable(True)
-        self.combo_sub_category.addItems(MetadataRules.get_sub_type_config('default')['items'])
+        # Populate later in update_ui_visibility
         self.combo_sub_category.setEnabled(False)
         self.chk_sub_category.toggled.connect(self.combo_sub_category.setEnabled)
         
@@ -150,9 +150,9 @@ class BatchOperationsDialog(QDialog):
         self.chk_parts = QCheckBox(T("discovery.batch_operations.fields.renumber_parts"))
         p_layout = QHBoxLayout()
         self.combo_part_type = QComboBox()
-        self.combo_part_type.addItem(T("discovery.batch_operations.options.parts.part"), "Part")
-        self.combo_part_type.addItem(T("discovery.batch_operations.options.parts.cd"), "CD")
-        self.combo_part_type.addItem(T("discovery.batch_operations.options.parts.disk"), "Disk")
+        self.combo_part_type.addItem(T("discovery.batch_operations.options.parts.part"), "part")
+        self.combo_part_type.addItem(T("discovery.batch_operations.options.parts.cd"), "cd")
+        self.combo_part_type.addItem(T("discovery.batch_operations.options.parts.disk"), "disk")
         self.combo_part_type.setEnabled(False)
         self.spin_part_start = QSpinBox()
         self.spin_part_start.setRange(1, 99)
@@ -181,7 +181,9 @@ class BatchOperationsDialog(QDialog):
 
         self.chk_lang = QCheckBox(T("discovery.batch_operations.fields.override_lang"))
         self.combo_lang = QComboBox()
-        self.combo_lang.addItems(["ENG", "HUN", "GER", "FRA", "SPA"])
+        for code in ["eng", "hun", "ger", "fra", "spa"]:
+            label = T(f"common.languages.{code}")
+            self.combo_lang.addItem(label, code.upper())
         self.combo_lang.setEnabled(False)
         self.chk_lang.toggled.connect(self.combo_lang.setEnabled)
 
@@ -220,11 +222,11 @@ class BatchOperationsDialog(QDialog):
         cat = f.get('category', 'video')
         
         # Category
-        self.combo_category.setCurrentText(MetadataRules.get_category_label(cat))
+        self._set_combo_by_data(self.combo_category, cat)
         if self.is_video_batch:
-            if cat == 'extra': self.combo_classification.setCurrentText(T("discovery.batch_operations.options.roles.bonus"))
-            elif f.get('fn_media_type') == 'tv': self.combo_classification.setCurrentText(T("discovery.batch_operations.options.roles.episode"))
-            else: self.combo_classification.setCurrentText(T("discovery.batch_operations.options.roles.movie"))
+            if cat == 'extra': self._set_combo_by_data(self.combo_classification, "bonus")
+            elif f.get('fn_media_type') == 'tv': self._set_combo_by_data(self.combo_classification, "episode")
+            else: self._set_combo_by_data(self.combo_classification, "movie")
 
         # Sub-type
         self.combo_sub_category.setCurrentText(f.get('sub_category') or "")
@@ -232,7 +234,7 @@ class BatchOperationsDialog(QDialog):
         # TV/Movie
         self.spin_season.setValue(f.get('fn_season') or 0)
         self.combo_edition.setCurrentText(f.get('edition') or "")
-        self.combo_lang.setCurrentText(f.get('language') or "ENG")
+        self._set_combo_by_data(self.combo_lang, (f.get('language') or "ENG").upper())
         
         # Parent
         parent_id = f.get('parent_file_id')
@@ -241,25 +243,29 @@ class BatchOperationsDialog(QDialog):
             self._initial_parent_id = parent_id
 
     def _on_classification_changed(self):
-        cls = self.combo_classification.currentText()
-        if cls == "Movie":
-            self.combo_category.setCurrentText("Video / Movie")
-            self.combo_media_type.setCurrentText("Movie")
-        elif cls == "Episode":
-            self.combo_category.setCurrentText("Video / Movie")
-            self.combo_media_type.setCurrentText("TV Series")
-        elif cls == "Bonus Video":
-            self.combo_category.setCurrentText("Extra / Bonus")
+        cls = self.combo_classification.currentData()
+        if cls == "movie":
+            self._set_combo_by_data(self.combo_category, "video")
+            self._set_combo_by_data(self.combo_media_type, "movie")
+        elif cls == "episode":
+            self._set_combo_by_data(self.combo_category, "video")
+            self._set_combo_by_data(self.combo_media_type, "tv")
+        elif cls == "bonus":
+            self._set_combo_by_data(self.combo_category, "extra")
         self._update_ui_visibility()
+
+    def _set_combo_by_data(self, combo, data):
+        idx = combo.findData(data)
+        if idx >= 0: combo.setCurrentIndex(idx)
 
     def _create_card(self, title):
         card = QFrame()
-        card.setStyleSheet(f"background-color: {Theme.SURFACE}; border-radius: 8px; border: 1px solid {Theme.BORDER};")
+        card.setStyleSheet(Theme.get_batch_card_style())
         layout = QVBoxLayout(card)
         layout.setContentsMargins(15, 15, 15, 15)
         layout.setSpacing(10)
         lbl = QLabel(title)
-        lbl.setStyleSheet("font-weight: bold; color: #E2E8F0; border: none;")
+        lbl.setStyleSheet(Theme.get_card_header_style())
         layout.addWidget(lbl)
         line = QFrame()
         line.setFrameShape(QFrame.HLine)
@@ -268,12 +274,12 @@ class BatchOperationsDialog(QDialog):
         return card
 
     def _update_ui_visibility(self):
-        cat = MetadataRules.get_internal_category(self.combo_category.currentText())
-        media = "tv" if self.combo_media_type.currentText() == "TV Series" else "movie"
+        cat = self.combo_category.currentData()
+        media = self.combo_media_type.currentData()
         
         # Sorter List Visibility: Only for Movie and Episode roles
-        cls = self.combo_classification.currentText() if self.is_video_batch else None
-        show_sorter = not self.is_video_batch or cls in ["Movie", "Episode"]
+        cls = self.combo_classification.currentData() if self.is_video_batch else None
+        show_sorter = not self.is_video_batch or cls in ["movie", "episode"]
         self.left_pane_widget.setVisible(show_sorter)
         
         self.tv_card.setVisible(cat == 'video' and media == 'tv')
@@ -286,12 +292,20 @@ class BatchOperationsDialog(QDialog):
         config = MetadataRules.get_sub_type_config(cat)
         current = self.combo_sub_category.currentText()
         self.combo_sub_category.clear()
-        self.combo_sub_category.addItems(config['items'])
+        for item_key in config['items']:
+            label = T(f"discovery.extras.subtypes.{item_key}")
+            if label == f"discovery.extras.subtypes.{item_key}":
+                label = item_key.title()
+            self.combo_sub_category.addItem(label, item_key)
         
-        if not current and config['items']:
-            self.combo_sub_category.setCurrentText(config['items'][0])
+        if not current:
+            if config['default']:
+                idx = self.combo_sub_category.findData(config['default'])
+                if idx >= 0: self.combo_sub_category.setCurrentIndex(idx)
         else:
-            self.combo_sub_category.setCurrentText(current)
+            idx = self.combo_sub_category.findText(current)
+            if idx >= 0: self.combo_sub_category.setCurrentIndex(idx)
+            else: self.combo_sub_category.setCurrentText(current)
         self.combo_sub_category.blockSignals(False)
 
     def _populate_list(self):
@@ -311,8 +325,8 @@ class BatchOperationsDialog(QDialog):
         except: pass
 
     def _apply_changes(self):
-        target_cat = MetadataRules.get_internal_category(self.combo_category.currentText())
-        target_media = "tv" if self.combo_media_type.currentText() == "TV Series" else "movie"
+        target_cat = self.combo_category.currentData()
+        target_media = self.combo_media_type.currentData()
         
         updates_to_apply = []
         current_ep = self.spin_episode_start.value()
@@ -333,7 +347,7 @@ class BatchOperationsDialog(QDialog):
                     updates['language'] = None
                     updates['match_status'] = None
             
-            if self.chk_sub_category.isChecked(): updates['sub_category'] = self.combo_sub_category.currentText()
+            if self.chk_sub_category.isChecked(): updates['sub_category'] = self.combo_sub_category.currentData()
             if self.chk_media_type.isChecked(): updates['fn_media_type'] = target_media
             if self.chk_season.isChecked(): updates['fn_season'] = self.spin_season.value()
             if self.chk_episodes.isChecked():
@@ -341,9 +355,10 @@ class BatchOperationsDialog(QDialog):
                 current_ep += 1
             if self.chk_parts.isChecked():
                 updates['part_number'] = current_part
+                updates['part_type'] = self.combo_part_type.currentData()
                 current_part += 1
             if self.chk_edition.isChecked(): updates['edition'] = self.combo_edition.currentText()
-            if self.chk_lang.isChecked(): updates['language'] = self.combo_lang.currentText()
+            if self.chk_lang.isChecked(): updates['language'] = self.combo_lang.currentData()
             if self.chk_parent.isChecked(): updates['parent_file_id'] = self.combo_parent.currentData()
 
             if len(updates) > 1:

@@ -17,11 +17,11 @@ class TechnicalSection(QWidget):
         layout.setSpacing(8)
 
         header = QLabel(T("discovery.inspector.sections.technical_header"))
-        header.setStyleSheet(f"font-weight: 800; font-size: 10px; color: {Theme.TEXT_DIM}; letter-spacing: 1.5px;")
+        header.setStyleSheet(Theme.get_inspector_section_header_style())
         layout.addWidget(header)
 
         self.frame = QFrame()
-        self.frame.setStyleSheet(f"background-color: {Theme.SURFACE}; border-radius: 10px; border: 1px solid {Theme.BORDER};")
+        self.frame.setStyleSheet(Theme.get_inspector_tech_frame_style())
         grid = QGridLayout(self.frame)
         grid.setContentsMargins(12, 10, 12, 10)
         grid.setSpacing(6)
@@ -36,9 +36,9 @@ class TechnicalSection(QWidget):
         ]
         for i, (key, label) in enumerate(fields):
             l_key = QLabel(label)
-            l_key.setStyleSheet(f"color: {Theme.TEXT_DIM}; font-size: 9px; font-weight: 800; letter-spacing: 1px; border: none;")
+            l_key.setStyleSheet(Theme.get_inspector_tech_key_style())
             l_val = QLabel("-")
-            l_val.setStyleSheet(f"color: {Theme.TEXT_MAIN}; font-size: 12px; font-weight: 600; border: none;")
+            l_val.setStyleSheet(Theme.get_inspector_tech_val_style())
             grid.addWidget(l_key, i, 0)
             grid.addWidget(l_val, i, 1)
             self.labels[key] = l_val

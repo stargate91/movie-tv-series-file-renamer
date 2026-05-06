@@ -20,12 +20,7 @@ class InspectorPanel(QFrame):
         super().__init__(parent)
         self.setFixedWidth(340)
         self.setObjectName("Inspector")
-        self.setStyleSheet(f"""
-            QFrame#Inspector {{
-                background-color: {Theme.SURFACE_DARK};
-                border-left: 1px solid {Theme.BORDER};
-            }}
-        """)
+        self.setStyleSheet(Theme.get_inspector_style())
         self._current_file_data = None
         self._current_media_data = None
         self._current_episode_data = None
@@ -55,16 +50,7 @@ class InspectorPanel(QFrame):
         self.data_btn = QPushButton(T("discovery.inspector.check_data"))
         self.data_btn.setFixedHeight(40)
         self.data_btn.setCursor(Qt.PointingHandCursor)
-        self.data_btn.setStyleSheet(f"""
-            QPushButton {{
-                background: {Theme.SURFACE_LIGHT};
-                color: {Theme.TEXT_MAIN};
-                border-radius: 8px;
-                font-weight: 700;
-                border: 1px solid {Theme.BORDER};
-            }}
-            QPushButton:hover {{ background: {Theme.SURFACE_LIGHTER}; border-color: {Theme.PRIMARY}; }}
-        """)
+        self.data_btn.setStyleSheet(Theme.get_secondary_ghost_button_style())
         self.data_btn.clicked.connect(self._on_check_data_clicked)
         layout.addWidget(self.data_btn)
 

@@ -1,5 +1,5 @@
 import os
-from PySide6.QtWidgets import (QTableWidget, QTableWidgetItem, QHeaderView, QLabel, QWidget, QHBoxLayout, QPushButton, QApplication, QStyledItemDelegate, QStyle)
+from PySide6.QtWidgets import (QTableWidget, QTableWidgetItem, QHeaderView, QLabel, QWidget, QHBoxLayout, QPushButton, QApplication, QStyledItemDelegate, QStyle, QMenu)
 from PySide6.QtGui import QColor, QLinearGradient, QPainter, QPalette
 from PySide6.QtCore import Qt, QSize, QRect, Signal, Slot
 from ui.v3.styles.theme import Theme
@@ -46,6 +46,8 @@ class DiscoveryTable(QTableWidget):
     clear_match_requested = Signal(int)
     ignore_requested = Signal(int)
     batch_ignore_requested = Signal()
+    batch_identify_requested = Signal()
+    batch_edit_requested = Signal()
     restore_requested = Signal(int, int) # file_id, row
 
     def __init__(self, parent=None):
@@ -64,7 +66,7 @@ class DiscoveryTable(QTableWidget):
         self.setEditTriggers(QTableWidget.NoEditTriggers)
         self.setSelectionBehavior(QTableWidget.SelectRows)
         self.setShowGrid(False)
-        self.setFocusPolicy(Qt.NoFocus)
+        self.setFocusPolicy(Qt.StrongFocus)
         self.setSelectionMode(QTableWidget.ExtendedSelection)
         self.verticalHeader().setVisible(False)
         
@@ -88,6 +90,13 @@ class DiscoveryTable(QTableWidget):
         self.setColumnWidth(4, 300) # Maximum spacious width
         header.setDefaultAlignment(Qt.AlignLeft)
         self.verticalHeader().setDefaultSectionSize(72) # Maximum 72px row height
+        
+        # Enable Context Menu
+        self.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.customContextMenuRequested.connect(self._on_context_menu_requested)
+
+    def _on_context_menu_requested(self, pos):
+        self._show_actions_menu(self.viewport().mapToGlobal(pos))
 
     def fill_data(self, videos, is_conflicts=False):
         self.setUpdatesEnabled(False)
@@ -116,7 +125,7 @@ class DiscoveryTable(QTableWidget):
                 sc = Theme.STATUS_COLORS.get(status, '#64748B')
                 status_label = QLabel(status)
                 status_label.setAlignment(Qt.AlignCenter)
-                status_label.setStyleSheet(f"color: {sc}; background: transparent; font-weight: 700; font-size: 11px;")
+                status_label.setStyleSheet(Theme.get_status_label_style(color=sc))
                 self.setCellWidget(i, 0, status_label)
                 
                 status_item = QTableWidgetItem(status)
@@ -129,6 +138,7 @@ class DiscoveryTable(QTableWidget):
                 # 1. Original Name
                 name_item = QTableWidgetItem(vid.get('file_name', T("common.unknown")))
                 name_item.setData(Qt.UserRole, vid['id'])
+                name_item.setData(Qt.UserRole + 3, vid.get('current_path')) # Store path for context menu
                 if is_new_group:
                     name_item.setData(Qt.UserRole + 1, True)
                 self.setItem(i, 1, name_item)
@@ -137,19 +147,11 @@ class DiscoveryTable(QTableWidget):
                 mtype = vid.get('_media_type_from_db') or vid.get('fn_media_type')
                 sub_cat = vid.get('sub_category')
                 
-                if raw_cat == 'video':
-                    cat_display = T("common.types.movie") if mtype == 'movie' else T("common.types.tv") if mtype == 'tv' else T("common.types.video")
-                elif raw_cat == 'extra':
-                    cat_display = sub_cat.title() if sub_cat else T("common.types.bonus")
-                else:
-                    # Show sub-category if available (e.g. Forced instead of Subtitle)
-                    if sub_cat and sub_cat != raw_cat:
-                        cat_display = f"{raw_cat.capitalize()} ({sub_cat.title()})"
-                    else:
-                        cat_display = raw_cat.capitalize()
+                cat_display = self._get_type_display(raw_cat, mtype, sub_cat)
                 
                 type_item = QTableWidgetItem(cat_display)
                 type_item.setData(Qt.UserRole, raw_cat)
+                type_item.setData(Qt.UserRole + 2, mtype)
                 if is_new_group:
                     type_item.setData(Qt.UserRole + 1, True)
                 self.setItem(i, 2, type_item)
@@ -164,66 +166,55 @@ class DiscoveryTable(QTableWidget):
                 # 4. Actions
                 actions_widget = QWidget()
                 actions_layout = QHBoxLayout(actions_widget)
-                actions_layout.setContentsMargins(8, 8, 8, 8) # Maximum breathing room
+                actions_layout.setContentsMargins(8, 8, 8, 8)
                 actions_layout.setSpacing(10)
 
-                # 1. FIX button (for video) / EDIT button (for others)
-                if status == 'CONFLICT':
-                    fix_btn = QPushButton("🛠️")
-                    fix_btn.setToolTip(T("discovery.actions.fix"))
-                    fix_btn.setFixedSize(58, 46)
-                    fix_btn.setCursor(Qt.PointingHandCursor)
-                    fix_btn.setStyleSheet(Theme.get_discovery_action_btn_style('danger'))
-                    fix_btn.clicked.connect(lambda checked=False, v=vid: self.fix_requested.emit(v))
-                    actions_layout.addWidget(fix_btn)
-                else:
-                    edit_btn = QPushButton("✏️")
-                    edit_btn.setToolTip(T("discovery.actions.edit"))
-                    edit_btn.setFixedSize(58, 46)
-                    edit_btn.setCursor(Qt.PointingHandCursor)
-                    edit_btn.setStyleSheet(Theme.get_discovery_action_btn_style('neutral'))
-                    # Emit a special signal or reuse fix_requested with a flag
-                    # For now, let's emit fix_requested, but we'll need DiscoveryPage to know it's a manual edit
-                    edit_btn.clicked.connect(lambda checked=False, v=vid: self._on_manual_edit_clicked(v))
-                    actions_layout.addWidget(edit_btn)
-                
-                # 3. FOLDER button
-                folder_btn = QPushButton("📂")
-                folder_btn.setToolTip(T("discovery.actions.open_folder"))
-                folder_btn.setFixedSize(48, 42)
-                folder_btn.setCursor(Qt.PointingHandCursor)
-                folder_btn.setStyleSheet(Theme.get_discovery_action_btn_style('neutral'))
-                folder_btn.clicked.connect(lambda checked=False, p=vid['current_path']: self.open_folder_requested.emit(p))
-                actions_layout.addWidget(folder_btn)
-
-                # 3. CLEAR MATCH (Link) button
-                clear_btn = QPushButton("🔄")
-                clear_btn.setToolTip(T("discovery.actions.clear_match"))
-                clear_btn.setFixedSize(58, 46)
-                clear_btn.setCursor(Qt.PointingHandCursor)
-                clear_btn.setStyleSheet(Theme.get_discovery_action_btn_style('warning'))
-                clear_btn.setEnabled(status == 'MATCHED')
-                clear_btn.clicked.connect(lambda checked=False, fid=vid['id']: self.clear_match_requested.emit(fid))
-                actions_layout.addWidget(clear_btn)
-
-                # 4. DELETE / RESTORE button
+                # --- 1. Primary Action Button ---
+                primary_btn = None
                 if status == 'IGNORED':
-                    restore_btn = QPushButton("📥")
-                    restore_btn.setToolTip(T("discovery.actions.restore"))
-                    restore_btn.setFixedSize(58, 46)
-                    restore_btn.setCursor(Qt.PointingHandCursor)
-                    restore_btn.setStyleSheet(Theme.get_discovery_action_btn_style('success'))
-                    restore_btn.clicked.connect(lambda checked=False, fid=vid['id']: self.restore_requested.emit(fid, i))
-                    actions_layout.addWidget(restore_btn)
-                else:
-                    delete_btn = QPushButton("🗑️")
-                    delete_btn.setToolTip(T("discovery.actions.ignore"))
-                    delete_btn.setFixedSize(58, 46)
-                    delete_btn.setCursor(Qt.PointingHandCursor)
-                    delete_btn.setStyleSheet(Theme.get_discovery_action_btn_style('danger'))
-                    delete_btn.clicked.connect(lambda checked=False, fid=vid['id']: self.ignore_requested.emit(fid))
-                    actions_layout.addWidget(delete_btn)
+                    # Restore Button for Trash
+                    primary_btn = QPushButton("📥")
+                    primary_btn.setToolTip(T("discovery.actions.restore"))
+                    primary_btn.setFixedSize(54, 46)
+                    primary_btn.setCursor(Qt.PointingHandCursor)
+                    primary_btn.setStyleSheet(Theme.get_discovery_action_btn_style('success'))
+                    primary_btn.clicked.connect(lambda checked=False, fid=vid['id']: self.restore_requested.emit(fid, i))
+                elif raw_cat == 'video':
+                    # API Resolve Button (Only for videos)
+                    primary_btn = QPushButton("🛠️")
+                    primary_btn.setToolTip(T("discovery.actions.fix"))
+                    primary_btn.setFixedSize(54, 46)
+                    primary_btn.setCursor(Qt.PointingHandCursor)
+                    variant = 'danger' if status == 'CONFLICT' else 'neutral'
+                    primary_btn.setStyleSheet(Theme.get_discovery_action_btn_style(variant))
+                    primary_btn.clicked.connect(lambda checked=False, v=vid: self.fix_requested.emit(v))
+                
+                if primary_btn:
+                    actions_layout.addWidget(primary_btn)
+                
+                # --- 2. Base Edit Button (Meta 2) ---
+                edit_btn = QPushButton("✏️")
+                edit_btn.setToolTip(T("discovery.actions.edit"))
+                edit_btn.setFixedSize(54, 46)
+                edit_btn.setCursor(Qt.PointingHandCursor)
+                edit_btn.setStyleSheet(Theme.get_discovery_action_btn_style('neutral'))
+                edit_btn.clicked.connect(lambda checked=False, v=vid: self._on_manual_edit_clicked(v))
+                actions_layout.addWidget(edit_btn)
+                
 
+
+
+
+                # --- 3. Overflow Menu (...) ---
+                overflow_btn = QPushButton("•••")
+                overflow_btn.setToolTip(T("common.more"))
+                overflow_btn.setFixedSize(54, 46)
+                overflow_btn.setCursor(Qt.PointingHandCursor)
+                overflow_btn.setStyleSheet(Theme.get_discovery_action_btn_style('neutral'))
+                overflow_btn.clicked.connect(lambda checked=False, b=overflow_btn, v=vid: self._show_row_menu(b, v))
+                actions_layout.addWidget(overflow_btn)
+
+                actions_layout.addStretch()
                 self.setCellWidget(i, 4, actions_widget)
 
             except Exception as row_err:
@@ -237,6 +228,87 @@ class DiscoveryTable(QTableWidget):
 
     def _on_manual_edit_clicked(self, vid):
         self.manual_edit_requested.emit(vid)
+
+    def _show_row_menu(self, button, vid):
+        """Shows the overflow menu for a specific row's button."""
+        self._show_actions_menu(button.mapToGlobal(button.rect().bottomLeft()), vid)
+
+    def _show_actions_menu(self, global_pos, vid=None):
+        """Renders the overflow/context menu."""
+        if not vid:
+            # Try to get vid from current selection if not provided
+            items = self.selectedItems()
+            if not items: return
+            row = items[0].row()
+            file_id = self.item(row, 1).data(Qt.UserRole)
+            status = self.item(row, 0).data(Qt.UserRole)
+            raw_cat = self.item(row, 2).data(Qt.UserRole)
+            path = self.item(row, 1).data(Qt.UserRole + 3) # Retrieve stored path
+        else:
+            file_id = vid['id']
+            status = vid.get('match_status', 'pending').upper()
+            raw_cat = vid.get('category', 'video')
+            path = vid['current_path']
+
+        menu = QMenu(self)
+        menu.setWindowFlags(menu.windowFlags() | Qt.FramelessWindowHint)
+        menu.setAttribute(Qt.WA_TranslucentBackground)
+        # Apply a clean dark style to the menu
+        menu.setStyleSheet(Theme.get_context_menu_style())
+        
+        # --- PRIMARY ACTIONS (Fix / Edit) ---
+        if status != 'IGNORED':
+            is_multi = len(set(item.row() for item in self.selectedItems())) > 1
+            
+            # 1. API Fix / Identify
+            if raw_cat == 'video':
+                label = T("discovery.actions.batch_identify") if is_multi else T("discovery.actions.fix")
+                icon = "🪄" if is_multi else "🛠️"
+                fix_act = menu.addAction(f"{icon}  {label}")
+                
+                if is_multi:
+                    fix_act.triggered.connect(self.batch_identify_requested.emit)
+                elif vid:
+                    fix_act.triggered.connect(lambda: self.fix_requested.emit(vid))
+                else:
+                    fix_act.triggered.connect(lambda: self.fix_requested.emit({'id': file_id, 'category': 'video'}))
+            
+            # 2. Manual Edit (For all)
+            edit_label = T("discovery.actions.batch_actions") if is_multi else T("discovery.actions.edit")
+            edit_icon = "🪄" if is_multi else "✏️"
+            edit_act = menu.addAction(f"{edit_icon}  {edit_label}")
+            
+            if is_multi:
+                edit_act.triggered.connect(self.batch_edit_requested.emit)
+            elif vid:
+                edit_act.triggered.connect(lambda: self._on_manual_edit_clicked(vid))
+            else:
+                edit_act.triggered.connect(lambda: self._on_manual_edit_clicked({'id': file_id}))
+            
+            menu.addSeparator()
+
+        # 3. Folder Action
+        open_act = menu.addAction("📂  " + T("discovery.actions.open_folder"))
+        if path:
+            open_act.triggered.connect(lambda: self.open_folder_requested.emit(path))
+        else:
+            open_act.setEnabled(False)
+            
+        # 4. Clear Match Action (Only for videos)
+        if raw_cat == 'video':
+            clear_act = menu.addAction("🔄  " + T("discovery.actions.clear_match"))
+            clear_act.setEnabled(status == 'MATCHED')
+            clear_act.triggered.connect(lambda: self.clear_match_requested.emit(file_id))
+        
+        menu.addSeparator()
+        
+        # 3. Ignore / Restore Action
+        ignore_label = T("discovery.actions.restore") if status == 'IGNORED' else T("discovery.actions.ignore")
+        ignore_icon = "📥" if status == 'IGNORED' else "🗑️"
+        ignore_act = menu.addAction(f"{ignore_icon}  {ignore_label}")
+        ignore_act.triggered.connect(lambda: self.restore_requested.emit(file_id, 0) if status == 'IGNORED' else self.ignore_requested.emit(file_id))
+        
+        menu.exec(global_pos)
 
     def apply_filters(self, current_filter, search_text):
         search_text = search_text.lower()
@@ -254,16 +326,17 @@ class DiscoveryTable(QTableWidget):
             type_item = self.item(row, 2)
             if status_item and type_item:
                 status = status_item.data(Qt.UserRole)
-                media_type = type_item.text()
+                raw_cat = type_item.data(Qt.UserRole)
+                mtype = type_item.data(Qt.UserRole + 2)
+
                 if current_filter == "ignored": btn_match = (status == 'IGNORED')
                 else:
-                    raw_cat = type_item.data(Qt.UserRole)
                     if status == 'IGNORED': btn_match = False
                     elif current_filter == "all": btn_match = True
                     elif current_filter == "review": btn_match = (status in ('PENDING', 'MULTIPLE', 'UNCERTAIN', 'NO_MATCH'))
                     elif current_filter == "conflicts": btn_match = (status == 'CONFLICT')
-                    elif current_filter == "movies": btn_match = (status == 'MATCHED' and media_type == "Movie")
-                    elif current_filter == "shows": btn_match = (status == 'MATCHED' and media_type == "TV Show")
+                    elif current_filter == "movies": btn_match = (status == 'MATCHED' and mtype == "movie")
+                    elif current_filter == "shows": btn_match = (status == 'MATCHED' and mtype == "tv")
                     elif current_filter == "extras": btn_match = (raw_cat != 'video')
                     # Sub-filters for Extras
                     elif current_filter in ("subtitle", "image", "metadata", "extra"):
@@ -288,7 +361,7 @@ class DiscoveryTable(QTableWidget):
                     if widget:
                         sc = Theme.STATUS_COLORS.get(status, '#64748B')
                         widget.setText(status)
-                        widget.setStyleSheet(f"color: {sc}; background: transparent; font-weight: 700; font-size: 11px;")
+                        widget.setStyleSheet(Theme.get_status_label_style(color=sc))
 
                 # Update Type
                 links = engine.db.get_links_for_file(file_id)
@@ -297,12 +370,8 @@ class DiscoveryTable(QTableWidget):
                     if media:
                         mtype = media.get('media_type')
                         raw_cat = file_data.get('category', 'video')
-                        if raw_cat == 'video':
-                            display = T("common.types.movie") if mtype == 'movie' else T("common.types.tv") if mtype == 'tv' else T("common.types.video")
-                        elif raw_cat == 'extra':
-                            display = T("common.types.bonus")
-                        else:
-                            display = raw_cat.capitalize()
+                        sub_cat = file_data.get('sub_category')
+                        display = self._get_type_display(raw_cat, mtype, sub_cat)
                         self.setItem(row, 2, QTableWidgetItem(display))
 
                 # Update Preview
@@ -310,6 +379,23 @@ class DiscoveryTable(QTableWidget):
                 preview = f"{new_name}{os.path.splitext(file_data.get('file_name', ''))[1]}" if new_name else "-"
                 self.setItem(row, 3, QTableWidgetItem(preview))
                 break
+
+    def _get_type_display(self, raw_cat, mtype, sub_cat):
+        if raw_cat == 'video':
+            return T("common.types.movie") if mtype == 'movie' else T("common.types.tv") if mtype == 'tv' else T("common.types.video")
+        
+        # Generic lookup for other categories (extra, subtitle, image, meta)
+        cat_display = T(f"discovery.batch_operations.options.categories.{raw_cat}")
+        if cat_display == f"discovery.batch_operations.options.categories.{raw_cat}":
+            cat_display = raw_cat.capitalize()
+        
+        if sub_cat and sub_cat != raw_cat:
+            sub_display = T(f"discovery.extras.subtypes.{sub_cat}")
+            if sub_display == f"discovery.extras.subtypes.{sub_cat}":
+                sub_display = sub_cat.title()
+            return f"{cat_display} ({sub_display})"
+        
+        return cat_display
 
     def get_selected_ids(self):
         """Returns unique database IDs for all selected rows that are VISIBLE."""

@@ -46,17 +46,12 @@ class AdvancedTab(BaseSettingsTab):
         
         danger_desc = QLabel(T("settings.advanced.fields.wipe_desc"))
         danger_desc.setWordWrap(True)
-        danger_desc.setStyleSheet(f"color: {Theme.TEXT_MUTED}; font-size: 13px;")
+        danger_desc.setStyleSheet(Theme.get_card_description_style())
         layout.addWidget(danger_desc)
         
         self.wipe_btn = QPushButton(T("settings.advanced.fields.wipe_btn"))
         self.wipe_btn.setFixedSize(200, 40)
-        self.wipe_btn.setStyleSheet("""
-            QPushButton { 
-                background: #442222; border: 1px solid #663333; color: #ff8888; border-radius: 6px; font-weight: bold;
-            }
-            QPushButton:hover { background: #663333; }
-        """)
+        self.wipe_btn.setStyleSheet(Theme.get_danger_ghost_button_style())
         self.wipe_btn.clicked.connect(self._on_wipe_database)
         layout.addWidget(self.wipe_btn)
 

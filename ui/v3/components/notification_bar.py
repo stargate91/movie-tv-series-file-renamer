@@ -16,20 +16,7 @@ class NotificationBar(QWidget):
         # Premium dark glass look
         self.setFixedHeight(50)
         self.setFixedWidth(500)
-        self.setStyleSheet(f"""
-            QWidget#NotifContainer {{
-                background-color: {Theme.SURFACE_DARK}ee;
-                border: 1px solid {Theme.PRIMARY};
-                border-radius: 25px;
-            }}
-            QLabel {{
-                color: {Theme.TEXT_MAIN};
-                font-weight: 600;
-                font-size: 13px;
-                border: none;
-                background: transparent;
-            }}
-        """)
+        self.setStyleSheet(Theme.get_notification_bar_style())
         
         container = QWidget(self)
         container.setObjectName("NotifContainer")
@@ -44,24 +31,12 @@ class NotificationBar(QWidget):
         self.undo_btn = QPushButton(T("common.undo") if T("common.undo") != "common.undo" else "Undo")
         self.undo_btn.setFixedSize(80, 30)
         self.undo_btn.setCursor(Qt.PointingHandCursor)
-        self.undo_btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {Theme.PRIMARY};
-                color: white;
-                border-radius: 15px;
-                font-weight: 800;
-                font-size: 11px;
-                letter-spacing: 1px;
-            }}
-            QPushButton:hover {{
-                background-color: {Theme.PRIMARY_HOVER};
-            }}
-        """)
+        self.undo_btn.setStyleSheet(Theme.get_notification_undo_style())
         self.undo_btn.clicked.connect(self._on_undo_clicked)
 
         close_btn = QPushButton("✕")
         close_btn.setFixedSize(30, 30)
-        close_btn.setStyleSheet(f"color: {Theme.TEXT_MUTED}; border: none; font-size: 16px; background: transparent;")
+        close_btn.setStyleSheet(Theme.get_notification_close_style())
         close_btn.clicked.connect(self.hide_notification)
 
         layout.addWidget(self.label)

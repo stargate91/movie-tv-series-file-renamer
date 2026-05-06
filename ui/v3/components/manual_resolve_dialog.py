@@ -2,8 +2,7 @@ import logging
 import json
 from PySide6.QtCore import Qt, QSize, Signal, Slot
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLineEdit, QWidget,
-                             QPushButton, QListWidget, QListWidgetItem, QLabel, QFrame, 
-                             QScrollArea, QSpinBox, QMessageBox)
+                             QScrollArea, QSpinBox, QMessageBox, QComboBox)
 from PySide6.QtGui import QPixmap
 
 from ui.v3.styles.theme import Theme
@@ -52,7 +51,7 @@ class ManualResolveDialog(QDialog):
         self.back_btn.clicked.connect(self._on_back)
         
         self.nav_label = QLabel(T("manual_resolve.search_results"))
-        self.nav_label.setStyleSheet(f"font-size: 18px; font-weight: 700; color: {Theme.TEXT_MAIN};")
+        self.nav_label.setStyleSheet(Theme.get_settings_title_style())
         
         self.mode_btn = QPushButton(T("manual_resolve.link_multiple"))
         self.mode_btn.setObjectName("SecondaryButton")
@@ -82,7 +81,15 @@ class ManualResolveDialog(QDialog):
         self.search_btn.setFixedWidth(100)
         self.search_btn.clicked.connect(self._on_search_clicked)
         
+        self.search_type_combo = QComboBox()
+        self.search_type_combo.addItem("🎬 " + T("common.types.movie"), "movie")
+        self.search_type_combo.addItem("📺 " + T("common.types.tv"), "tv")
+        self.search_type_combo.setFixedWidth(130)
+        self.search_type_combo.setFixedHeight(40)
+        self.search_type_combo.currentIndexChanged.connect(self._on_search_type_changed)
+
         search_row.addWidget(self.search_input)
+        search_row.addWidget(self.search_type_combo)
         search_row.addWidget(self.search_btn)
         tools.addLayout(search_row)
 
@@ -138,25 +145,25 @@ class ManualResolveDialog(QDialog):
 
     def _create_preview_panel(self):
         panel = QFrame()
-        panel.setStyleSheet(f"background: {Theme.SURFACE_DARK}; border: 1px solid {Theme.BORDER}; border-radius: 12px;")
+        panel.setStyleSheet(Theme.get_preview_panel_style())
         panel.setFixedWidth(280)
         layout = QVBoxLayout(panel)
         
         self.preview_poster = QLabel(T("manual_resolve.no_selection"))
         self.preview_poster.setAlignment(Qt.AlignCenter)
         self.preview_poster.setFixedSize(250, 375)
-        self.preview_poster.setStyleSheet(f"background-color: {Theme.SURFACE}; border-radius: 8px;")
+        self.preview_poster.setStyleSheet(Theme.get_batch_card_style())
         
         self.preview_title = QLabel(T("discovery.manual_resolve.select_result"))
         self.preview_title.setWordWrap(True)
-        self.preview_title.setStyleSheet(f"font-weight: 800; font-size: 16px; color: {Theme.TEXT_MAIN};")
+        self.preview_title.setStyleSheet(Theme.get_preview_title_style())
         
         self.preview_meta = QLabel("")
-        self.preview_meta.setStyleSheet(f"color: {Theme.PRIMARY}; font-weight: 700;")
+        self.preview_meta.setStyleSheet(Theme.get_preview_meta_style())
         
         self.preview_overview = QLabel("")
         self.preview_overview.setWordWrap(True)
-        self.preview_overview.setStyleSheet(f"color: {Theme.TEXT_MUTED}; font-size: 12px;")
+        self.preview_overview.setStyleSheet(Theme.get_preview_overview_style())
         
         layout.addWidget(self.preview_poster, 0, Qt.AlignCenter)
         layout.addWidget(self.preview_title)
@@ -187,12 +194,20 @@ class ManualResolveDialog(QDialog):
         layout.addWidget(self.confirm_btn)
         return widget
 
+    def _on_search_type_changed(self):
+        is_tv = self.search_type_combo.currentData() == "tv"
+        self.tv_selector.setVisible(is_tv)
+
     def _prefill_from_data(self, data):
         self.search_input.setText(data.get('fn_title') or data.get('fd_title') or "")
         self.year_spin.setValue(int(data.get('fn_year') or 0))
         
+        mtype = data.get('fn_media_type') or data.get('fd_media_type') or 'movie'
+        idx = self.search_type_combo.findData(mtype)
+        if idx >= 0: self.search_type_combo.setCurrentIndex(idx)
+        self.tv_selector.setVisible(mtype == 'tv')
+
         self.tv_selector.set_values(
-            data.get('fn_media_type') or data.get('fd_media_type') or 'movie',
             data.get('fn_season') or data.get('fd_season') or 0,
             data.get('fn_episode') or data.get('fd_episode') or 0
         )
@@ -219,16 +234,21 @@ class ManualResolveDialog(QDialog):
         if mode == "search":
             self.nav_stack = []
             self.back_btn.setVisible(False)
-            self.nav_label.setText("Search Results")
+            self.nav_label.setText(T("manual_resolve.search_results"))
         else:
             self.back_btn.setVisible(True)
-            self.nav_label.setText(title or "Browsing...")
+            self.nav_label.setText(title or T("manual_resolve.browsing"))
 
         vals = self.tv_selector.get_values()
+        m_type = self.search_type_combo.currentData()
         year = self.year_spin.value()
         year_param = str(year) if year > 0 else None
 
-        self.search_worker = SearchWorker(self.engine, query, year_param, vals['type'], mode, parent_id, season_num)
+        # Use passed season_num if available (browsing mode), otherwise use UI filter
+        final_s = season_num if season_num is not None else vals['season']
+        final_e = vals['episode']
+
+        self.search_worker = SearchWorker(self.engine, query, year_param, m_type, mode, parent_id, final_s, final_e)
         self.search_worker.results_found.connect(self._on_search_results)
         self.search_worker.start()
 
@@ -377,7 +397,7 @@ class ManualResolveDialog(QDialog):
             return
 
         url = f"https://image.tmdb.org/t/p/w200{poster_path}"
-        self.preview_poster.setText("Loading...")
+        self.preview_poster.setText(T("common.loading"))
         self.poster_worker = ImageDownloader(url, local_path)
         self.poster_worker.finished.connect(self._on_poster_loaded)
         self.poster_worker.start()

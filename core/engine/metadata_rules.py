@@ -32,39 +32,39 @@ class MetadataRules:
         }
     }
 
-    # Allowed category transitions from an original category
+    # Allowed category transitions from an original category (using internal keys)
     ALLOWED_TRANSITIONS = {
-        'video': ["Video / Movie", "Extra / Bonus"],
-        'extra': ["Extra / Bonus", "Video / Movie"],
-        'audio': ["Audio"],
-        'subtitle': ["Subtitle"],
-        'image': ["Image"],
-        'metadata': ["NFO / Meta"],
-        'unknown': ["Video / Movie", "Extra / Bonus", "Subtitle", "Audio", "Image", "NFO / Meta"]
+        'video': ["video", "extra"],
+        'extra': ["extra", "video"],
+        'audio': ["audio"],
+        'subtitle': ["subtitle"],
+        'image': ["image"],
+        'metadata': ["metadata"],
+        'unknown': ["video", "extra", "subtitle", "audio", "image", "metadata"]
     }
 
     # Predefined lists and defaults
     SUB_TYPES = {
         'audio': {
-            'items': ["Dub", "Commentary", "Music"],
-            'default': "Dub"
+            'items': ["dub", "commentary", "music"],
+            'default': "dub"
         },
         'subtitle': {
-            'items': ["Forced", "Full"],
-            'default': "Forced"
+            'items': ["forced", "full"],
+            'default': "forced"
         },
         'image': {
-            'items': ["Poster", "Fanart", "Background", "Banner", "Thumb", "Logo", "Disc"],
+            'items': ["poster", "fanart", "background", "banner", "thumb", "logo", "disc"],
             'default': None
         },
         'extra': {
-            'items': ["Trailer", "Sample", "Behind the Scenes", "Deleted", "Interview", "Featurette", "Bonus"],
+            'items': ["trailer", "sample", "behind the scenes", "deleted", "interview", "featurette", "bonus"],
             'default': None
         },
         'default': {
-            'items': ["Trailer", "Sample", "Behind the Scenes", "Deleted", "Interview", "Featurette", "Bonus",
-                     "Poster", "Fanart", "Background", "Banner", "Thumb", "Logo", "Disc",
-                     "Forced", "Full", "Dub", "Commentary", "Music"],
+            'items': ["trailer", "sample", "behind the scenes", "deleted", "interview", "featurette", "bonus",
+                     "poster", "fanart", "background", "banner", "thumb", "logo", "disc",
+                     "forced", "full", "dub", "commentary", "music"],
             'default': None
         }
     }
@@ -83,7 +83,7 @@ class MetadataRules:
 
     @staticmethod
     def get_allowed_categories(original_category):
-        """Returns labels of categories that a file can transition into."""
+        """Returns internal keys of categories that a file can transition into."""
         return MetadataRules.ALLOWED_TRANSITIONS.get(original_category, MetadataRules.ALLOWED_TRANSITIONS['unknown'])
 
     @staticmethod
@@ -91,28 +91,3 @@ class MetadataRules:
         """Returns items and default for sub-types."""
         return MetadataRules.SUB_TYPES.get(category, MetadataRules.SUB_TYPES['default'])
 
-    @staticmethod
-    def get_category_label(internal_name):
-        """Maps internal category names to UI labels."""
-        mapping = {
-            "video": "Video / Movie",
-            "extra": "Extra / Bonus",
-            "subtitle": "Subtitle",
-            "audio": "Audio",
-            "image": "Image",
-            "metadata": "NFO / Meta"
-        }
-        return mapping.get(internal_name, "Video / Movie")
-
-    @staticmethod
-    def get_internal_category(label):
-        """Maps UI labels back to internal category names."""
-        mapping = {
-            "Video / Movie": "video",
-            "Extra / Bonus": "extra",
-            "Subtitle": "subtitle",
-            "Audio": "audio",
-            "Image": "image",
-            "NFO / Meta": "metadata"
-        }
-        return mapping.get(label, "unknown")

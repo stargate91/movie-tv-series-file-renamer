@@ -24,7 +24,7 @@ class FoldersTab(BaseSettingsTab):
         layout.addWidget(self._create_section_header(T("settings.folders.sections.logic")))
         self.move_files_cb = QCheckBox(T("settings.folders.fields.move_files"))
         self.move_files_cb.setChecked(self.engine.config.settings.move_files)
-        self.move_files_cb.setStyleSheet("font-size: 14px; color: white;")
+        # Style is handled by global theme
         layout.addWidget(self.move_files_cb)
 
         self.base_path_input = self._create_path_input(T("settings.folders.fields.root_path"), self.engine.config.settings.base_target_path, "root", self._on_browse)
