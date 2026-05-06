@@ -1,6 +1,7 @@
 import os
 import logging
 from PySide6.QtCore import QThread, Signal
+from core.i18n import T
 
 logger = logging.getLogger(__name__)
 
@@ -14,46 +15,32 @@ class DataLoader(QThread):
 
     def run(self):
         try:
-            # Use FileRepository
-            raw_videos = self.engine.db.files.get_files_by_category('video', 'extra', 'subtitle', 'audio', 'image', 'metadata', 'unknown')
-            # Filter out files that are already completed (renamed) or deleted
-            videos = [v for v in raw_videos if v.get('status') not in ('renamed', 'deleted')]
+            # Use optimized batch fetch
+            videos = self.engine.db.files.get_files_with_metadata('video', 'extra', 'subtitle', 'audio', 'image', 'metadata', 'unknown')
             
             status_priority = {'multiple': 0, 'no_match': 1, 'uncertain': 2, 'matched': 3, 'pending': 4}
             videos.sort(key=lambda v: status_priority.get(v.get('match_status', 'pending'), 99))
+
+            # Create a lookup map for prefetched data to help the formatter
+            prefetched_map = {v['id']: v for v in videos}
 
             # Collect poster paths and generate preview names here (off main thread)
             poster_paths = []
             for vid in videos:
                 try:
-                    # Pre-generate the new name for the preview column
-                    new_name = self.engine.formatter.generate_name(vid['id'], self.engine.config.settings)
+                    # Pre-generate the new name for the preview column using prefetched data
+                    new_name = self.engine.formatter.generate_name(vid['id'], self.engine.config.settings, prefetched_data=prefetched_map)
                     if new_name:
-                        import os
-                        ext = os.path.splitext(vid.get('file_name', ''))[1]
+                        ext = vid.get('extension', '')
                         vid['_new_name'] = f"{new_name}{ext}"
                         
-                    # Fetch links (use parent_id if extra)
-                    target_id = vid.get('parent_file_id') or vid['id']
-                    # Use MediaRepository
-                    links = self.engine.db.media.get_links_for_file(target_id)
-                    if links:
-                        link = links[0]
-                        # Use MediaRepository
-                        media = self.engine.db.media.get_media_item_by_id(link['media_item_id'])
-                        if media:
-                            vid['_media_type_from_db'] = media.get('media_type')
-                            if media.get('poster_path'):
-                                poster_paths.append(media['poster_path'])
-                                
-                            # Pre-fetch Season and Episode posters for TV
-                            if media.get('media_type') == 'tv' and link.get('tv_episode_id'):
-                                ep = self.engine.db.media.get_episode_by_id(link['tv_episode_id'])
-                                if ep and ep.get('still_path'):
-                                    poster_paths.append(ep['still_path'])
-                                season = self.engine.db.media.get_season_for_episode(link['tv_episode_id'])
-                                if season and season.get('poster_path'):
-                                    poster_paths.append(season['poster_path'])
+                    # Poster paths from our joined query
+                    if vid.get('media_poster'):
+                        poster_paths.append(vid['media_poster'])
+                    if vid.get('episode_poster'):
+                        poster_paths.append(vid['episode_poster'])
+                    if vid.get('season_poster'):
+                        poster_paths.append(vid['season_poster'])
                 except:
                     pass
 
@@ -97,7 +84,7 @@ class RenameWorker(QThread):
             def cb(curr, total, path):
                 if self._is_cancelled: return False
                 pct = int((curr / total) * 100)
-                self.progress.emit(pct, f"Moving: {os.path.basename(path)}")
+                self.progress.emit(pct, T("discovery.messages.moving", filename=os.path.basename(path)))
                 return True
 
             results = self.engine.executor.execute_plan(self.plan, progress_callback=cb)
@@ -174,11 +161,19 @@ class DropProcessor(QThread):
             all_files.sort(key=lambda x: os.path.getsize(x) if os.path.exists(x) else 0, reverse=True)
 
             total = len(all_files)
+            allowed_exts = {'.mkv', '.mp4', '.avi', '.mov', '.wmv', '.m4v', '.mpg', '.mpeg', 
+                            '.srt', '.sub', '.ass', '.vtt', 
+                            '.mp3', '.flac', '.m4a', '.wav', '.ogg'}
+            
             for i, file_path in enumerate(all_files):
                 abs_path = os.path.abspath(file_path)
+                ext = os.path.splitext(abs_path)[1].lower()
+                
+                if ext not in allowed_exts:
+                    continue
                 
                 # Update progress
-                self.progress.emit(int((i / total) * 100), f"Ingesting: {os.path.basename(abs_path)}")
+                self.progress.emit(int((i / total) * 100), T("discovery.messages.ingesting", filename=os.path.basename(abs_path)))
                 
                 # 2. Duplicate check
                 existing = self.engine.db.files.get_file_by_path(abs_path)
@@ -199,33 +194,6 @@ class DropProcessor(QThread):
         except Exception as e:
             logger.error(f"DropProcessor Error: {e}")
             self.finished.emit()
-
-class UndoWorker(QThread):
-    """Handles the undo process for a batch in the background."""
-    finished = Signal(int, int, list) # success, failed, errors
-    progress = Signal(int, str)
-
-    def __init__(self, engine, batch_id):
-        super().__init__()
-        self.engine = engine
-        self.batch_id = batch_id
-        self._is_cancelled = False
-
-    def stop(self):
-        self._is_cancelled = True
-
-    def run(self):
-        try:
-            def cb(curr, total, path):
-                if self._is_cancelled: return False
-                pct = int((curr / total) * 100)
-                self.progress.emit(pct, f"Restoring: {os.path.basename(path)}")
-                return True
-
-            success, failed, errors = self.engine.executor.undo_batch(self.batch_id, progress_callback=cb)
-            self.finished.emit(success, failed, errors)
-        except Exception as e:
-            self.finished.emit(0, 1, [str(e)])
 
 class SyncWorker(QThread):
     """Handles the full discovery pipeline: Scan -> Collect -> Resolve."""

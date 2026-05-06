@@ -25,13 +25,20 @@ class MatchingEngine:
             tmdb_bearer_token=settings.tmdb_bearer_token,
             db=self.db
         )
-        self.language = getattr(settings, 'metadata_language', 'en-US')
-        self.fallback_language = getattr(settings, 'fallback_language', '')
 
-    def resolve_by_imdb(self, imdb_id):
+    @property
+    def language(self):
+        return getattr(self.s, 'metadata_language', 'en-US')
+
+    @property
+    def fallback_language(self):
+        return getattr(self.s, 'fallback_language', '')
+
+    def resolve_by_imdb(self, imdb_id, language_override=None):
         """Uses /find endpoint to get TMDB data from IMDB ID. Always trusted."""
         try:
-            data = self.api.get_external_id_raw(imdb_id, language=self.language)
+            target_lang = language_override or self.language
+            data = self.api.get_external_id_raw(imdb_id, language=target_lang)
             if not data: return None
             
             movies = data.get('movie_results', [])
@@ -63,12 +70,13 @@ class MatchingEngine:
             logger.warning(f"IMDB resolve failed for {imdb_id}: {e}")
         return None
 
-    def search_api(self, title, year, search_type):
+    def search_api(self, title, year, search_type, language_override=None):
         """Searches TMDB by title+year. Returns list of result dicts."""
-        results = self._execute_search(title, year, search_type, self.language)
+        target_lang = language_override or self.language
+        results = self._execute_search(title, year, search_type, target_lang)
         
         if not results and self.fallback_language:
-            logger.debug(f"No results for '{title}' in {self.language}, trying fallback {self.fallback_language}")
+            logger.debug(f"No results for '{title}' in {target_lang}, trying fallback {self.fallback_language}")
             results = self._execute_search(title, year, search_type, self.fallback_language)
             
         return results

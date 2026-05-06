@@ -147,19 +147,17 @@ class BatchOperationsDialog(QDialog):
 
         # --- Card 3: Parts ---
         self.part_card = self._create_card(T("discovery.batch_operations.cards.parts"))
-        self.chk_parts = QCheckBox(T("discovery.batch_operations.fields.renumber_parts"))
+        self.chk_parts = QCheckBox(T("discovery.batch_operations.fields.set_sequential_parts") or "Set Sequential Parts")
+        
         p_layout = QHBoxLayout()
-        self.combo_part_type = QComboBox()
-        self.combo_part_type.addItem(T("discovery.batch_operations.options.parts.part"), "part")
-        self.combo_part_type.addItem(T("discovery.batch_operations.options.parts.cd"), "cd")
-        self.combo_part_type.addItem(T("discovery.batch_operations.options.parts.disk"), "disk")
-        self.combo_part_type.setEnabled(False)
+        p_layout.addWidget(QLabel(T("discovery.batch_operations.fields.start_val") or "Start Number:"))
         self.spin_part_start = QSpinBox()
-        self.spin_part_start.setRange(1, 99)
+        self.spin_part_start.setRange(1, 999)
+        self.spin_part_start.setValue(1)
         self.spin_part_start.setEnabled(False)
-        p_layout.addWidget(self.combo_part_type)
         p_layout.addWidget(self.spin_part_start)
-        self.chk_parts.toggled.connect(self.combo_part_type.setEnabled)
+        p_layout.addStretch()
+        
         self.chk_parts.toggled.connect(self.spin_part_start.setEnabled)
         
         self.part_card.layout().addWidget(self.chk_parts)
@@ -192,10 +190,20 @@ class BatchOperationsDialog(QDialog):
         self.combo_parent.setEnabled(False)
         self.chk_parent.toggled.connect(self.combo_parent.setEnabled)
 
+        self.chk_metadata_lang = QCheckBox(T("discovery.batch_operations.fields.override_metadata_lang") or "Override Metadata Lang")
+        self.combo_metadata_lang = QComboBox()
+        self.combo_metadata_lang.addItem(T("common.languages.default") or "Default (Global)", None)
+        for code in ["hu-HU", "en-US", "de-DE", "fr-FR", "es-ES", "it-IT", "ja-JP", "ko-KR"]:
+            self.combo_metadata_lang.addItem(code, code)
+        self.combo_metadata_lang.setEnabled(False)
+        self.chk_metadata_lang.toggled.connect(self.combo_metadata_lang.setEnabled)
+
         self.meta_card.layout().addWidget(self.chk_edition)
         self.meta_card.layout().addWidget(self.combo_edition)
         self.meta_card.layout().addWidget(self.chk_lang)
         self.meta_card.layout().addWidget(self.combo_lang)
+        self.meta_card.layout().addWidget(self.chk_metadata_lang)
+        self.meta_card.layout().addWidget(self.combo_metadata_lang)
         self.meta_card.layout().addWidget(self.chk_parent)
         self.meta_card.layout().addWidget(self.combo_parent)
         scroll_layout.addWidget(self.meta_card)
@@ -354,11 +362,11 @@ class BatchOperationsDialog(QDialog):
                 updates['fn_episode'] = str(current_ep)
                 current_ep += 1
             if self.chk_parts.isChecked():
-                updates['part_number'] = current_part
-                updates['part_type'] = self.combo_part_type.currentData()
+                updates['part'] = str(current_part)
                 current_part += 1
             if self.chk_edition.isChecked(): updates['edition'] = self.combo_edition.currentText()
             if self.chk_lang.isChecked(): updates['language'] = self.combo_lang.currentData()
+            if self.chk_metadata_lang.isChecked(): updates['target_language'] = self.combo_metadata_lang.currentData()
             if self.chk_parent.isChecked(): updates['parent_file_id'] = self.combo_parent.currentData()
 
             if len(updates) > 1:

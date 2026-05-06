@@ -55,11 +55,12 @@ class DiscoveryTable(QTableWidget):
         self._init_setup()
 
     def _init_setup(self):
-        self.setColumnCount(5)
+        self.setColumnCount(6)
         self.setHorizontalHeaderLabels([
             T("discovery.table.status"), 
             T("discovery.table.original_name"), 
             T("discovery.table.type"), 
+            "Part",
             T("discovery.table.new_name"), 
             T("discovery.table.actions")
         ])
@@ -85,9 +86,11 @@ class DiscoveryTable(QTableWidget):
         header.setSectionResizeMode(1, QHeaderView.Stretch)
         header.setSectionResizeMode(2, QHeaderView.Fixed)
         self.setColumnWidth(2, 100)
-        header.setSectionResizeMode(3, QHeaderView.Stretch)
-        header.setSectionResizeMode(4, QHeaderView.Fixed)
-        self.setColumnWidth(4, 300) # Maximum spacious width
+        header.setSectionResizeMode(3, QHeaderView.Fixed)
+        self.setColumnWidth(3, 80)
+        header.setSectionResizeMode(4, QHeaderView.Stretch)
+        header.setSectionResizeMode(5, QHeaderView.Fixed)
+        self.setColumnWidth(5, 300) # Maximum spacious width
         header.setDefaultAlignment(Qt.AlignLeft)
         self.verticalHeader().setDefaultSectionSize(72) # Maximum 72px row height
         
@@ -156,12 +159,20 @@ class DiscoveryTable(QTableWidget):
                     type_item.setData(Qt.UserRole + 1, True)
                 self.setItem(i, 2, type_item)
 
-                # 3. New Name Preview
+                # 3. Part
+                part_val = vid.get('part', '')
+                part_item = QTableWidgetItem(str(part_val) if part_val else "")
+                part_item.setTextAlignment(Qt.AlignCenter)
+                if is_new_group:
+                    part_item.setData(Qt.UserRole + 1, True)
+                self.setItem(i, 3, part_item)
+
+                # 4. New Name Preview
                 ident_text = vid.get('_new_name') or "-"
                 preview_item = QTableWidgetItem(ident_text)
                 if is_new_group:
                     preview_item.setData(Qt.UserRole + 1, True)
-                self.setItem(i, 3, preview_item)
+                self.setItem(i, 4, preview_item)
 
                 # 4. Actions
                 actions_widget = QWidget()
@@ -227,7 +238,7 @@ class DiscoveryTable(QTableWidget):
                     actions_layout.addWidget(overflow_btn)
 
                 actions_layout.addStretch()
-                self.setCellWidget(i, 4, actions_widget)
+                self.setCellWidget(i, 5, actions_widget)
 
             except Exception as row_err:
                 import logging
@@ -341,7 +352,7 @@ class DiscoveryTable(QTableWidget):
         for row in range(self.rowCount()):
             text_match = not search_text
             if search_text:
-                for col in range(4):
+                for col in range(5):
                     item = self.item(row, col)
                     if item and (search_text in item.text().lower() or (isinstance(item.data(Qt.UserRole), str) and search_text in item.data(Qt.UserRole).lower())):
                         text_match = True
@@ -404,7 +415,11 @@ class DiscoveryTable(QTableWidget):
                 # Update Preview
                 new_name = engine.formatter.generate_name(file_id, engine.config.settings)
                 preview = f"{new_name}{os.path.splitext(file_data.get('file_name', ''))[1]}" if new_name else "-"
-                self.setItem(row, 3, QTableWidgetItem(preview))
+                self.setItem(row, 4, QTableWidgetItem(preview))
+                
+                # Update Part
+                part_val = file_data.get('part', '')
+                self.setItem(row, 3, QTableWidgetItem(str(part_val) if part_val else ""))
                 break
 
     def _get_type_display(self, raw_cat, mtype, sub_cat):

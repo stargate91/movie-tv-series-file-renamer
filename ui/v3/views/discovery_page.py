@@ -21,6 +21,8 @@ from core.i18n import T
 from ui.v3.components.discovery.review_view import ReviewView
 from ui.v3.components.discovery.dropped_view import DroppedView
 from ui.v3.components.discovery.extras_view import ExtrasView
+from ui.v3.components.discovery.conflicts_view import ConflictsView
+from ui.v3.components.discovery.trash_view import TrashView
 
 logger = logging.getLogger(__name__)
 
@@ -74,10 +76,10 @@ class DiscoveryPage(QWidget):
         self.main_tabs.setStyleSheet(Theme.get_tab_widget_style())
 
         self.review_view = ReviewView(self.engine)
-        self.conflicts_view = DiscoveryTable()
+        self.conflicts_view = ConflictsView(self.engine)
         self.extras_view = ExtrasView(self.engine)
         self.dropped_view = DroppedView(self.engine)
-        self.trash_view = DiscoveryTable()
+        self.trash_view = TrashView(self.engine)
 
         self.main_tabs.addTab(self.review_view, T("discovery.tabs.library"))
         self.main_tabs.addTab(self.conflicts_view, T("discovery.tabs.conflicts"))
@@ -231,10 +233,10 @@ class DiscoveryPage(QWidget):
     def _get_active_table(self):
         idx = self.main_tabs.currentIndex()
         if idx == 0: return self.review_view.get_active_table()
-        if idx == 1: return self.conflicts_view
+        if idx == 1: return self.conflicts_view.table
         if idx == 2: return self.extras_view.get_active_table()
         if idx == 3: return self.dropped_view.table
-        if idx == 4: return self.trash_view
+        if idx == 4: return self.trash_view.table
         return None
 
     def refresh_data(self):
@@ -250,19 +252,10 @@ class DiscoveryPage(QWidget):
         self.loader.start()
 
     def _on_manual_scan_triggered(self):
+        if self.sync_worker and self.sync_worker.isRunning(): return
+        if self.loader and self.loader.isRunning(): return
+        
         from PySide6.QtWidgets import QFileDialog
-        
-        # Disable button immediately to prevent double-triggers during dialog
-        self.scan_new_btn.setEnabled(False)
-        
-        default_path = self.engine.config.settings.default_scan_path
-        if not default_path or not os.path.exists(default_path):
-            default_path = os.path.expanduser("~")
-            
-        path = QFileDialog.getExistingDirectory(self, T("discovery.messages.select_dir"), default_path)
-        if not path:
-            self.scan_new_btn.setEnabled(True)
-            return
         
         # Save as default if it's the first time or if requested (optional logic, but let's keep it simple)
         if not self.engine.config.settings.default_scan_path:
@@ -288,6 +281,11 @@ class DiscoveryPage(QWidget):
         self.status_info.setText(T("discovery.messages.loading_list"))
         self.abort_btn.hide()
         self._set_controls_enabled(True)
+        
+        # Check for OMDB failure
+        if getattr(self.engine.resolver.library, '_omdb_auth_failed', False):
+            self.notif_bar.show_message(T("discovery.messages.omdb_auth_error"), type='error')
+            
         self.refresh_data()
 
     def _on_data_ready(self, videos, poster_paths):
@@ -602,7 +600,7 @@ class DiscoveryPage(QWidget):
         table = self._get_active_table()
         if not table: return
         
-        file_ids = table.get_selected_file_ids()
+        file_ids = table.get_selected_ids()
         if not file_ids: return
         
         if QMessageBox.question(self, T("discovery.actions.restore"), T("discovery.messages.batch_restore_confirm", count=len(file_ids))) == QMessageBox.Yes:
@@ -651,6 +649,8 @@ class DiscoveryPage(QWidget):
             subprocess.Popen(f'explorer /select,"{os.path.normpath(path)}"')
 
     def _on_batch_identify_requested(self):
+        if self.sync_worker and self.sync_worker.isRunning(): return
+        
         table = self._get_active_table()
         if not table: return
         ids = table.get_selected_ids()

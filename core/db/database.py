@@ -85,6 +85,7 @@ class LibraryDB:
                     type TEXT,
                     poster_path TEXT,
                     details_json TEXT,
+                    fetched_languages TEXT,
                     last_updated DATETIME
                 )
             """)
@@ -135,6 +136,7 @@ class LibraryDB:
                     previous_match_status TEXT,
                     edition TEXT,
                     is_manual INTEGER DEFAULT 0,
+                    target_language TEXT,
                     FOREIGN KEY(parent_file_id) REFERENCES media_files(id)
                 )
             """)
@@ -186,6 +188,7 @@ class LibraryDB:
                     air_date TEXT,
                     episode_count INTEGER,
                     details_json TEXT,
+                    fetched_languages TEXT,
                     FOREIGN KEY(media_item_id) REFERENCES media_items(id),
                     UNIQUE(media_item_id, season_number)
                 )
@@ -212,6 +215,7 @@ class LibraryDB:
                     rating_rotten TEXT,
                     rating_metacritic INTEGER,
                     details_json TEXT,
+                    fetched_languages TEXT,
                     FOREIGN KEY(season_id) REFERENCES tv_seasons(id),
                     FOREIGN KEY(media_item_id) REFERENCES media_items(id),
                     UNIQUE(media_item_id, season_number, episode_number)

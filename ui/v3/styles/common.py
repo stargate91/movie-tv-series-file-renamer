@@ -213,12 +213,28 @@ class CommonStyles:
             margin: 0;
         }}
         QComboBox QAbstractItemView {{
-            background-color: {Palette.SURFACE};
+            background-color: {Palette.SURFACE} !important;
             border: 1px solid {Palette.BORDER};
             selection-background-color: {Palette.PRIMARY};
+            selection-color: white;
             color: {Palette.TEXT_MAIN};
-            padding: 5px;
+            padding: 4px;
             outline: none;
+        }}
+        QComboBox QListView {{
+            background-color: {Palette.SURFACE} !important;
+            color: {Palette.TEXT_MAIN};
+            selection-background-color: {Palette.PRIMARY};
+            selection-color: white;
+        }}
+        QComboBox::item {{
+            padding: 8px 12px;
+            color: {Palette.TEXT_MAIN};
+            background-color: transparent;
+        }}
+        QComboBox::item:selected {{
+            background-color: {Palette.PRIMARY} !important;
+            color: white !important;
         }}
 
         /* SpinBoxes */

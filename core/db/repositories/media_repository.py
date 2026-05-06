@@ -65,6 +65,15 @@ class MediaRepository(BaseRepository):
             row = conn.execute("SELECT id FROM tv_seasons WHERE media_item_id = ? AND season_number = ?", (data['media_item_id'], data['season_number'])).fetchone()
             return row['id'] if row else cursor.lastrowid
 
+    def get_season_by_number_by_tmdb_id(self, tmdb_id, season_number):
+        with self._get_connection() as conn:
+            row = conn.execute("""
+                SELECT s.* FROM tv_seasons s 
+                JOIN media_items m ON s.media_item_id = m.id 
+                WHERE m.tmdb_id = ? AND s.season_number = ?
+            """, (tmdb_id, season_number)).fetchone()
+            return dict(row) if row else None
+
     def upsert_episode(self, **data):
         cols = ", ".join(data.keys())
         placeholders = ", ".join("?" for _ in data)

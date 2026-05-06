@@ -67,6 +67,7 @@ class MainWindowV3(QMainWindow):
         
         # Connect Settings Signals
         self.settings_view.database_wiped.connect(self.discovery_page.refresh_data)
+        self.settings_view.settings_changed.connect(self.discovery_page.refresh_data)
 
     def _on_nav_requested(self, index):
         self.content_stack.setCurrentIndex(index)
@@ -123,6 +124,7 @@ class MainWindowV3(QMainWindow):
 def start_v3_ui():
     from PySide6.QtWidgets import QApplication
     app = QApplication(sys.argv)
+    app.setStyleSheet(Theme.get_main_stylesheet())
     
     window = MainWindowV3()
     window.showMaximized()

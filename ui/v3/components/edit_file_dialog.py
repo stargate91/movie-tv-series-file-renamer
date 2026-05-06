@@ -97,16 +97,12 @@ class EditFileDialog(QDialog):
         self.combo_edition.addItem(T("edit_file.editions.uncut"), "Uncut")
         mv_lay.addWidget(self.combo_edition)
         
-        part_lay = QHBoxLayout()
-        part_lay.addWidget(QLabel(T("edit_file.fields.part")))
-        self.combo_part_type = QComboBox()
-        self.combo_part_type.addItem(T("edit_file.parts.part"), "Part")
-        self.combo_part_type.addItem(T("edit_file.parts.cd"), "CD")
-        self.combo_part_type.addItem(T("edit_file.parts.disk"), "Disk")
-        part_lay.addWidget(self.combo_part_type)
-        self.spin_part = QSpinBox()
-        self.spin_part.setRange(0, 99)
-        part_lay.addWidget(self.spin_part)
+        part_lay = QVBoxLayout()
+        part_lay.setContentsMargins(0, 5, 0, 0)
+        part_lay.addWidget(QLabel(T("edit_file.fields.part") or "Part ID (1, A, II):", styleSheet=Theme.get_status_label_style()))
+        self.edit_part = QLineEdit()
+        self.edit_part.setPlaceholderText("e.g. 1, A, II")
+        part_lay.addWidget(self.edit_part)
         mv_lay.addLayout(part_lay)
 
         # Language
@@ -120,18 +116,21 @@ class EditFileDialog(QDialog):
             self.combo_lang.addItem(T(f"common.languages.{code}"), code.upper())
         lang_lay.addWidget(self.combo_lang)
 
-        # Linking
-        self.link_group = QWidget()
-        link_lay = QVBoxLayout(self.link_group)
-        link_lay.setContentsMargins(0, 0, 0, 0)
-        link_lay.addWidget(QLabel(T("edit_file.fields.linked_to")))
-        self.combo_parent = QComboBox()
-        self.combo_parent.setEditable(True)
-        link_lay.addWidget(self.combo_parent)
+        # Metadata Language Override
+        self.metadata_lang_group = QWidget()
+        ml_lay = QVBoxLayout(self.metadata_lang_group)
+        ml_lay.setContentsMargins(0, 0, 0, 0)
+        ml_lay.addWidget(QLabel(T("edit_file.fields.metadata_language") or "Metadata Language:"))
+        self.combo_metadata_lang = QComboBox()
+        self.combo_metadata_lang.addItem(T("common.languages.default") or "Default (Global)", None)
+        for code in ["hu-HU", "en-US", "de-DE", "fr-FR", "es-ES", "it-IT", "ja-JP", "ko-KR"]:
+            self.combo_metadata_lang.addItem(code, code)
+        ml_lay.addWidget(self.combo_metadata_lang)
 
         self.details_card.layout().addWidget(self.tv_group)
         self.details_card.layout().addWidget(self.movie_group)
         self.details_card.layout().addWidget(self.lang_group)
+        self.details_card.layout().addWidget(self.metadata_lang_group)
         self.details_card.layout().addWidget(self.link_group)
         layout.addWidget(self.details_card)
 
@@ -206,8 +205,9 @@ class EditFileDialog(QDialog):
         ep_val = f.get('fn_episode')
         self.spin_episode.setValue(int(ep_val) if str(ep_val or "").isdigit() else 0)
         self.combo_edition.setCurrentText(f.get('edition') or "")
-        self.spin_part.setValue(f.get('part_number') or 0)
+        self.edit_part.setText(str(f.get('part') or ""))
         self._set_combo_by_data(self.combo_lang, (f.get('language') or "ENG").upper())
+        self._set_combo_by_data(self.combo_metadata_lang, f.get('target_language'))
         
         # Update visibility
         self._update_visibility()
@@ -301,7 +301,7 @@ class EditFileDialog(QDialog):
             updates['fn_season'] = self.spin_season.value() if updates['fn_media_type'] == 'tv' else None
             updates['fn_episode'] = str(self.spin_episode.value()) if updates['fn_media_type'] == 'tv' else None
             updates['edition'] = self.combo_edition.currentText() if updates['fn_media_type'] == 'movie' else None
-            updates['part_number'] = self.spin_part.value()
+            updates['part'] = self.edit_part.text().strip()
             updates['parent_file_id'] = None
             updates['sub_category'] = None
             updates['match_status'] = 'PENDING'
@@ -313,6 +313,7 @@ class EditFileDialog(QDialog):
         else:
             updates['sub_category'] = self.combo_sub_type.currentData() if self.st_group.isVisible() else None
             updates['language'] = self.combo_lang.currentData() if self.lang_group.isVisible() else None
+            updates['target_language'] = self.combo_metadata_lang.currentData()
             updates['parent_file_id'] = self.combo_parent.currentData() if self.link_group.isVisible() else None
 
         try:

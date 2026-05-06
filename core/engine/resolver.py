@@ -27,13 +27,31 @@ class Resolver:
         """Runs the full matching pipeline concurrently on all unmatched parent videos."""
         # Use FileRepository
         videos = self.db.files.get_files_by_category('video')
-        unmatched = [v for v in videos if v['match_status'] == 'pending']
+        # We process 'pending' files, but also 'matched' or 'multiple' 
+        # to allow supplementing missing translations if the language changed.
+        targets = []
+        for v in videos:
+            status = v['match_status']
+            if status == 'pending' or status == 'multiple':
+                targets.append(v)
+            elif status == 'matched':
+                # Only re-resolve if we need to supplement a new language
+                target_lang = v.get('target_language') or self.s.metadata_language
+                links = self.db.media.get_links_for_file(v['id'])
+                if links:
+                    media_item = self.db.media.get_media_item_by_id(links[0]['media_item_id'])
+                    if media_item:
+                        fetched = (media_item.get('fetched_languages') or "").split(',')
+                        fetched = [l.strip() for l in fetched if l.strip()]
+                        if target_lang not in fetched:
+                            targets.append(v)
+        
         
         completed = 0
-        total = len(unmatched)
+        total = len(targets)
         
         with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
-            futures = {executor.submit(self._resolve_single, vid): vid for vid in unmatched}
+            futures = {executor.submit(self._resolve_single, vid): vid for vid in targets}
             
             for future in concurrent.futures.as_completed(futures):
                 vid = futures[future]
@@ -58,13 +76,14 @@ class Resolver:
     def _resolve_single(self, vid):
         """Runs the waterfall for a single file."""
         file_id = vid['id']
+        target_lang = vid.get('target_language') # Per-file override
 
         # ── Tier 1: NFO IMDB ID (trusted) ──
         if vid['nfo_imdb_id']:
-            result = self.matcher.resolve_by_imdb(vid['nfo_imdb_id'])
+            result = self.matcher.resolve_by_imdb(vid['nfo_imdb_id'], language_override=target_lang)
             if result:
-                media_item_id = self.library.store_result(result)
-                self._finalize_match(file_id, media_item_id, result, vid, 'matched')
+                media_item_id = self.library.store_result(result, language_override=target_lang)
+                self._finalize_match(file_id, media_item_id, result, vid, 'matched', language_override=target_lang)
                 return
 
         # ── Tier 2: FFmpeg internal title ──
@@ -72,22 +91,22 @@ class Resolver:
             title, year = self.matcher.parse_title_year(vid['internal_title'])
             if title:
                 search_type = self.matcher.guess_search_type(vid)
-                results = self.matcher.search_api(title, year, search_type)
-                outcome = self._evaluate_results(results, title, year, file_id, 'internal_title', vid)
+                results = self.matcher.search_api(title, year, search_type, language_override=target_lang)
+                outcome = self._evaluate_results(results, title, year, file_id, 'internal_title', vid, language_override=target_lang)
                 if outcome == 'matched': return
 
         # ── Tier 3: Filename GuessIt ──
         if vid['fn_title']:
             search_type = vid['fn_media_type'] or self.matcher.guess_search_type(vid)
-            results = self.matcher.search_api(vid['fn_title'], vid['fn_year'], search_type)
-            outcome = self._evaluate_results(results, vid['fn_title'], vid['fn_year'], file_id, 'filename', vid)
+            results = self.matcher.search_api(vid['fn_title'], vid['fn_year'], search_type, language_override=target_lang)
+            outcome = self._evaluate_results(results, vid['fn_title'], vid['fn_year'], file_id, 'filename', vid, language_override=target_lang)
             if outcome == 'matched': return
 
         # ── Tier 4: Foldername GuessIt ──
         if vid['fd_title']:
             search_type = vid['fd_media_type'] or self.matcher.guess_search_type(vid)
-            results = self.matcher.search_api(vid['fd_title'], vid['fd_year'], search_type)
-            outcome = self._evaluate_results(results, vid['fd_title'], vid['fd_year'], file_id, 'foldername', vid)
+            results = self.matcher.search_api(vid['fd_title'], vid['fd_year'], search_type, language_override=target_lang)
+            outcome = self._evaluate_results(results, vid['fd_title'], vid['fd_year'], file_id, 'foldername', vid, language_override=target_lang)
             if outcome == 'matched': return
 
         # ── If we collected candidates across tiers, mark as multiple ──
@@ -103,7 +122,7 @@ class Resolver:
         seen_ids = set()
         for title, year, source in self.matcher.get_all_search_terms(vid):
             search_type = self.matcher.guess_search_type(vid)
-            results = self.matcher.search_api(title, year, search_type)
+            results = self.matcher.search_api(title, year, search_type, language_override=target_lang)
             for r in results:
                 if r['tmdb_id'] not in seen_ids:
                     r['_source'] = source
@@ -113,8 +132,8 @@ class Resolver:
         if len(all_unfiltered) == 1:
             r = all_unfiltered[0]
             status = 'matched' if str(r.get('year')) == str(vid.get('fn_year') or vid.get('fd_year')) else 'uncertain'
-            media_item_id = self.library.store_result(r)
-            self._finalize_match(file_id, media_item_id, r, vid, status)
+            media_item_id = self.library.store_result(r, language_override=target_lang)
+            self._finalize_match(file_id, media_item_id, r, vid, status, language_override=target_lang)
         elif len(all_unfiltered) > 1:
             for r in all_unfiltered:
                 # Use MatchRepository
@@ -126,7 +145,7 @@ class Resolver:
             # Use FileRepository
             self.db.files.update_file(file_id, match_status='no_match')
 
-    def _evaluate_results(self, results, search_title, search_year, file_id, source, vid):
+    def _evaluate_results(self, results, search_title, search_year, file_id, source, vid, language_override=None):
         """Evaluates search results with confidence check."""
         if not results: return 'none'
 
@@ -143,24 +162,24 @@ class Resolver:
         # Priority 1: Super Confident (Exact title + Exact year)
         if len(super_confident) == 1:
             res = super_confident[0]
-            media_item_id = self.library.store_result(res)
-            self._finalize_match(file_id, media_item_id, res, vid, 'matched')
+            media_item_id = self.library.store_result(res, language_override=language_override)
+            self._finalize_match(file_id, media_item_id, res, vid, 'matched', language_override=language_override)
             return 'matched'
         
         # Priority 2: Only one confident match
         all_conf = super_confident + confident
         if len(all_conf) == 1:
             res = all_conf[0]
-            media_item_id = self.library.store_result(res)
-            self._finalize_match(file_id, media_item_id, res, vid, 'matched')
+            media_item_id = self.library.store_result(res, language_override=language_override)
+            self._finalize_match(file_id, media_item_id, res, vid, 'matched', language_override=language_override)
             return 'matched'
         elif len(all_conf) > 1:
-            self._add_candidates_deduped(file_id, all_conf, source)
+            self._add_candidates_deduped(file_id, all_conf, source, language_override=language_override)
             return 'multiple'
             
         return 'none'
 
-    def _finalize_match(self, file_id, media_item_id, res, vid, status='matched'):
+    def _finalize_match(self, file_id, media_item_id, res, vid, status='matched', language_override=None):
         """Links file to media and specific episodes and synchronizes file metadata."""
         # Ensure file metadata matches the resolved result (Movie vs TV)
         updates = {
@@ -175,7 +194,7 @@ class Resolver:
             
             if season_num is not None:
                 updates['fn_season'] = season_num
-                self.library.fetch_and_store_season(res['tmdb_id'], season_num)
+                self.library.fetch_and_store_season(res['tmdb_id'], season_num, language_override=language_override)
                 
                 ep_val = vid.get('fn_episode') if vid.get('fn_episode') is not None else vid.get('fd_episode')
                 ep_nums = self._parse_episode_numbers(ep_val)
@@ -223,7 +242,7 @@ class Resolver:
                     except: pass
         return ep_nums
 
-    def _add_candidates_deduped(self, file_id, results, source):
+    def _add_candidates_deduped(self, file_id, results, source, language_override=None):
         """Adds candidates while avoiding duplicates."""
         # Use MatchRepository
         existing = self.db.matches.get_candidates(file_id)
@@ -231,7 +250,7 @@ class Resolver:
         
         for r in results:
             if r['tmdb_id'] not in existing_ids:
-                self.library.store_result(r)
+                self.library.store_result(r, language_override=language_override)
                 # Use MatchRepository
                 self.db.matches.add_candidate(file_id, r['tmdb_id'], r['title'], r['year'],
                                     r['media_type'], r.get('poster_path'), source)

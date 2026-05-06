@@ -10,7 +10,7 @@ class SearchWorker(QThread):
     """
     results_found = Signal(list, str) # results, mode
 
-    def __init__(self, engine, query, year, search_type, mode="search", parent_id=None, season_num=None, ep_num=None):
+    def __init__(self, engine, query, year, search_type, mode="search", parent_id=None, season_num=None, ep_num=None, language_override=None):
         super().__init__()
         self.engine = engine
         self.query = query
@@ -20,9 +20,10 @@ class SearchWorker(QThread):
         self.parent_id = parent_id # tmdb_id of show
         self.season_num = season_num
         self.ep_num = ep_num
+        self.language_override = language_override
 
     def run(self):
-        lang = self.engine.config.settings.metadata_language
+        lang = self.language_override or self.engine.config.settings.metadata_language
         try:
             if self.mode == "search":
                 # Extract S/E hints from query if any

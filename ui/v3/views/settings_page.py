@@ -26,6 +26,7 @@ class SaveWorker(QThread):
 
 class SettingsPage(QWidget):
     database_wiped = Signal()
+    settings_changed = Signal()
 
     def __init__(self, engine, parent=None):
         super().__init__(parent)
@@ -124,6 +125,7 @@ class SettingsPage(QWidget):
     def _on_save_finished(self):
         self.save_btn.setEnabled(True)
         self.save_btn.setText(T("settings.save_btn"))
+        self.settings_changed.emit()
         logger.info("Settings saved successfully.")
 
 from PySide6.QtWidgets import QFrame # Ensure QFrame is available

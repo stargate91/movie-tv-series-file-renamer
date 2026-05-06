@@ -67,9 +67,10 @@ class SmartScanner:
             
             sub_category = self.filter.get_sub_category(path, category)
             language = self.filter.get_language(path)
+            part = self.filter.get_part(path)
             
             # Upsert logic via Repository
-            db_id = self._upsert_file(path, category, stats['size_bytes'], sub_category, language)
+            db_id = self._upsert_file(path, category, stats['size_bytes'], sub_category, language, part)
             
             if category == 'video':
                 video_ids[path] = db_id

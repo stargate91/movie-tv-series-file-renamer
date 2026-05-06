@@ -25,64 +25,76 @@ class LibraryManager:
             tmdb_bearer_token=settings.tmdb_bearer_token,
             db=self.db
         )
-        self.language = getattr(settings, 'metadata_language', 'en-US')
         self._download_executor = concurrent.futures.ThreadPoolExecutor(max_workers=10)
-        self._omdb_auth_failed = False # Track 401 errors to avoid spamming
-        self._enriched_ids = set() # Track items enriched in this session
+        self._omdb_auth_failed = False 
+        self._enriched_ids = set()
 
-    def store_result(self, result):
+    @property
+    def language(self):
+        """Always get the current language from settings."""
+        return getattr(self.s, 'metadata_language', 'en-US')
+
+    def store_result(self, result, language_override=None):
         """
         Enriches TMDB search result with full details and saves to media_items.
         Returns the new/existing media_item_id.
         """
         tmdb_id = result['tmdb_id']
         media_type = result['media_type']
+        target_lang = language_override or self.language
         
-        # Check if already enriched in this session or exists in DB with details
-        if tmdb_id in self._enriched_ids:
-            item = self.db.media.get_media_item_by_tmdb_id(tmdb_id)
-            if item: return item['id']
-
         existing = self.db.media.get_media_item_by_tmdb_id(tmdb_id)
-        if existing and existing.get('details_json'):
-            self._enriched_ids.add(tmdb_id)
+        fetched = (existing.get('fetched_languages') or "") if existing else ""
+        fetched_list = [l.strip() for l in fetched.split(',') if l.strip()]
+        
+        if existing and target_lang in fetched_list:
             return existing['id']
 
-        # Enrichment variables
-        director = ""
-        cast = ""
-        rating_tmdb = None
-        rating_imdb = None
-        rating_rotten = None
-        rating_metacritic = None
-        votes_imdb = None
-        vote_count_tmdb = None
-        budget = None
-        revenue = None
-        runtime = None
-        popularity = None
-        tagline = ""
-        overview = ""
-        genres = ""
-        original_title = ""
-        original_language = ""
-        origin_country = ""
-        release_date = ""
-        first_air_date = ""
-        last_air_date = ""
-        number_of_episodes = None
-        number_of_seasons = None
-        languages = ""
-        status = ""
-        type = ""
-        imdb_id = result.get('imdb_id', '')
+        # Enrichment
+        director = existing.get('director', "") if existing else ""
+        cast = existing.get('cast', "") if existing else ""
+        rating_tmdb = existing.get('rating_tmdb') if existing else None
+        rating_imdb = existing.get('rating_imdb') if existing else None
+        rating_rotten = existing.get('rating_rotten', "") if existing else ""
+        rating_metacritic = existing.get('rating_metacritic') if existing else None
+        votes_imdb = existing.get('votes_imdb') if existing else None
+        vote_count_tmdb = existing.get('vote_count_tmdb') if existing else None
+        budget = existing.get('budget') if existing else None
+        revenue = existing.get('revenue') if existing else None
+        runtime = existing.get('runtime') if existing else None
+        popularity = existing.get('popularity') if existing else None
+        tagline = existing.get('tagline', "") if existing else ""
+        overview = existing.get('overview', "") if existing else ""
+        genres = existing.get('genres', "") if existing else ""
+        original_title = existing.get('original_title', "") if existing else ""
+        original_language = existing.get('original_language', "") if existing else ""
+        origin_country = existing.get('origin_country', "") if existing else ""
+        release_date = existing.get('release_date', "") if existing else ""
+        first_air_date = existing.get('first_air_date', "") if existing else ""
+        last_air_date = existing.get('last_air_date', "") if existing else ""
+        number_of_episodes = existing.get('number_of_episodes') if existing else None
+        number_of_seasons = existing.get('number_of_seasons') if existing else None
+        languages = existing.get('languages', "") if existing else ""
+        status = existing.get('status', "") if existing else ""
+        type = existing.get('type', "") if existing else ""
+        imdb_id = result.get('imdb_id', '') or (existing.get('imdb_id') if existing else "")
+        networks = result.get('networks') or (existing.get('networks') if existing else "")
+        
         full_data = None
-
-        # 1. TMDB Detail enrichment
         try:
-            full_data = self.api.get_from_tmdb(tmdb_id, media_type, self.language)
+            full_data = self.api.get_from_tmdb(tmdb_id, media_type, target_lang)
             if full_data:
-                result['details_json'] = json.dumps(full_data, ensure_ascii=False)
+                details_json = {}
+                if existing and existing.get('details_json'):
+                    try:
+                        details_json = json.loads(existing['details_json'])
+                        if not isinstance(details_json, dict) or 'tmdb_id' in details_json:
+                            details_json = { "en-US": details_json }
+                    except: pass
+                
+                details_json[target_lang] = full_data
+                result['details_json'] = json.dumps(details_json, ensure_ascii=False)
+                
                 if full_data.get('poster_path'):
                     result['poster_path'] = full_data['poster_path']
                 
@@ -102,7 +114,6 @@ class LibraryManager:
                 original_title = full_data.get('original_title') or full_data.get('original_name', '')
                 original_language = full_data.get('original_language', '')
                 release_date = full_data.get('release_date') or full_data.get('first_air_date', '')
-                
                 first_air_date = full_data.get('first_air_date', '')
                 last_air_date = full_data.get('last_air_date', '')
                 number_of_episodes = full_data.get('number_of_episodes')
@@ -112,10 +123,8 @@ class LibraryManager:
                 
                 lang_list = [l['name'] for l in full_data.get('spoken_languages', [])]
                 languages = ", ".join(lang_list)
-
                 if release_date and len(release_date) >= 4:
-                    try:
-                        result['year'] = int(release_date[:4])
+                    try: result['year'] = int(release_date[:4])
                     except: pass
                 
                 genre_list = [g['name'] for g in full_data.get('genres', [])]
@@ -139,13 +148,15 @@ class LibraryManager:
                 actors = [p['name'] for p in cast_list[:6]]
                 cast = ", ".join(actors) if actors else ""
                 
+                if full_data.get('networks'):
+                    networks = ", ".join([n['name'] for n in full_data['networks']])
+                
                 if not imdb_id:
                     imdb_id = full_data.get('imdb_id') or full_data.get('external_ids', {}).get('imdb_id', '')
 
         except Exception as e:
             logger.warning(f"TMDB enrichment failed for {media_type} {tmdb_id}: {e}")
 
-        # 2. OMDB enrichment
         if not self._omdb_auth_failed:
             try:
                 if imdb_id:
@@ -163,18 +174,19 @@ class LibraryManager:
                             if r['Source'] == 'Rotten Tomatoes':
                                 rating_rotten = r['Value']
             except Exception as e:
-                # Catch 401/403 to stop spamming
-                if "401" in str(e) or "403" in str(e) or "Authentication failed" in str(e):
+                if "401" in str(e) or "403" in str(e):
                     self._omdb_auth_failed = True
-                    logger.error(f"OMDB enrichment disabled: {e}. Please check your API key in settings.")
-                else:
-                    logger.warning(f"OMDB enrichment failed for {media_type} {tmdb_id}: {e}")
+                logger.warning(f"OMDB enrichment failed: {e}")
 
-        # 3. Save to DB using MediaRepository
+        if target_lang not in fetched_list:
+            fetched_list.append(target_lang)
+        fetched_languages = ", ".join(fetched_list)
+
         media_data = {
-            'tmdb_id': tmdb_id, 'imdb_id': imdb_id, 'title': result['title'],
-            'year': result.get('year'), 'media_type': media_type,
-            'details_json': result.get('details_json'), 'poster_path': result.get('poster_path'),
+            'tmdb_id': tmdb_id, 'imdb_id': imdb_id, 'title': result.get('title') or (existing.get('title') if existing else ""),
+            'year': result.get('year') or (existing.get('year') if existing else None), 'media_type': media_type,
+            'details_json': result.get('details_json') or (existing.get('details_json') if existing else ""), 
+            'poster_path': result.get('poster_path') or (existing.get('poster_path') if existing else ""),
             'director': director, 'cast': cast, 'rating_tmdb': rating_tmdb,
             'rating_imdb': rating_imdb, 'rating_rotten': rating_rotten,
             'rating_metacritic': rating_metacritic, 'votes_imdb': votes_imdb,
@@ -185,96 +197,120 @@ class LibraryManager:
             'release_date': release_date, 'first_air_date': first_air_date,
             'last_air_date': last_air_date, 'number_of_episodes': number_of_episodes,
             'number_of_seasons': number_of_seasons, 'languages': languages,
-            'status': status, 'type': type
+            'status': status, 'type': type, 'fetched_languages': fetched_languages,
+            'networks': networks
         }
         item_id = self.db.media.upsert_media_item(**media_data)
         self._enriched_ids.add(tmdb_id)
         
-        # 4. Pre-download poster
         if result.get('poster_path'):
             self.pre_download_poster(result['poster_path'])
             
-        # 5. TV Logic: Fetch ALL seasons/episodes for TV shows
         if media_type == 'tv':
             try:
-                details = json.loads(result.get('details_json', '{}'))
+                details_json = json.loads(media_data.get('details_json', '{}'))
+                details = details_json.get(target_lang) if isinstance(details_json, dict) else details_json
                 if details and 'seasons' in details:
                     for s in details['seasons']:
                         s_num = s.get('season_number')
                         if s_num is not None:
-                            self.fetch_and_store_season(tmdb_id, s_num)
+                            self.fetch_and_store_season(tmdb_id, s_num, target_lang)
             except Exception as e:
-                logger.warning(f"Season hydration failed for TMDB {tmdb_id}: {e}")
+                logger.warning(f"Season hydration failed: {e}")
             
         return item_id
 
-    def fetch_and_store_season(self, tmdb_id, season_number):
+    def fetch_and_store_season(self, tmdb_id, season_number, language_override=None):
         """Fetches a full season from TMDB and stores episodes."""
         try:
-            data = self.api.tmdb.get_season_details(tmdb_id, season_number, self.language)
-            if not data:
-                return
+            target_lang = language_override or self.language
+            existing_season = self.db.media.get_season_by_number_by_tmdb_id(tmdb_id, season_number)
+            fetched = (existing_season.get('fetched_languages') or "") if existing_season else ""
+            fetched_list = [l.strip() for l in fetched.split(',') if l.strip()]
             
-            # Use MediaRepository to find the item
+            if existing_season and target_lang in fetched_list:
+                return
+
+            data = self.api.tmdb.get_season_details(tmdb_id, season_number, target_lang)
+            if not data: return
+            
             media_item = self.db.media.get_media_item_by_tmdb_id(tmdb_id)
             if not media_item: return
             media_item_id = media_item['id']
             
+            details_json = {}
+            if existing_season and existing_season.get('details_json'):
+                try:
+                    details_json = json.loads(existing_season['details_json'])
+                    if not isinstance(details_json, dict) or 'id' in details_json:
+                        details_json = { "en-US": details_json }
+                except: pass
+            details_json[target_lang] = data
+            
+            if target_lang not in fetched_list:
+                fetched_list.append(target_lang)
+            fetched_languages = ", ".join(fetched_list)
+
             season_data = {
                 'media_item_id': media_item_id, 'season_number': season_number,
                 'name': data.get('name', ''), 'overview': data.get('overview', ''),
                 'poster_path': data.get('poster_path'), 'air_date': data.get('air_date', ''),
-                'details_json': json.dumps(data, ensure_ascii=False),
-                'tmdb_id': data.get('id'), 'episode_count': data.get('episode_count')
+                'details_json': json.dumps(details_json, ensure_ascii=False),
+                'tmdb_id': data.get('id'), 'episode_count': data.get('episode_count'),
+                'fetched_languages': fetched_languages
             }
             season_id = self.db.media.upsert_season(**season_data)
             
-            if data.get('poster_path'):
-                self.pre_download_poster(data['poster_path'])
-            
             for ep in data.get('episodes', []):
                 ep_num = ep.get('episode_number')
+                existing_ep = self.db.media.get_episode_by_id_fields(media_item_id, season_number, ep_num)
+                ep_fetched = (existing_ep.get('fetched_languages') or "") if existing_ep else ""
+                ep_fetched_list = [l.strip() for l in ep_fetched.split(',') if l.strip()]
                 
-                # Check if external_ids were included in the bulk response (rare but possible in some API versions)
-                imdb_id = ep.get('external_ids', {}).get('imdb_id')
+                ep_details = {}
+                if existing_ep and existing_ep.get('details_json'):
+                    try:
+                        ep_details = json.loads(existing_ep['details_json'])
+                        if not isinstance(ep_details, dict) or 'id' in ep_details:
+                            ep_details = { "en-US": ep_details }
+                    except: pass
+                ep_details[target_lang] = ep
                 
+                if target_lang not in ep_fetched_list:
+                    ep_fetched_list.append(target_lang)
+                ep_fetched_languages = ", ".join(ep_fetched_list)
+
                 episode_data = {
                     'season_id': season_id, 'media_item_id': media_item_id,
                     'season_number': season_number, 'episode_number': ep_num,
                     'name': ep.get('name', ''), 'overview': ep.get('overview', ''),
                     'air_date': ep.get('air_date', ''), 'runtime': ep.get('runtime'),
                     'still_path': ep.get('still_path'), 'vote_average': ep.get('vote_average'),
-                    'details_json': json.dumps(ep, ensure_ascii=False),
+                    'details_json': json.dumps(ep_details, ensure_ascii=False),
                     'tmdb_id': ep.get('id'), 'vote_count_tmdb': ep.get('vote_count'),
-                    'imdb_id': imdb_id
+                    'imdb_id': ep.get('external_ids', {}).get('imdb_id') or (existing_ep.get('imdb_id') if existing_ep else ""),
+                    'fetched_languages': ep_fetched_languages
                 }
                 self.db.media.upsert_episode(**episode_data)
-                if ep.get('still_path'):
-                    self.pre_download_poster(ep['still_path'])
-                
+
         except Exception as e:
-            logger.warning(f"Season fetch failed for TMDB {tmdb_id} S{season_number}: {e}")
+            logger.warning(f"Season fetch failed: {e}")
 
     def pre_download_poster(self, poster_path):
-        """Initiates an asynchronous background download for a poster."""
+        """Initiates background download for a poster."""
         if not poster_path: return
-        
         base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         cache_dir = os.path.join(base_dir, 'data', 'cache', 'posters')
         local_path = os.path.join(cache_dir, poster_path.lstrip('/'))
-        
         if not os.path.exists(local_path):
             url = f"https://image.tmdb.org/t/p/w500{poster_path}"
             self._download_executor.submit(self._do_download, url, local_path)
 
     def _do_download(self, url, local_path):
-        """The actual synchronous download task run in a background thread."""
         try:
             os.makedirs(os.path.dirname(local_path), exist_ok=True)
             r = self.api.session.get(url, timeout=10)
             if r.status_code == 200:
                 with open(local_path, 'wb') as f:
                     f.write(r.content)
-                logger.debug(f"Downloaded poster: {os.path.basename(local_path)}")
-        except Exception as e:
-            logger.debug(f"Poster download failed: {e}")
+        except: pass

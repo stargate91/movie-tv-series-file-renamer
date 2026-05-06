@@ -110,7 +110,7 @@ class CollisionResolver:
                     
             if keyword:
                 part_str += f"{keyword}"
-                if sep_char != "": part_str += " " # Space between keyword and number
+                if sep_char: part_str += sep_char
                 
             part_str += formatted_val
             
@@ -139,6 +139,8 @@ class CollisionResolver:
                 return f"{num:02d}"
             if style == "roman":
                 return self._int_to_roman(num)
+            if style == "letter":
+                return chr(64 + num) if 1 <= num <= 26 else str(num)
             return str(num)
         except:
             # val is likely 'A', 'B', etc.

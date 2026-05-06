@@ -100,7 +100,11 @@
             "select_dir": "Choose a folder to organize",
             "drop_ingest": "🚀 Drag & Drop files here to start organizing",
             "abort_btn": "Stop Now",
-            "candidate_prefix": "Possible Match: {title}"
+            "candidate_prefix": "Possible Match: {title}",
+            "omdb_auth_error": "⚠️ OMDb API Key failed! IMDb ratings and Rotten Tomatoes data are currently unavailable. Check your settings.",
+            "ingesting": "Ingesting: {filename}",
+            "moving": "Moving: {filename}",
+            "restoring": "Restoring: {filename}"
         },
         "extras": {
             "tabs": {
@@ -152,7 +156,8 @@
                 "renumber_parts": "Renumber as Parts (CD1, CD2...)",
                 "set_edition": "Set Edition:",
                 "edition_label": "Edition:",
-                "override_lang": "Override Language:",
+                "override_lang": "Override Audio/Sub Language:",
+                "override_metadata_lang": "Override Metadata Language:",
                 "link_parent": "Link to Parent:",
                 "select_parent": "--- Select Parent ---"
             },
@@ -220,7 +225,8 @@
                 "season": "Series + Season",
                 "sequential": "Series + Season + Sequential Episodes"
             },
-            "link_sequential": "Link to S{s}E{e} (Sequential Start)"
+            "link_sequential": "Link to S{s}E{e} (Sequential Start)",
+            "lang_label": "Metadata Language:"
         },
         "batch": {
             "clear": "🔄 Clear Metadata",
@@ -442,7 +448,8 @@
             "episode": "Episode:",
             "edition": "Edition:",
             "part": "Part:",
-            "language": "Language:",
+            "language": "Audio/Sub Language:",
+            "metadata_language": "Metadata Language:",
             "linked_to": "Linked to Parent Video:"
         },
         "roles": {

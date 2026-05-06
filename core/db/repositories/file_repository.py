@@ -150,3 +150,22 @@ class FileRepository(BaseRepository):
             row = conn.execute("SELECT COUNT(*) as count FROM media_files").fetchone()
             return row['count'] if row else 0
 
+    def get_files_with_metadata(self, *categories):
+        """Fetches files joined with their media metadata in a single efficient query."""
+        placeholders = ", ".join("?" for _ in categories)
+        query = f"""
+            SELECT f.*, 
+                   m.media_type as media_item_type, m.title as media_title, m.poster_path as media_poster,
+                   e.name as episode_title, e.still_path as episode_poster,
+                   s.name as season_name, s.poster_path as season_poster
+            FROM media_files f
+            LEFT JOIN file_media_links l ON f.id = l.file_id
+            LEFT JOIN media_items m ON l.media_item_id = m.id
+            LEFT JOIN tv_episodes e ON l.tv_episode_id = e.id
+            LEFT JOIN tv_seasons s ON l.tv_season_id = s.id
+            WHERE f.category IN ({placeholders}) 
+              AND f.status NOT IN ('renamed', 'deleted')
+        """
+        with self._get_connection() as conn:
+            return [dict(row) for row in conn.execute(query, categories).fetchall()]
+

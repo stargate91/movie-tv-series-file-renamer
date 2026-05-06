@@ -10,6 +10,8 @@ from ui.v3.components.image_loader import ImageDownloader
 from .manual_resolve.searcher import SearchWorker
 from .manual_resolve.tv_selector import TVMetadataSelector
 from .manual_resolve.result_widget import ResultItemWidget
+from .manual_resolve.preview_panel import PreviewPanel
+from .manual_resolve.basket_widget import BasketWidget
 from core.i18n import T
 
 logger = logging.getLogger(__name__)
@@ -105,6 +107,16 @@ class ManualResolveDialog(QDialog):
 
         self.tv_selector = TVMetadataSelector()
         filters_row.addWidget(self.tv_selector)
+        
+        filters_row.addSpacing(20)
+        filters_row.addWidget(QLabel(T("manual_resolve.lang_label") or "Language:"))
+        self.lang_combo = QComboBox()
+        self.lang_combo.addItem(T("common.languages.default") or "Default (Global)", None)
+        for code in ["hu-HU", "en-US", "de-DE", "fr-FR", "es-ES", "it-IT", "ja-JP", "ko-KR"]:
+            self.lang_combo.addItem(code, code)
+        self.lang_combo.setFixedWidth(140)
+        filters_row.addWidget(self.lang_combo)
+        
         tools.addLayout(filters_row)
         layout.addLayout(tools)
 
@@ -128,11 +140,13 @@ class ManualResolveDialog(QDialog):
         self.content_row.addLayout(res_col, 2)
         
         # Preview Panel
-        self.preview_panel = self._create_preview_panel()
+        self.preview_panel = PreviewPanel()
         self.content_row.addWidget(self.preview_panel)
         
         # Basket (Hidden by default)
-        self.basket_widget = self._create_basket_widget()
+        self.basket_widget = BasketWidget()
+        self.basket_widget.clear_requested.connect(self._clear_basket)
+        self.basket_widget.confirm_requested.connect(self._on_confirm)
         self.content_row.addWidget(self.basket_widget, 2)
         
         layout.addLayout(self.content_row)
@@ -143,56 +157,6 @@ class ManualResolveDialog(QDialog):
         footer.addWidget(QPushButton(T("common.cancel"), clicked=self.reject, objectName="SecondaryButton", fixedWidth=100, fixedHeight=40))
         layout.addLayout(footer)
 
-    def _create_preview_panel(self):
-        panel = QFrame()
-        panel.setStyleSheet(Theme.get_preview_panel_style())
-        panel.setFixedWidth(280)
-        layout = QVBoxLayout(panel)
-        
-        self.preview_poster = QLabel(T("manual_resolve.no_selection"))
-        self.preview_poster.setAlignment(Qt.AlignCenter)
-        self.preview_poster.setFixedSize(250, 375)
-        self.preview_poster.setStyleSheet(Theme.get_batch_card_style())
-        
-        self.preview_title = QLabel(T("discovery.manual_resolve.select_result"))
-        self.preview_title.setWordWrap(True)
-        self.preview_title.setStyleSheet(Theme.get_preview_title_style())
-        
-        self.preview_meta = QLabel("")
-        self.preview_meta.setStyleSheet(Theme.get_preview_meta_style())
-        
-        self.preview_overview = QLabel("")
-        self.preview_overview.setWordWrap(True)
-        self.preview_overview.setStyleSheet(Theme.get_preview_overview_style())
-        
-        layout.addWidget(self.preview_poster, 0, Qt.AlignCenter)
-        layout.addWidget(self.preview_title)
-        layout.addWidget(self.preview_meta)
-        layout.addWidget(self.preview_overview)
-        layout.addStretch()
-        return panel
-
-    def _create_basket_widget(self):
-        widget = QWidget()
-        widget.setVisible(False)
-        layout = QVBoxLayout(widget)
-        layout.setContentsMargins(0, 0, 0, 0)
-        
-        header = QHBoxLayout()
-        header.addWidget(QLabel(T("manual_resolve.basket")))
-        clear_btn = QPushButton(T("manual_resolve.clear"), clicked=self._clear_basket, objectName="SecondaryButton")
-        header.addWidget(clear_btn)
-        layout.addLayout(header)
-        
-        self.basket_list = QListWidget()
-        layout.addWidget(self.basket_list)
-        
-        self.confirm_btn = QPushButton(T("manual_resolve.confirm_all"), clicked=self._on_confirm)
-        self.confirm_btn.setEnabled(False)
-        self.confirm_btn.setFixedHeight(45)
-        self.confirm_btn.setStyleSheet(Theme.get_success_button_style())
-        layout.addWidget(self.confirm_btn)
-        return widget
 
     def _on_search_type_changed(self):
         is_tv = self.search_type_combo.currentData() == "tv"
@@ -247,8 +211,9 @@ class ManualResolveDialog(QDialog):
         # Use passed season_num if available (browsing mode), otherwise use UI filter
         final_s = season_num if season_num is not None else vals['season']
         final_e = vals['episode']
+        target_lang = self.lang_combo.currentData()
 
-        self.search_worker = SearchWorker(self.engine, query, year_param, m_type, mode, parent_id, final_s, final_e)
+        self.search_worker = SearchWorker(self.engine, query, year_param, m_type, mode, parent_id, final_s, final_e, language_override=target_lang)
         self.search_worker.results_found.connect(self._on_search_results)
         self.search_worker.start()
 
@@ -280,18 +245,12 @@ class ManualResolveDialog(QDialog):
         if not res: return
         self.selected_media = res
         self.action_btn.setEnabled(True)
-        
-        self.preview_title.setText(res['title'])
-        meta = T("manual_resolve.type_label", type=res['media_type'].capitalize())
-        if res.get('year'): meta += f" • {res['year']}"
-        self.preview_meta.setText(meta)
-        self.preview_overview.setText(res.get('overview', ""))
+        self.preview_panel.update_info(res)
         
         if res.get('poster_path'):
             self._load_poster(res['poster_path'])
         else:
-            self.preview_poster.setText(T("manual_resolve.no_poster"))
-
+            self.preview_panel.set_poster(None)
     def _on_item_double_clicked(self, item):
         res = item.data(Qt.UserRole)
         if not res: return
@@ -342,15 +301,7 @@ class ManualResolveDialog(QDialog):
         self._refresh_basket_ui()
 
     def _refresh_basket_ui(self):
-        self.basket_list.clear()
-        for item in self.basket:
-            m = item['media']
-            label = f"{m['title']}"
-            if m['media_type'] in ('tv', 'season', 'episode'):
-                label += f" [S{str(item['s']).zfill(2)}E{str(item['e']).zfill(2)}]"
-            self.basket_list.addItem(label)
-        self.confirm_btn.setEnabled(len(self.basket) > 0)
-
+        self.basket_widget.refresh(self.basket)
     def _on_confirm(self):
         if not self.basket: return
         self.engine.db.files.clear_match(self.file_id)
@@ -370,11 +321,14 @@ class ManualResolveDialog(QDialog):
             last_s, last_type = s_num, actual_res['media_type']
             all_episodes.append(e_num)
             
+            target_lang = self.lang_combo.currentData()
+            self.engine.db.files.update_file(self.file_id, target_language=target_lang)
+
             # Finalize using resolver
-            mid = self.engine.resolver.library.store_result(actual_res)
+            mid = self.engine.resolver.library.store_result(actual_res, language_override=target_lang)
             vid_mock = self.engine.db.files.get_file_by_id(self.file_id)
             vid_mock['fn_season'], vid_mock['fn_episode'], vid_mock['fn_media_type'] = s_num, str(e_num), actual_res['media_type']
-            self.engine.resolver._finalize_match(self.file_id, mid, actual_res, vid_mock, status='matched')
+            self.engine.resolver._finalize_match(self.file_id, mid, actual_res, vid_mock, status='matched', language_override=target_lang)
             
         # Update final file tags for multi-episode support
         if all_episodes:
@@ -397,14 +351,10 @@ class ManualResolveDialog(QDialog):
             return
 
         url = f"https://image.tmdb.org/t/p/w200{poster_path}"
-        self.preview_poster.setText(T("common.loading"))
+        self.preview_panel.set_loading()
         self.poster_worker = ImageDownloader(url, local_path)
         self.poster_worker.finished.connect(self._on_poster_loaded)
         self.poster_worker.start()
 
     def _on_poster_loaded(self, pixmap):
-        if not pixmap.isNull():
-            scaled = pixmap.scaled(self.preview_poster.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation)
-            self.preview_poster.setPixmap(scaled)
-        else:
-            self.preview_poster.setText(T("manual_resolve.no_poster"))
+        self.preview_panel.set_poster(pixmap)
