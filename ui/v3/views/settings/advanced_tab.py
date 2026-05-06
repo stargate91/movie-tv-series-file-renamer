@@ -1,7 +1,8 @@
-from PySide6.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QCheckBox, QComboBox, QPushButton, QMessageBox
+from PySide6.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QPushButton
 from PySide6.QtCore import Qt, Signal
 from ui.v3.styles.theme import Theme
 from ui.v3.views.settings.base_tab import BaseSettingsTab
+from ui.v3.components.modern_dialog import ModernDialog
 from core.i18n import T
 
 class AdvancedTab(BaseSettingsTab):
@@ -21,25 +22,6 @@ class AdvancedTab(BaseSettingsTab):
         header.setStyleSheet(Theme.get_page_header_style())
         layout.addWidget(header)
 
-        # --- Section: Multi-Part ---
-        layout.addWidget(self._create_section_header(T("settings.advanced.sections.multi_part")))
-        self.multi_kw_combo = QComboBox()
-        self.multi_kw_combo.addItems(["Part", "CD", "Disk", "pt"])
-        self.multi_kw_combo.setEditable(True)
-        self.multi_kw_combo.setCurrentText(self.engine.config.settings.multi_part_keyword)
-        
-        kw_layout = QHBoxLayout()
-        kw_layout.addWidget(QLabel(T("settings.advanced.fields.part_keyword")))
-        kw_layout.addWidget(self.multi_kw_combo)
-        kw_layout.addStretch()
-        layout.addLayout(kw_layout)
-
-        # --- Section: Cleanup ---
-        layout.addWidget(self._create_section_header(T("settings.advanced.sections.cleanup")))
-        self.cleanup_cb = QCheckBox(T("settings.advanced.fields.cleanup_folders"))
-        self.cleanup_cb.setChecked(self.engine.config.settings.cleanup_empty_folders)
-        layout.addWidget(self.cleanup_cb)
-
         # --- Section: Danger Zone ---
         layout.addSpacing(40)
         layout.addWidget(self._create_section_header(T("settings.advanced.sections.danger")))
@@ -58,21 +40,19 @@ class AdvancedTab(BaseSettingsTab):
         layout.addStretch()
 
     def _on_wipe_database(self):
-        reply = QMessageBox.question(
-            self, T("settings.advanced.fields.wipe_confirm_title"), 
+        if ModernDialog.confirm(
+            self, 
+            T("settings.advanced.fields.wipe_confirm_title"), 
             T("settings.advanced.fields.wipe_confirm_msg"),
-            QMessageBox.Yes | QMessageBox.No, QMessageBox.No
-        )
-        
-        if reply == QMessageBox.Yes:
+            icon="alert"
+        ):
             try:
                 # Actual wipe logic
                 self.engine.db.wipe_discovery_data()
                 self.database_wiped.emit()
-                QMessageBox.information(self, T("common.success"), T("settings.advanced.fields.wipe_success"))
+                ModernDialog.show_message(self, T("common.success"), T("settings.advanced.fields.wipe_success"), icon="check")
             except Exception as e:
-                QMessageBox.critical(self, T("common.error"), f"{T('settings.advanced.fields.wipe_error_msg')} {e}")
+                ModernDialog.show_message(self, T("common.error"), f"{T('settings.advanced.fields.wipe_error_msg')} {e}", icon="alert")
 
     def save_to_settings(self, s):
-        s.multi_part_keyword = self.multi_kw_combo.currentText()
-        s.cleanup_empty_folders = self.cleanup_cb.isChecked()
+        pass

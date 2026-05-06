@@ -131,6 +131,18 @@ class MiscStyles:
         return CommonStyles.get_typography_style('h4', 'black')
 
     @staticmethod
+    def get_preview_panel_style():
+        return f"background-color: {Palette.SURFACE}; border-left: 1px solid {Palette.BORDER};"
+
+    @staticmethod
+    def get_preview_meta_style():
+        return f"margin-bottom: 10px; {CommonStyles.get_typography_style('small', 'semibold', Palette.TEXT_MUTED)}"
+
+    @staticmethod
+    def get_preview_overview_style():
+        return f"line-height: 1.4; {CommonStyles.get_typography_style('body', 'normal', Palette.TEXT_DIM)}"
+
+    @staticmethod
     def get_batch_bar_style():
         return f"background-color: {Palette.SURFACE_DARK}; border-top: 2px solid {Palette.PRIMARY}; padding: 10px;"
 

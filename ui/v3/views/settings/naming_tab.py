@@ -27,6 +27,7 @@ class NamingTab(BaseSettingsTab):
         c_group = QVBoxLayout()
         c_group.addWidget(QLabel(T("settings.naming.fields.casing")))
         self.casing_combo = QComboBox()
+        self.casing_combo.setStyleSheet(Theme.get_combobox_style())
         self.casing_combo.setFixedWidth(160)
         c_opts = [
             (T("settings.naming.casing_options.none"), "none"), 
@@ -45,6 +46,7 @@ class NamingTab(BaseSettingsTab):
         s_group = QVBoxLayout()
         s_group.addWidget(QLabel(T("settings.naming.fields.separator")))
         self.sep_combo = QComboBox()
+        self.sep_combo.setStyleSheet(Theme.get_combobox_style())
         self.sep_combo.setFixedWidth(160)
         s_opts = [
             (T("settings.naming.separator_options.space"), "space"), 
@@ -65,11 +67,8 @@ class NamingTab(BaseSettingsTab):
 
         # --- Section: Movie Template ---
         layout.addWidget(self._create_section_header(T("settings.naming.sections.movie")))
-        self.movie_tpl = self._create_input_group(T("settings.naming.fields.movie_tpl"), self.engine.config.settings.movie_template, "{Title} ({Year})")
+        self.movie_tpl = self._create_input_group(T("settings.naming.fields.movie_tpl"), self.engine.config.settings.movie_template, "{Title} ({Year})", context="movie")
         layout.addLayout(self.movie_tpl['layout'])
-        
-        m_tags = ["Title", "Year", "Collection", "Resolution", "VideoCodec", "Part", "PartRaw", "HDR", "OriginalTitle", "IMDB_ID"]
-        layout.addLayout(self._create_tag_chips(m_tags, self.movie_tpl['edit']))
 
         layout.addSpacing(10)
         
@@ -83,7 +82,7 @@ class NamingTab(BaseSettingsTab):
         coll_header_layout.addStretch()
         layout.addLayout(coll_header_layout)
         
-        self.coll_tpl = self._create_input_group(T("settings.naming.fields.coll_tpl") or "Collection Folder Template", self.engine.config.settings.collection_folder_template, "{Collection}")
+        self.coll_tpl = self._create_input_group(T("settings.naming.fields.coll_tpl") or "Collection Folder Template", self.engine.config.settings.collection_folder_template, "{Collection}", context="movie")
         layout.addLayout(self.coll_tpl['layout'])
         self.coll_tpl['edit'].setEnabled(self.coll_folder_check.isChecked())
         self.coll_folder_check.toggled.connect(self.coll_tpl['edit'].setEnabled)
@@ -92,11 +91,8 @@ class NamingTab(BaseSettingsTab):
 
         # --- Section: Episode Template ---
         layout.addWidget(self._create_section_header(T("settings.naming.sections.episode")))
-        self.episode_tpl = self._create_input_group(T("settings.naming.fields.episode_tpl"), self.engine.config.settings.episode_template, "{ShowTitle} - {Season}{Episode} - {EpisodeTitle}")
+        self.episode_tpl = self._create_input_group(T("settings.naming.fields.episode_tpl"), self.engine.config.settings.episode_template, "{ShowTitle} - {Season}{Episode} - {EpisodeTitle}", context="tv")
         layout.addLayout(self.episode_tpl['layout'])
-        
-        e_tags = ["ShowTitle", "Season", "Episode", "Part", "Network", "EpisodeTitle", "Year", "Resolution", "VideoCodec"]
-        layout.addLayout(self._create_tag_chips(e_tags, self.episode_tpl['edit']))
 
         # --- Section: Multi-Part Formatting ---
         layout.addWidget(self._create_section_header(T("settings.naming.sections.multi_part") or "Multi-Part Formatting"))
@@ -106,6 +102,7 @@ class NamingTab(BaseSettingsTab):
         p_kw_group = QVBoxLayout()
         p_kw_group.addWidget(QLabel(T("settings.naming.fields.part_keyword") or "Keyword"))
         self.part_keyword_combo = QComboBox()
+        self.part_keyword_combo.setStyleSheet(Theme.get_combobox_style())
         self.part_keyword_combo.setFixedWidth(120)
         for kw in ["Part", "CD", "Disc", "Disk", "None"]:
             self.part_keyword_combo.addItem(kw, kw)
@@ -118,6 +115,7 @@ class NamingTab(BaseSettingsTab):
         p_st_group = QVBoxLayout()
         p_st_group.addWidget(QLabel(T("settings.naming.fields.part_style") or "Numbering Style"))
         self.part_style_combo = QComboBox()
+        self.part_style_combo.setStyleSheet(Theme.get_combobox_style())
         self.part_style_combo.setFixedWidth(160)
         st_opts = [
             ("1, 2, 3...", "number"),
@@ -136,6 +134,7 @@ class NamingTab(BaseSettingsTab):
         p_sep_group = QVBoxLayout()
         p_sep_group.addWidget(QLabel(T("settings.naming.fields.part_separator") or "Inner Separator"))
         self.part_sep_combo = QComboBox()
+        self.part_sep_combo.setStyleSheet(Theme.get_combobox_style())
         self.part_sep_combo.setFixedWidth(140)
         sep_opts = [
             (T("settings.naming.separator_options.space"), "space"),

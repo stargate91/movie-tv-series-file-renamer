@@ -3,7 +3,7 @@ import logging
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLineEdit, QApplication,
                              QLabel, QFrame, QPushButton, QProgressBar, QMessageBox, QTabWidget, QFileDialog, QMenu)
 from PySide6.QtGui import QPixmap
-from PySide6.QtCore import Qt, Signal, QTimer
+from PySide6.QtCore import Qt, Signal, QTimer, QSize
 
 from ui.v3.styles.theme import Theme
 from ui.v3.components.discovery_table import DiscoveryTable
@@ -81,11 +81,12 @@ class DiscoveryPage(QWidget):
         self.dropped_view = DroppedView(self.engine)
         self.trash_view = TrashView(self.engine)
 
-        self.main_tabs.addTab(self.review_view, T("discovery.tabs.library"))
-        self.main_tabs.addTab(self.conflicts_view, T("discovery.tabs.conflicts"))
-        self.main_tabs.addTab(self.extras_view, T("discovery.tabs.extras"))
-        self.main_tabs.addTab(self.dropped_view, T("discovery.tabs.dropped"))
-        self.main_tabs.addTab(self.trash_view, T("discovery.tabs.trash"))
+        self.main_tabs.setIconSize(QSize(16, 16))
+        self.main_tabs.addTab(self.review_view, Theme.get_icon("search", size=16, color=Theme.TEXT_MUTED), T("discovery.tabs.library"))
+        self.main_tabs.addTab(self.conflicts_view, Theme.get_icon("alert-triangle", size=16, color=Theme.TEXT_MUTED), T("discovery.tabs.conflicts"))
+        self.main_tabs.addTab(self.extras_view, Theme.get_icon("paperclip", size=16, color=Theme.TEXT_MUTED), T("discovery.tabs.extras"))
+        self.main_tabs.addTab(self.dropped_view, Theme.get_icon("package", size=16, color=Theme.TEXT_MUTED), T("discovery.tabs.dropped"))
+        self.main_tabs.addTab(self.trash_view, Theme.get_icon("trash-2", size=16, color=Theme.TEXT_MUTED), T("discovery.tabs.trash"))
 
         # Connect internal signals
         self.dropped_view.refresh_requested.connect(self.refresh_data)

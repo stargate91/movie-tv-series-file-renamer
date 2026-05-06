@@ -1,7 +1,7 @@
 import logging
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
                              QPushButton, QScrollArea, QListWidget, QListWidgetItem, QStackedWidget)
-from PySide6.QtCore import Qt, QThread, Signal
+from PySide6.QtCore import Qt, QThread, Signal, QSize
 from ui.v3.styles.theme import Theme
 from core.i18n import T
 
@@ -54,16 +54,17 @@ class SettingsPage(QWidget):
         self.nav_list.setStyleSheet(Theme.get_settings_nav_list_style())
         
         items = [
-            (T("settings.tabs.general"), 0),
-            (T("settings.tabs.naming"), 1),
-            (T("settings.tabs.folders"), 2),
-            (T("settings.tabs.extras"), 3),
-            (T("settings.tabs.api"), 4),
-            (T("settings.tabs.advanced"), 5)
+            (T("settings.tabs.general"), 0, "sliders"),
+            (T("settings.tabs.naming"), 1, "type"),
+            (T("settings.tabs.folders"), 2, "folder"),
+            (T("settings.tabs.extras"), 3, "puzzle"),
+            (T("settings.tabs.api"), 4, "key"),
+            (T("settings.tabs.advanced"), 5, "shield-alert")
         ]
         
-        for label, idx in items:
-            item = QListWidgetItem(label)
+        self.nav_list.setIconSize(QSize(18, 18))
+        for label, idx, icon_name in items:
+            item = QListWidgetItem(Theme.get_icon(icon_name, size=18, color=Theme.TEXT_MUTED), label)
             self.nav_list.addItem(item)
             
         sidebar_layout.addWidget(self.nav_list)

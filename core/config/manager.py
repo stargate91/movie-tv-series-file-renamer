@@ -34,6 +34,9 @@ class AppSettings:
 
     # General behaviour
     vid_size: int = 500  # minimum MB
+    
+    # Global Toggle
+    enable_extras: bool = True
 
     # Extras handling (skip, delete, rename)
     action_extra_video: str = "rename"     # Small videos (trailers, samples)
@@ -42,10 +45,10 @@ class AppSettings:
     action_extra_image: str = "rename"     # Posters, fanart
     action_extra_metadata: str = "rename"  # NFO, XML
     
-    template_extra_video: str = "{ParentName}-trailer"
-    template_extra_subtitle: str = "{ParentName}.{Language}"
-    template_extra_audio: str = "{ParentName}.{Language}"
-    template_extra_image: str = "poster"
+    template_extra_video: str = "{ParentName} - {ExtraCategory}"
+    template_extra_subtitle: str = "{ParentName}.{Language}.{ExtraCategory}"
+    template_extra_audio: str = "{ParentName}.{Language}.{ExtraCategory}"
+    template_extra_image: str = "{ExtraCategory}"
     template_extra_metadata: str = "{ParentName}"
 
     # Sample detection

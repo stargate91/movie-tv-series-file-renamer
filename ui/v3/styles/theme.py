@@ -9,6 +9,7 @@ from .components.tables import TableStyles
 from .components.dialogs import DialogStyles
 from .components.lists import ListStyles
 from .components.progress import ProgressStyles
+from .icons import IconManager
 
 class Theme(
     Palette, 
@@ -21,7 +22,8 @@ class Theme(
     TableStyles, 
     DialogStyles, 
     ListStyles, 
-    ProgressStyles
+    ProgressStyles,
+    IconManager
 ):
     """
     Unified Theme engine for Renda V3.

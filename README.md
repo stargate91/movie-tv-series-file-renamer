@@ -1,50 +1,39 @@
-# Media File Renamer
+# RENDA - Smart Media Organizer
 
-This is a program I made to rename movie and TV show files. It uses PySide6 for the interface and gets data from TMDb and OMDb APIs.
+Hi, this is a python project I made to rename and organize my movies and TV shows. I had a lot of messy folders and I wanted to learn PySide6, so I built this.
 
 ## What it does
-- You can drag and drop folders or files into the window.
-- It scans the files and tries to find out what movie or show they are.
-- It shows a list of files with their current names and the new names.
-- If it's not sure, you can manually select the correct movie or show from a list.
-- It supports batch renaming for multiple files at once.
-- There is a settings menu to put your API keys and change how the files are named.
 
-## How to use it
-1. Install the requirements using pip.
-2. Get your API keys from TMDb and OMDb.
-3. Run main.py.
-4. Select a folder or drag files in.
-5. Click "Download Metadata" to get the information.
-6. Check if the names are correct and then rename them.
+Basically, it scans your folders and looks for video files. Then it tries to guess what movie or TV show it is, and uses the TMDB API to get the correct titles, seasons, and episodes. 
 
-## Requirements
-- Python 3.x
-- PySide6
-- requests
-- python-dotenv
-- guessit
-- ffmpeg (for some metadata)
+- It can sort files into separate folders for movies and TV shows.
+- It finds "extras" like trailers or subtitles and keeps them with the main video.
+- You can create your own naming templates using variables like {Title} or {Resolution}.
+- If it guesses wrong, you can use the Manual Resolve window to search TMDB yourself.
+- It saves everything into a local sqlite database so it's faster the second time.
 
-## Project Structure
-- main.py: This is where the program starts.
-- ui/: Contains all the code for the windows and buttons.
-- core/: Contains the main logic and settings management.
-- metadata/: Code for finding files and handling information.
-- utils/: Helper scripts like the API client.
-- data/: Where the .env file with API keys goes.
+## How to install
 
-## Installation
-First, clone the project. Then install everything:
-```bash
-pip install -r requirements.txt
-```
-Make sure you have a .env file in the data folder with these:
-- TMDB_API_KEY
-- OMDB_API_KEY
-- TMDB_BEARER_TOKEN
+I made a requirements file, so you can just install the packages. I use python 3.11 but it probably works on newer versions too.
 
-## To Do
-- Better error handling for when the internet is down.
-- Add support for more video formats.
-- Make the undo function work better.
+1. Clone or download this code.
+2. Open terminal and run: pip install -r requirements.txt
+3. Run python main.py to start the app.
+
+Note: You will need to go into the Settings tab inside the app to put your TMDB and OMDB api keys. It won't download metadata without them!
+
+## Structure
+
+I tried to organize the code so it's not all in one file. 
+- main.py is the entry point.
+- core/ has the backend logic, like the database code and the file scanner.
+- ui/v3/ has all the PySide6 widgets and views. I rewrote the UI a few times, so this is version 3.
+- api/ is where the requests to TMDB and OMDB happen.
+
+## Things I want to fix later
+
+- Sometimes the regex for finding season numbers fails if the file is named really weirdly.
+- I want to add more tests because sometimes I break things when I change the UI.
+- Make the scanning even faster.
+
+Thanks for checking out my code.

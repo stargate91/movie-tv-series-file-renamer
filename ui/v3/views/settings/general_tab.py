@@ -30,6 +30,7 @@ class GeneralTab(BaseSettingsTab):
         app_lang_layout = QVBoxLayout()
         app_lang_layout.addWidget(QLabel(T("settings.general.fields.app_lang")))
         self.app_lang_combo = QComboBox()
+        self.app_lang_combo.setStyleSheet(Theme.get_combobox_style())
         self.app_lang_combo.setFixedWidth(200)
         self.app_lang_combo.addItem(T("common.languages.en"), "en")
         
@@ -51,6 +52,7 @@ class GeneralTab(BaseSettingsTab):
         l1_group = QVBoxLayout()
         l1_group.addWidget(QLabel(T("settings.general.fields.primary_lang")))
         self.lang_combo = QComboBox()
+        self.lang_combo.setStyleSheet(Theme.get_combobox_style())
         self.lang_combo.setFixedWidth(200)
         langs = [
             (T("common.languages.hu"), "hu-HU"), 
@@ -72,6 +74,7 @@ class GeneralTab(BaseSettingsTab):
         l2_group = QVBoxLayout()
         l2_group.addWidget(QLabel(T("settings.general.fields.fallback_lang")))
         self.fallback_combo = QComboBox()
+        self.fallback_combo.setStyleSheet(Theme.get_combobox_style())
         self.fallback_combo.setFixedWidth(200)
         self.fallback_combo.addItem(T("settings.general.fields.none_fallback"), "")
         for name, code in langs:

@@ -131,7 +131,6 @@ class EditFileDialog(QDialog):
         self.details_card.layout().addWidget(self.movie_group)
         self.details_card.layout().addWidget(self.lang_group)
         self.details_card.layout().addWidget(self.metadata_lang_group)
-        self.details_card.layout().addWidget(self.link_group)
         layout.addWidget(self.details_card)
 
         layout.addStretch()

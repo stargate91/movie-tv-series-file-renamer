@@ -1,5 +1,5 @@
 from PySide6.QtWidgets import QFrame, QVBoxLayout, QPushButton, QLabel
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, Signal, QSize
 from ui.v3.styles.theme import Theme
 from core.i18n import T
 
@@ -14,7 +14,7 @@ class Sidebar(QFrame):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("Sidebar")
-        self.setFixedWidth(220)
+        self.setFixedWidth(250)
         self._init_ui()
 
     def _init_ui(self):
@@ -37,10 +37,10 @@ class Sidebar(QFrame):
         layout.addSpacing(20)
 
         # 2. Navigation Area (Top)
-        self.btn_dash = self._create_nav_btn(T("sidebar.dashboard"), 0, True)
-        self.btn_lib = self._create_nav_btn(T("sidebar.library"), 1)
-        self.btn_hist = self._create_nav_btn(T("sidebar.history"), 3)
-        self.btn_sett = self._create_nav_btn(T("sidebar.settings"), 4)
+        self.btn_dash = self._create_nav_btn(T("sidebar.dashboard"), 0, "home", True)
+        self.btn_lib = self._create_nav_btn(T("sidebar.library"), 1, "folder")
+        self.btn_hist = self._create_nav_btn(T("sidebar.history"), 3, "history")
+        self.btn_sett = self._create_nav_btn(T("sidebar.settings"), 4, "settings")
         
         layout.addWidget(self.btn_dash)
         layout.addWidget(self.btn_lib)
@@ -48,7 +48,9 @@ class Sidebar(QFrame):
         layout.addWidget(self.btn_sett)
         
         # 3. Support Button (Part of Navigation)
-        self.btn_support = QPushButton(T("sidebar.support"))
+        self.btn_support = QPushButton(f"  {T('sidebar.support')}")
+        self.btn_support.setIcon(Theme.get_icon("coffee", size=18, color="#000000"))
+        self.btn_support.setIconSize(QSize(18, 18))
         self.btn_support.setStyleSheet(Theme.get_support_button_style())
         self.btn_support.setFixedHeight(45)
         self.btn_support.setCursor(Qt.PointingHandCursor)
@@ -58,13 +60,17 @@ class Sidebar(QFrame):
         layout.addStretch()
 
         # 4. System Actions (Bottom)
-        self.btn_restart = QPushButton(T('sidebar.restart'))
+        self.btn_restart = QPushButton(f"  {T('sidebar.restart')}")
+        self.btn_restart.setIcon(Theme.get_icon("refresh", size=16, color=Theme.TEXT_MUTED))
+        self.btn_restart.setIconSize(QSize(16, 16))
         self.btn_restart.setObjectName("SecondaryButton")
         self.btn_restart.setFixedHeight(45)
         self.btn_restart.setCursor(Qt.PointingHandCursor)
         self.btn_restart.clicked.connect(self.restart_requested.emit)
         
-        self.btn_quit = QPushButton(T('common.quit'))
+        self.btn_quit = QPushButton(f"  {T('common.quit')}")
+        self.btn_quit.setIcon(Theme.get_icon("logout", size=16, color=Theme.TEXT_MUTED))
+        self.btn_quit.setIconSize(QSize(16, 16))
         self.btn_quit.setObjectName("SecondaryButton") # Reuse styling
         self.btn_quit.setFixedHeight(45)
         self.btn_quit.setCursor(Qt.PointingHandCursor)
@@ -73,8 +79,10 @@ class Sidebar(QFrame):
         layout.addWidget(self.btn_restart)
         layout.addWidget(self.btn_quit)
 
-    def _create_nav_btn(self, text, index, active=False):
-        btn = QPushButton(text)
+    def _create_nav_btn(self, text, index, icon_name, active=False):
+        btn = QPushButton(f"  {text}")
+        btn.setIcon(Theme.get_icon(icon_name, size=18, color=Theme.TEXT_MUTED))
+        btn.setIconSize(QSize(18, 18))
         btn.setObjectName("NavButton")
         btn.setCheckable(True)
         btn.setAutoExclusive(True)

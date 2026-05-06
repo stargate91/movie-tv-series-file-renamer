@@ -21,7 +21,14 @@ class FileFilter:
         size_mb = os.path.getsize(path) / (1024 * 1024)
         
         if ext in self.video_exts:
-            return 'video' if size_mb >= self.s.vid_size else 'extra'
+            if size_mb >= self.s.vid_size:
+                return 'video'
+            else:
+                return 'extra' if self.s.enable_extras else 'unknown'
+                
+        if not self.s.enable_extras:
+            return 'unknown'
+            
         if ext in self.sub_exts: return 'subtitle'
         if ext in self.audio_exts: return 'audio'
         if ext in self.img_exts: return 'image'

@@ -1,6 +1,7 @@
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QFileDialog
 from PySide6.QtCore import Qt
 from ui.v3.styles.theme import Theme
+from ui.v3.components.template_input import TemplateLineEdit
 
 class BaseSettingsTab(QWidget):
     """
@@ -15,13 +16,17 @@ class BaseSettingsTab(QWidget):
         lbl.setStyleSheet(Theme.get_section_header_style())
         return lbl
 
-    def _create_input_group(self, label_text, value, placeholder=""):
+    def _create_input_group(self, label_text, value, placeholder="", context=None):
         group = QVBoxLayout()
         lbl = QLabel(label_text)
         lbl.setStyleSheet(Theme.get_input_label_style())
         group.addWidget(lbl)
         
-        edit = QLineEdit()
+        if context:
+            edit = TemplateLineEdit(context=context)
+        else:
+            edit = QLineEdit()
+            
         edit.setText(value)
         edit.setPlaceholderText(placeholder)
         edit.setFixedHeight(40)
@@ -43,7 +48,7 @@ class BaseSettingsTab(QWidget):
         edit.setStyleSheet(Theme.get_settings_input_style())
         
         btn = QPushButton("Browse")
-        btn.setObjectName("SecondaryButton")
+        btn.setStyleSheet(Theme.get_secondary_button_style())
         btn.setFixedSize(80, 40)
         btn.clicked.connect(lambda: browse_callback(category, edit))
         

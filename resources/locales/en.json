@@ -9,7 +9,7 @@
         "history": "History",
         "settings": "Settings",
         "restart": "Restart App",
-        "support": "☕ Buy me a Coffee"
+        "support": "Buy me a Coffee"
     },
     "greeting": {
         "morning": "Good morning",
@@ -22,13 +22,14 @@
         "subtitle": "Ready to organize your library?",
         "scan": {
             "title": "Scan Directory",
-            "desc": "Import new media files and identify them automatically."
+            "desc": "Import new media files and identify them automatically.",
+            "button_text": "Scan Directory"
         },
         "stats": {
             "movies": "Movies",
             "episodes": "Episodes",
             "total_size": "Total Size",
-            "overview_title": "Library Overview",
+            "overview_title": "Workspace Overview",
             "movies_indexed": "• {count} Movies indexed",
             "series_indexed": "• {count} TV Series indexed"
         }
@@ -37,11 +38,11 @@
         "title": "Renaming Workspace",
         "search_placeholder": "Find a file by name...",
         "tabs": {
-            "library": "🔍 Review Center",
-            "conflicts": "⚔️ Name Clashes",
-            "extras": "📎 Attached Files",
-            "dropped": "📦 Just Ingested",
-            "trash": "🗑️ Trash"
+            "library": "Review Center",
+            "conflicts": "Name Clashes",
+            "extras": "Attached Files",
+            "dropped": "Just Ingested",
+            "trash": "Trash"
         },
         "table": {
             "status": "STATUS",
@@ -321,12 +322,12 @@
     "settings": {
         "title": "Settings",
         "tabs": {
-            "general": "⚙️ General",
-            "naming": "🏷️ Naming",
-            "folders": "📁 Folders",
-            "extras": "📎 Extras",
-            "api": "🔑 API Keys",
-            "advanced": "🛠️ Advanced"
+            "general": "General",
+            "naming": "Naming",
+            "folders": "Folders",
+            "extras": "Extras",
+            "api": "API Keys",
+            "advanced": "Advanced"
         },
         "save_btn": "Save All Changes",
         "saving": "Saving...",
@@ -356,6 +357,8 @@
                 "styling": "GLOBAL FILENAME STYLING",
                 "movie": "MOVIE NAMING TEMPLATE",
                 "episode": "TV EPISODE NAMING TEMPLATE",
+                "collection": "MOVIE COLLECTION FOLDERS",
+                "multi_part": "MULTI-PART FORMATTING",
                 "custom": "CUSTOM GLOBAL VARIABLE"
             },
             "fields": {
@@ -363,6 +366,11 @@
                 "separator": "Word Separator",
                 "movie_tpl": "Movie Template",
                 "episode_tpl": "Episode Template",
+                "coll_tpl": "Collection Folder Template",
+                "enable_coll_folder": "Enable Collection Folders",
+                "part_keyword": "Part Keyword",
+                "part_style": "Numbering Style",
+                "part_separator": "Inner Separator",
                 "custom_val": "Custom Tag Value ({Custom})",
                 "custom_placeholder": "e.g. GroupName"
             },
@@ -405,7 +413,9 @@
             "header": "API Configuration",
             "sections": {
                 "tmdb": "TMDB (THE MOVIE DATABASE)",
-                "omdb": "OMDB (FOR IMDB RATINGS)"
+                "omdb": "OMDB (FOR IMDB RATINGS)",
+                "welcome": "Connect your library to the world's largest media databases for automatic posters, ratings, and details.",
+                "privacy_note": "<b>Your Privacy Matters:</b> These keys are stored safely on your computer only. We never see, collect, or share your private API information."
             },
             "fields": {
                 "tmdb_v3": "TMDB API Key (v3)",
@@ -413,7 +423,9 @@
                 "tmdb_v4": "TMDB Bearer Token (v4)",
                 "tmdb_v4_placeholder": "Paste your Read Access Token",
                 "omdb_key": "OMDB API Key",
-                "omdb_key_placeholder": "Enter your OMDB key"
+                "omdb_key_placeholder": "Enter your OMDB key",
+                "tmdb_guide": "<b>How to get your TMDB Key:</b><br>1. Create an account at <a href='https://www.themoviedb.org/signup' style='color: #3b82f6;'>themoviedb.org</a><br>2. Go to <b>Settings > API</b> from your profile<br>3. Click <b>Create</b> and select 'Developer'<br>4. Copy the 'API Key (v3)' or 'Read Access Token' here.",
+                "omdb_guide": "<b>How to get your OMDb Key (for IMDb ratings):</b><br>1. Go to <a href='http://www.omdbapi.com/apikey.aspx' style='color: #3b82f6;'>omdbapi.com/apikey.aspx</a><br>2. Choose 'FREE' and enter your email<br>3. Check your inbox and click the activation link<br>4. Copy the key from the email here."
             }
         },
         "advanced": {
@@ -525,7 +537,9 @@
         "types": {
             "both": "Both (Movie/TV)",
             "movie": "Movie",
+            "movies": "Movies",
             "tv": "TV Show",
+            "tv_shows": "TV Shows",
             "video": "Video",
             "bonus": "Bonus Video",
             "season": "Season",

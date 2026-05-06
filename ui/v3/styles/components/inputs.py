@@ -48,3 +48,41 @@ class InputStyles:
             }}
             QSpinBox:focus {{ border-color: {Palette.PRIMARY}; }}
         """
+
+    @staticmethod
+    def get_combobox_style():
+        return f"""
+            QComboBox {{
+                background-color: {Palette.SURFACE_DARK};
+                border: 1px solid {Palette.BORDER};
+                border-radius: 6px;
+                padding: 5px 10px;
+                color: {Palette.TEXT_MAIN};
+                font-size: 13px;
+                min-height: 20px;
+            }}
+            QComboBox:hover {{
+                border-color: {Palette.PRIMARY};
+                background-color: {Palette.SURFACE_LIGHT};
+            }}
+            QComboBox::drop-down {{
+                border: none;
+                width: 20px;
+            }}
+            QComboBox::down-arrow {{
+                image: none;
+                border-left: 5px solid transparent;
+                border-right: 5px solid transparent;
+                border-top: 5px solid {Palette.TEXT_MUTED};
+                width: 0;
+                height: 0;
+                margin-right: 8px;
+            }}
+            QComboBox QAbstractItemView {{
+                background-color: {Palette.BACKGROUND};
+                border: 1px solid {Palette.BORDER};
+                selection-background-color: {Palette.PRIMARY};
+                selection-color: white;
+                outline: none;
+            }}
+        """
