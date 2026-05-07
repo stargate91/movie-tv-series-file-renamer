@@ -32,6 +32,11 @@ class MediaRepository(BaseRepository):
             row = conn.execute("SELECT * FROM media_items WHERE tmdb_id = ?", (tmdb_id,)).fetchone()
             return dict(row) if row else None
 
+    def get_all_media_items(self):
+        with self._get_connection() as conn:
+            rows = conn.execute("SELECT * FROM media_items").fetchall()
+            return [dict(row) for row in rows]
+
     def get_count(self, media_type=None):
         query = "SELECT COUNT(*) FROM media_items"
         params = []

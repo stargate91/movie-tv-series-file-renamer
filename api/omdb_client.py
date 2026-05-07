@@ -12,9 +12,21 @@ class OMDBClient(BaseClient, BaseMediaProvider):
 
     def get_by_imdb_id(self, imdb_id):
         if not imdb_id: return None
+        key = self.api_key
+        if not key or "your_omdb_key" in key:
+            return None
+            
         cache_key = f"imdb-{imdb_id}"
-        api_url = f"https://www.omdbapi.com/?i={imdb_id}&apikey={self.api_key}"
-        return self._get_from_api(api_url, cache_key)
+        api_url = f"https://www.omdbapi.com/?i={imdb_id}&apikey={key}"
+        raw = self._get_from_api(api_url, cache_key)
+        
+        if raw and raw.get("Response") == "False":
+            error_msg = raw.get("Error", "")
+            if "limit reached" in error_msg.lower():
+                from core.exceptions import APILimitReachedError
+                raise APILimitReachedError("OMDb API daily limit reached (1000 requests). Try again tomorrow or use a different key.")
+        
+        return raw
 
     # --- BaseMediaProvider Implementation ---
     def search(self, query: str, year: Optional[str] = None, media_type: str = "movie", language: str = "en-US") -> List[ProviderResult]:

@@ -63,7 +63,8 @@
             "restore": "Put back to Review",
             "ignore": "Move to Trash",
             "open_folder": "Show in Folder",
-            "clear_match": "Reset Identification"
+            "clear_match": "Reset Identification",
+            "fetch": "Fetch Missing"
         },
         "dropped": {
             "import_all": "Move All to Review",
@@ -106,7 +107,11 @@
             "omdb_auth_error": "OMDb API Key failed! IMDb ratings and Rotten Tomatoes data are currently unavailable. Check your settings.",
             "ingesting": "Ingesting: {filename}",
             "moving": "Moving: {filename}",
-            "restoring": "Restoring: {filename}"
+            "restoring": "Restoring: {filename}",
+            "api_limit_reached": "OMDb API limit reached (1000/day)! Some ratings or metadata details might be missing for the remaining files.",
+            "language_changed": "Language changed to {lang}. Fetch new metadata?",
+            "fetch_complete": "Language fetching complete.",
+            "up_to_date": "Language metadata is already up to date."
         },
         "extras": {
             "tabs": {
@@ -233,7 +238,8 @@
         "batch": {
             "clear": "Clear Metadata",
             "ignore": "Ignore Selection",
-            "identify": "Batch Identify"
+            "identify": "Batch Identify",
+            "fetch_language": "Fetch Missing Language"
         },
         "inspector": {
             "check_data": "Check Full Data",
@@ -531,29 +537,6 @@
         "parent_select": "--- Select Parent ---",
         "save_btn": "Save Changes"
     },
-    "manual_resolve": {
-        "title": "Manual Resolve: {filename}",
-        "back": "Back",
-        "search_results": "Search Results",
-        "link_multiple": "Link Multiple Items",
-        "search_placeholder": "Search title... (e.g. 'The Matrix')",
-        "search_btn": "Search",
-        "any_year": "Any Year",
-        "year_label": "Year:",
-        "match_btn": "Match This Item",
-        "add_basket": "+ Add to Basket",
-        "no_selection": "No Selection",
-        "select_result": "Select a result",
-        "no_poster": "No Poster",
-        "searching": "Searching API...",
-        "browsing": "Browsing...",
-        "candidates_found": "Found {count} Candidates",
-        "no_matches": "No matches found.",
-        "basket": "Basket",
-        "clear": "Clear",
-        "confirm_all": "Confirm & Link All",
-        "type_label": "Type: {type}"
-    },
     "preview": {
         "title": "Review Renaming Plan",
         "header": "Rename Preview ({count} items)",
@@ -595,6 +578,7 @@
         },
         "episodes": "{count} episodes",
         "languages": {
+            "default": "Default (Global)",
             "en": "English",
             "de": "German",
             "fr": "French",

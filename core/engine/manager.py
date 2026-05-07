@@ -30,6 +30,30 @@ class RenamerEngineV3:
         self.collision_resolver = CollisionResolver(self.config.settings)
         self.executor = Executor(self.db, self.formatter, self.collision_resolver, self.config.settings)
 
+    def wipe_discovery_data(self):
+        """Clears all discovery data from DB and resets in-memory caches."""
+        self.db.wipe_discovery_data()
+        if hasattr(self.resolver, 'library'):
+            self.resolver.library._enriched_ids.clear()
+            self.resolver.library._omdb_auth_failed = False
+            self.resolver.library._omdb_limit_reached = False
+
+    def refresh_settings(self):
+        """Resets engine state to pick up new settings (like API keys)."""
+        from api.base_client import BaseClient
+        BaseClient.reset_session()
+        
+        if hasattr(self.resolver, 'library'):
+            self.resolver.library._omdb_auth_failed = False
+            self.resolver.library._omdb_limit_reached = False
+
+    @property
+    def has_omdb_limit_reached(self):
+        """Returns True if OMDb API limit was hit during this session."""
+        if hasattr(self.resolver, 'library'):
+            return self.resolver.library._omdb_limit_reached
+        return False
+
     def full_scan_and_resolve(self, path, cb=None):
         """
         Runs the complete discovery and identification pipeline.
@@ -90,9 +114,3 @@ class RenamerEngineV3:
         Returns recent rename history.
         """
         return self.db.history.get_recent(limit)
-
-    def wipe_discovery_data(self):
-        """Clears all discovery data from DB and resets in-memory caches."""
-        self.db.wipe_discovery_data()
-        if hasattr(self.resolver, 'library'):
-            self.resolver.library._enriched_ids.clear()

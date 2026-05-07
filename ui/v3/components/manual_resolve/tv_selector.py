@@ -32,10 +32,6 @@ class TVMetadataSelector(QWidget):
         tv_layout.addWidget(self.episode_spin)
 
         layout.addWidget(self.tv_container)
-        
-        # Initial visibility: Hide TV fields by default
-        self.tv_container.setVisible(False)
-        
         layout.addStretch()
 
     def _create_spin(self, min_v, max_v, special_text):

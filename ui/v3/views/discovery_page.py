@@ -65,7 +65,7 @@ class DiscoveryPage(QWidget):
 
         refresh_btn = QPushButton(T("discovery.actions.refresh"))
         refresh_btn.setIcon(Theme.get_icon("refresh", size=16, color=Theme.TEXT_MAIN))
-        refresh_btn.setFixedWidth(120)
+        refresh_btn.setFixedWidth(140)
         refresh_btn.setStyleSheet(Theme.get_secondary_button_style())
         refresh_btn.clicked.connect(self.refresh_data)
 
@@ -126,6 +126,7 @@ class DiscoveryPage(QWidget):
         # Notification & Overlays
         self.notif_bar = NotificationBar(self)
         self.notif_bar.undo_requested.connect(self._on_undo_requested)
+        self.notif_bar.action_requested.connect(self._on_custom_action_requested)
         self._init_drop_overlay()
 
     def _init_status_elements(self, layout):
@@ -219,6 +220,9 @@ class DiscoveryPage(QWidget):
         
         self.batch_menu = QMenu(self)
         self.batch_menu.setStyleSheet(Theme.get_context_menu_style())
+        
+        fetch_lang_act = self.batch_menu.addAction(Theme.get_icon("globe", size=16, color=Theme.TEXT_MAIN), T("discovery.batch.fetch_language") if "discovery.batch.fetch_language" != T("discovery.batch.fetch_language") else "Fetch Missing Language")
+        fetch_lang_act.triggered.connect(self._on_batch_fetch_languages)
         
         clear_act = self.batch_menu.addAction(Theme.get_icon("refresh", size=16, color=Theme.TEXT_MAIN), T("discovery.batch.clear"))
         clear_act.triggered.connect(self._on_batch_clear_requested)
@@ -320,8 +324,12 @@ class DiscoveryPage(QWidget):
         self._set_controls_enabled(True)
         
         # Check for OMDB failure
-        if getattr(self.engine.resolver.library, '_omdb_auth_failed', False):
-            self.notif_bar.show_message(T("discovery.messages.omdb_auth_error"))
+        lib = getattr(self.engine.resolver, 'library', None)
+        if lib:
+            if getattr(lib, '_omdb_auth_failed', False):
+                self.notif_bar.show_message(T("discovery.messages.omdb_auth_error"))
+            if getattr(lib, '_omdb_limit_reached', False):
+                QMessageBox.warning(self, T("common.warning"), T("discovery.messages.api_limit_reached"))
             
         self.refresh_data()
 
@@ -742,6 +750,49 @@ class DiscoveryPage(QWidget):
             for fid in ids:
                 self.engine.db.matches.clear_all_for_file(fid)
             self.refresh_data()
+
+    def _on_batch_fetch_languages(self):
+        table = self._get_active_table()
+        if not table: return
+        ids = table.get_selected_ids()
+        if not ids: return
+        self._start_language_fetch(ids)
+
+    def notify_language_changed(self, new_lang):
+        """Triggered from MainWindow when settings change the language."""
+        msg = T("discovery.messages.language_changed", lang=new_lang) if "discovery.messages.language_changed" != T("discovery.messages.language_changed") else f"Language changed to {new_lang}. Fetch new metadata?"
+        self.notif_bar.show_custom_action(msg, T("discovery.actions.fetch") if "discovery.actions.fetch" != T("discovery.actions.fetch") else "Fetch", payload="smart_fetch")
+
+    def _on_custom_action_requested(self, payload):
+        if payload == "smart_fetch":
+            self._start_language_fetch(None)
+
+    def _start_language_fetch(self, item_ids=None):
+        from ui.v3.workers.discovery_workers import LanguageFetchWorker
+        self._set_controls_enabled(False)
+        self.progress_container.show()
+        self.progress_bar.show()
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(0)
+        self.status_info.show()
+        self.status_info.setText("Fetching missing metadata languages...")
+        
+        self.worker = LanguageFetchWorker(self.engine, item_ids)
+        self.active_workers.append(self.worker)
+        self.worker.progress.connect(self._on_worker_progress)
+        self.worker.finished.connect(self._on_fetch_languages_finished)
+        self.worker.start()
+
+    def _on_worker_progress(self, val, text):
+        self.progress_bar.setValue(val)
+        self.status_info.setText(text)
+
+    def _on_fetch_languages_finished(self):
+        self.progress_bar.hide()
+        self.status_info.hide()
+        self._set_controls_enabled(True)
+        self.refresh_data()
+        self.notif_bar.show_message("Language fetching complete.", duration=3000)
 
     def dragEnterEvent(self, event):
         if event.mimeData().hasUrls():

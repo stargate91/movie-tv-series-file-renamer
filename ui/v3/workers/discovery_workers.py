@@ -221,3 +221,71 @@ class SyncWorker(QThread):
         except Exception as e:
             logger.error(f"SyncWorker Error: {e}")
             self.finished.emit()
+
+class LanguageFetchWorker(QThread):
+    """Fetches missing metadata languages for specific items in the background."""
+    progress = Signal(int, str)
+    finished = Signal()
+
+    def __init__(self, engine, item_ids=None):
+        super().__init__()
+        self.engine = engine
+        self.item_ids = item_ids
+        self._is_cancelled = False
+
+    def stop(self):
+        self._is_cancelled = True
+
+    def run(self):
+        try:
+            target_lang = self.engine.config.settings.metadata_language
+            
+            if self.item_ids:
+                media_items_to_check = []
+                for fid in self.item_ids:
+                    links = self.engine.db.media.get_links_for_file(fid)
+                    for link in links:
+                        media_items_to_check.append(link['media_item_id'])
+                # Deduplicate
+                media_items_to_check = list(set(media_items_to_check))
+                
+                # Fetch full media item details
+                media_items = []
+                for m_id in media_items_to_check:
+                    m = self.engine.db.media.get_media_item_by_id(m_id)
+                    if m: media_items.append(m)
+            else:
+                media_items = self.engine.db.media.get_all_media_items()
+            
+            # Filter those that don't have the current target language
+            to_fetch = []
+            for item in media_items:
+                fetched_langs = item.get('fetched_languages', '')
+                fetched_list = [l.strip() for l in fetched_langs.split(',') if l.strip()]
+                if target_lang not in fetched_list:
+                    to_fetch.append(item)
+                    
+            total = len(to_fetch)
+            if total == 0:
+                self.progress.emit(100, T("discovery.messages.up_to_date") if T("discovery.messages.up_to_date") != "discovery.messages.up_to_date" else "Language metadata is already up to date.")
+                self.finished.emit()
+                return
+                
+            for i, item in enumerate(to_fetch):
+                if self._is_cancelled: break
+                
+                # Update progress
+                title = item.get('title', 'Unknown')
+                self.progress.emit(int((i / total) * 100), f"Fetching {target_lang} for: {title}")
+                
+                # Trigger fetch via LibraryManager
+                tmdb_id = item.get('tmdb_id')
+                media_type = item.get('media_type')
+                if tmdb_id:
+                    self.engine.resolver.library.store_result({'tmdb_id': tmdb_id, 'media_type': media_type}, language_override=target_lang)
+                    
+            self.progress.emit(100, T("discovery.messages.fetch_complete") if T("discovery.messages.fetch_complete") != "discovery.messages.fetch_complete" else "Language fetching complete.")
+            self.finished.emit()
+        except Exception as e:
+            logger.error(f"LanguageFetchWorker Error: {e}")
+            self.finished.emit()

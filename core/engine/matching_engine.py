@@ -87,7 +87,7 @@ class MatchingEngine:
         year_str = str(year) if year else "unknown"
         
         try:
-            if search_type in ('movie', None):
+            if search_type in ('movie', 'both', None):
                 data = self.api.search_movie(title, year_str, language)
                 for r in data.get('results', [])[:20]:
                     results.append({
@@ -100,7 +100,7 @@ class MatchingEngine:
                         'details_json': json.dumps(r, ensure_ascii=False)
                     })
             
-            if search_type in ('episode', 'tv', None):
+            if search_type in ('episode', 'tv', 'both', None):
                 data = self.api.search_tv(title, year_str, language)
                 for r in data.get('results', [])[:20]:
                     results.append({

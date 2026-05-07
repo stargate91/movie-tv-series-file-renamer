@@ -89,9 +89,9 @@ class CommonStyles:
         }}
         
         QPushButton#SecondaryButton:hover {{
-            background-color: {Palette.PRIMARY};
+            background-color: {Palette.SURFACE_LIGHTER};
             border-color: {Palette.PRIMARY};
-            color: white;
+            color: {Palette.TEXT_MAIN};
         }}
         
         /* Input Fields */

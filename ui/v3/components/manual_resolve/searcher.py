@@ -39,27 +39,28 @@ class SearchWorker(QThread):
                 results = self.engine.resolver.matcher.search_api(clean_query, self.year, self.search_type)
                 
                 # Auto-drill into TV episodes if hints found
-                if self.search_type == "tv" and results and (s_num is not None or e_num is not None):
-                    best_show = results[0]
-                    if s_num is not None:
-                        eps_data = self.engine.resolver.matcher.api.get_from_tmdb_season(best_show['tmdb_id'], s_num, language=lang)
-                        ep_results = []
-                        for ep in eps_data.get('episodes', []):
-                            if e_num is not None and ep['episode_number'] != e_num:
-                                continue
-                                
-                            ep_results.append({
-                                'tmdb_id': ep['id'],
-                                'title': f"S{str(s_num).zfill(2)}E{str(ep['episode_number']).zfill(2)} - {ep['name']}",
-                                'media_type': 'episode',
-                                'show_id': best_show['tmdb_id'],
-                                'season_number': s_num,
-                                'episode_number': ep['episode_number'],
-                                'poster_path': ep.get('still_path') or best_show.get('poster_path'),
-                                'overview': ep.get('overview')
-                            })
-                        self.results_found.emit(ep_results, "episodes")
-                        return
+                if self.search_type in ("tv", "both") and results and (s_num is not None or e_num is not None):
+                    best_show = next((r for r in results if r['media_type'] == 'tv'), None)
+                    if best_show:
+                        if s_num is not None:
+                            eps_data = self.engine.resolver.matcher.api.get_from_tmdb_season(best_show['tmdb_id'], s_num, language=lang)
+                            ep_results = []
+                            for ep in eps_data.get('episodes', []):
+                                if e_num is not None and ep['episode_number'] != e_num:
+                                    continue
+                                    
+                                ep_results.append({
+                                    'tmdb_id': ep['id'],
+                                    'title': f"S{str(s_num).zfill(2)}E{str(ep['episode_number']).zfill(2)} - {ep['name']}",
+                                    'media_type': 'episode',
+                                    'show_id': best_show['tmdb_id'],
+                                    'season_number': s_num,
+                                    'episode_number': ep['episode_number'],
+                                    'poster_path': ep.get('still_path') or best_show.get('poster_path'),
+                                    'overview': ep.get('overview')
+                                })
+                            self.results_found.emit(ep_results, "episodes")
+                            return
 
                 self.results_found.emit(results, "search")
 

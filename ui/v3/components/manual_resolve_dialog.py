@@ -29,6 +29,7 @@ class ManualResolveDialog(QDialog):
         self.selected_media = None
         self.basket = []
         self.search_worker = None
+        self.poster_worker = None
         self.nav_stack = [] # History of (mode, parent_id, season_num, title)
         self.multi_match_mode = False
 
@@ -160,8 +161,8 @@ class ManualResolveDialog(QDialog):
 
 
     def _on_search_type_changed(self):
-        is_tv = self.search_type_combo.currentData() == "tv"
-        self.tv_selector.setVisible(is_tv)
+        mtype = self.search_type_combo.currentData()
+        self.tv_selector.setVisible(mtype in ("tv", "both"))
 
     def _prefill_from_data(self, data):
         self.search_input.setText(data.get('fn_title') or data.get('fd_title') or "")
@@ -170,7 +171,10 @@ class ManualResolveDialog(QDialog):
         mtype = data.get('fn_media_type') or data.get('fd_media_type') or 'movie'
         idx = self.search_type_combo.findData(mtype)
         if idx >= 0: self.search_type_combo.setCurrentIndex(idx)
-        self.tv_selector.setVisible(mtype == 'tv')
+        
+        # If no valid media type is found in combo, default to current combo value
+        current_mtype = self.search_type_combo.currentData()
+        self.tv_selector.setVisible(current_mtype in ("tv", "both"))
 
         self.tv_selector.set_values(
             data.get('fn_season') or data.get('fd_season') or 0,
@@ -188,9 +192,11 @@ class ManualResolveDialog(QDialog):
         query = self.search_input.text().strip()
         if not query and mode == "search": return
 
+        # Safely stop previous search worker
         if self.search_worker and self.search_worker.isRunning():
             self.search_worker.results_found.disconnect()
-            self.search_worker.terminate()
+            self.search_worker.stop()
+            self.search_worker.wait()
 
         self.results_list.clear()
         self.results_list.addItem(T("discovery.manual_resolve.searching"))
@@ -246,12 +252,15 @@ class ManualResolveDialog(QDialog):
         if not res: return
         self.selected_media = res
         self.action_btn.setEnabled(True)
-        self.preview_panel.update_info(res)
         
-        if res.get('poster_path'):
-            self._load_poster(res['poster_path'])
-        else:
-            self.preview_panel.set_poster(None)
+        try:
+            self.preview_panel.update_info(res)
+            if res.get('poster_path'):
+                self._load_poster(res['poster_path'])
+            else:
+                self.preview_panel.set_poster(None)
+        except Exception as e:
+            logger.error(f"Failed to update preview for {res}: {e}")
     def _on_item_double_clicked(self, item):
         res = item.data(Qt.UserRole)
         if not res: return
@@ -350,6 +359,13 @@ class ManualResolveDialog(QDialog):
         if os.path.exists(local_path):
             self._on_poster_loaded(QPixmap(local_path))
             return
+            
+        # Safely stop previous poster downloader
+        if hasattr(self, 'poster_worker') and self.poster_worker and self.poster_worker.isRunning():
+            self.poster_worker.finished.disconnect()
+            self.poster_worker.terminate()
+            self.poster_worker.wait()
+            self.poster_worker = None
 
         url = f"https://image.tmdb.org/t/p/w200{poster_path}"
         self.preview_panel.set_loading()

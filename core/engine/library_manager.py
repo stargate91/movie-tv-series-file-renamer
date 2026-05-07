@@ -27,6 +27,7 @@ class LibraryManager:
         )
         self._download_executor = concurrent.futures.ThreadPoolExecutor(max_workers=10)
         self._omdb_auth_failed = False 
+        self._omdb_limit_reached = False
         self._enriched_ids = set()
 
     @property
@@ -161,7 +162,7 @@ class LibraryManager:
         except Exception as e:
             logger.warning(f"TMDB enrichment failed for {media_type} {tmdb_id}: {e}")
 
-        if not self._omdb_auth_failed:
+        if not self._omdb_auth_failed and not self._omdb_limit_reached:
             try:
                 if imdb_id:
                     omdb_data = self.api.get_from_omdb_by_imdb_id(imdb_id)
@@ -180,6 +181,9 @@ class LibraryManager:
             except Exception as e:
                 if "401" in str(e) or "403" in str(e):
                     self._omdb_auth_failed = True
+                if "limit reached" in str(e).lower():
+                    self._omdb_limit_reached = True
+                    logger.error("OMDb API Limit Reached! Further enrichment will be skipped for this session.")
                 logger.warning(f"OMDB enrichment failed: {e}")
 
         if target_lang not in fetched_list:

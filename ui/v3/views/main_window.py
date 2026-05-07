@@ -33,6 +33,7 @@ class MainWindowV3(QMainWindow):
         self._apply_theme(self.engine.config.settings.ui_theme)
         
         self._init_ui()
+        self._last_lang = self.engine.config.settings.metadata_language
 
     def _init_ui(self):
         # Main container
@@ -86,7 +87,14 @@ class MainWindowV3(QMainWindow):
         new_theme = self.engine.config.settings.ui_theme
         self._apply_theme(new_theme)
         
-        # 2. Refresh Data
+        # 2. Check for Language Change
+        new_lang = self.engine.config.settings.metadata_language
+        if new_lang != self._last_lang:
+            self._last_lang = new_lang
+            if hasattr(self.discovery_page, 'notify_language_changed'):
+                self.discovery_page.notify_language_changed(new_lang)
+        
+        # 3. Refresh Data
         self.discovery_page.refresh_data()
         self.dashboard_page.refresh_data()
 
@@ -165,13 +173,23 @@ class MainWindowV3(QMainWindow):
         self.discovery_page.progress_bar.hide()
         self.discovery_page.status_info.hide()
         self.discovery_page.refresh_data()
+        
+        # Check for API limits
+        if self.engine.has_omdb_limit_reached:
+            from PySide6.QtWidgets import QMessageBox
+            msg = T("discovery.messages.api_limit_reached")
+            QMessageBox.warning(self, T("common.warning"), msg)
 
     def _on_restart_clicked(self):
         """Restarts the application to apply code changes."""
-        import os
         import sys
-        # os.execl replaces the current process with a new one
-        os.execl(sys.executable, sys.executable, *sys.argv)
+        import subprocess
+        from PySide6.QtCore import QCoreApplication
+        
+        # Launch new instance detached
+        subprocess.Popen([sys.executable] + sys.argv)
+        # Gracefully quit current instance to let threads/DB close
+        QCoreApplication.quit()
 
 def start_v3_ui():
     from PySide6.QtWidgets import QApplication

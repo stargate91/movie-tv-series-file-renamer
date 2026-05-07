@@ -37,28 +37,39 @@ class PreviewPanel(QFrame):
         layout.addStretch()
 
     def update_info(self, res):
-        self.title.setText(res['title'])
-        meta = T("manual_resolve.type_label", type=res['media_type'].capitalize())
-        if res.get('year'): meta += f" • {res['year']}"
-        
-        # Add Network info if available
-        network = res.get('networks')
-        if not network and res.get('details_json'):
-            try:
-                import json
-                details = json.loads(res['details_json'])
-                if details.get('networks'):
-                    network = ", ".join([n['name'] for n in details['networks']])
-            except: pass
+        try:
+            title = res.get('title') or res.get('name') or "Unknown Title"
+            self.title.setText(str(title))
             
-        if network:
-            meta += f"\n{network}"
+            mtype = res.get('media_type', 'unknown')
+            mtype_str = str(mtype).capitalize() if mtype else "Unknown"
             
-        if res.get('collection'):
-            meta += f"\nCollection: {res['collection']}"
+            meta = T("manual_resolve.type_label", type=mtype_str)
+            if res.get('year'): meta += f" • {res['year']}"
             
-        self.meta.setText(meta)
-        self.overview.setText(res.get('overview', ""))
+            # Add Network info if available
+            network = res.get('networks')
+            if not network and res.get('details_json'):
+                try:
+                    import json
+                    details = json.loads(res['details_json'])
+                    if details.get('networks'):
+                        network = ", ".join([n['name'] for n in details['networks']])
+                except: pass
+                
+            if network:
+                meta += f"\n{network}"
+                
+            if res.get('collection'):
+                meta += f"\nCollection: {res['collection']}"
+                
+            self.meta.setText(meta)
+            self.overview.setText(str(res.get('overview', "")))
+        except Exception as e:
+            from utils.logger import setup_logger
+            import logging
+            logging.getLogger(__name__).error(f"Error updating preview info: {e}")
+            self.title.setText("Error loading preview")
         
     def set_poster(self, pixmap):
         if not pixmap or pixmap.isNull():
