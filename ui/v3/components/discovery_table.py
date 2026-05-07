@@ -48,6 +48,7 @@ class DiscoveryTable(QTableWidget):
     batch_ignore_requested = Signal()
     batch_identify_requested = Signal()
     batch_edit_requested = Signal()
+    fetch_language_requested = Signal(list) # item_ids
     restore_requested = Signal(int, int) # file_id, row
 
     def __init__(self, parent=None):
@@ -327,7 +328,12 @@ class DiscoveryTable(QTableWidget):
             else:
                 open_act.setEnabled(False)
                 
-            # 4. Clear Match Action (Only for videos)
+            # 4. Fetch Missing Language Action (Only for videos)
+            if raw_cat == 'video':
+                fetch_lang_act = menu.addAction(Theme.get_icon("globe", size=16, color=Theme.TEXT_MAIN), T("discovery.batch.fetch_language") if "discovery.batch.fetch_language" != T("discovery.batch.fetch_language") else "Fetch Missing Language")
+                fetch_lang_act.triggered.connect(lambda: self.fetch_language_requested.emit(self.get_selected_ids()))
+            
+            # 5. Clear Match Action (Only for videos)
             if raw_cat == 'video':
                 clear_act = menu.addAction(Theme.get_icon("refresh", size=16, color=Theme.TEXT_MAIN), T("discovery.actions.clear_match"))
                 clear_act.setEnabled(status == 'MATCHED')

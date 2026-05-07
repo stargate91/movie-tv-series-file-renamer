@@ -403,6 +403,7 @@ class DiscoveryPage(QWidget):
         table.batch_ignore_requested.connect(self._on_batch_ignore_requested)
         table.batch_identify_requested.connect(self._on_batch_identify_requested)
         table.batch_edit_requested.connect(self._on_batch_actions_requested)
+        table.fetch_language_requested.connect(self._start_language_fetch)
         table.clear_match_requested.connect(self._on_clear_match_requested)
         table.restore_requested.connect(self._on_restore_requested)
 
