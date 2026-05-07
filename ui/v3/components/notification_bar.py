@@ -34,7 +34,8 @@ class NotificationBar(QWidget):
         self.undo_btn.setStyleSheet(Theme.get_notification_undo_style())
         self.undo_btn.clicked.connect(self._on_undo_clicked)
 
-        close_btn = QPushButton("✕")
+        close_btn = QPushButton()
+        close_btn.setIcon(Theme.get_icon("x", size=16, color="#FFFFFF"))
         close_btn.setFixedSize(30, 30)
         close_btn.setStyleSheet(Theme.get_notification_close_style())
         close_btn.clicked.connect(self.hide_notification)

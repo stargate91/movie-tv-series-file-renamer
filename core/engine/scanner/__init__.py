@@ -67,10 +67,9 @@ class SmartScanner:
             
             sub_category = self.filter.get_sub_category(path, category)
             language = self.filter.get_language(path)
-            part = self.filter.get_part(path)
             
             # Upsert logic via Repository
-            db_id = self._upsert_file(path, category, stats['size_bytes'], sub_category, language, part)
+            db_id = self._upsert_file(path, category, stats['size_bytes'], sub_category, language)
             
             if category == 'video':
                 video_ids[path] = db_id
@@ -78,26 +77,43 @@ class SmartScanner:
                 asset_ids.append((path, category, db_id))
 
         # Link Assets to Parents using AssetLinker
-        self._link_assets(asset_ids, video_ids)
+        db_vids = [f['current_path'] for f in self.db.files.get_all_files('video')]
+        all_potential_parents = list(set(list(video_ids.keys()) + db_vids))
+        
+        self._link_assets(asset_ids, all_potential_parents, video_ids)
         return len(video_ids)
 
     def _upsert_file(self, path, category, size, sub_cat, language=None):
         """Adds or updates file in DB, returning its ID."""
-        existing = self.db.get_file_by_path(path)
+        existing = self.db.files.get_file_by_path(path)
         if existing:
             if existing['size_bytes'] != size or existing['category'] != category or existing['sub_category'] != sub_cat or existing['language'] != language:
-                self.db.update_file(existing['id'], category=category, size_bytes=size, sub_category=sub_cat, language=language)
+                self.db.files.update_file(existing['id'], category=category, size_bytes=size, sub_category=sub_cat, language=language)
             return existing['id']
         else:
             return self.db.files.add_file(path, category, size, sub_category=sub_cat, language=language)
 
-    def _link_assets(self, asset_ids, video_ids):
+    def _link_assets(self, asset_ids, all_potential_parents, current_scan_video_ids):
         """Links subtitles, images, and extras to the most likely parent video."""
-        video_paths = list(video_ids.keys())
+        video_index = self.linker._build_index(all_potential_parents)
+        
+        # Build case-insensitive map for current scan
+        id_lookup = {os.path.normpath(p).lower(): pid for p, pid in current_scan_video_ids.items()}
+        
         for path, category, db_id in asset_ids:
-            parent_path = self.linker.find_best_parent(path, video_paths)
+            parent_path = self.linker._find_in_index(path, video_index)
             if parent_path:
-                self.db.files.link_parent(db_id, video_ids[parent_path])
+                # 1. Try current scan (case-insensitive)
+                norm_parent = os.path.normpath(parent_path).lower()
+                parent_id = id_lookup.get(norm_parent)
+                
+                # 2. Try DB (case-insensitive)
+                if not parent_id:
+                    p_file = self.db.files.get_file_by_path_insensitive(parent_path)
+                    if p_file: parent_id = p_file['id']
+                
+                if parent_id:
+                    self.db.files.link_parent(db_id, parent_id)
 
     def scan_single_file(self, path):
         """Scans a single file, adds to DB and attempts linking."""

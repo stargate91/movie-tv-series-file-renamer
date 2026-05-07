@@ -12,6 +12,7 @@ from ui.v3.views.settings.folders_tab import FoldersTab
 from ui.v3.views.settings.extras_tab import ExtrasTab
 from ui.v3.views.settings.api_tab import APITab
 from ui.v3.views.settings.advanced_tab import AdvancedTab
+from ui.v3.views.settings.view_tab import ViewTab
 
 logger = logging.getLogger(__name__)
 
@@ -39,10 +40,10 @@ class SettingsPage(QWidget):
         layout.setSpacing(0)
 
         # 1. Left Sidebar Navigation
-        sidebar = QFrame()
-        sidebar.setFixedWidth(240)
-        sidebar.setStyleSheet(Theme.get_settings_sidebar_style())
-        sidebar_layout = QVBoxLayout(sidebar)
+        self.sidebar = QFrame()
+        self.sidebar.setFixedWidth(240)
+        self.sidebar.setStyleSheet(Theme.get_settings_sidebar_style())
+        sidebar_layout = QVBoxLayout(self.sidebar)
         sidebar_layout.setContentsMargins(20, 30, 20, 30)
         sidebar_layout.setSpacing(10)
 
@@ -59,7 +60,8 @@ class SettingsPage(QWidget):
             (T("settings.tabs.folders"), 2, "folder"),
             (T("settings.tabs.extras"), 3, "puzzle"),
             (T("settings.tabs.api"), 4, "key"),
-            (T("settings.tabs.advanced"), 5, "shield-alert")
+            (T("settings.tabs.view") or "Appearance", 5, "rocket"),
+            (T("settings.tabs.advanced"), 6, "shield-alert")
         ]
         
         self.nav_list.setIconSize(QSize(18, 18))
@@ -77,7 +79,7 @@ class SettingsPage(QWidget):
         self.save_btn.clicked.connect(self._on_save)
         sidebar_layout.addWidget(self.save_btn)
 
-        layout.addWidget(sidebar)
+        layout.addWidget(self.sidebar)
 
         # 2. Main Content Area (Stacked Tabs)
         self.content_stack = QStackedWidget()
@@ -88,6 +90,7 @@ class SettingsPage(QWidget):
             FoldersTab(self.engine),
             ExtrasTab(self.engine),
             APITab(self.engine),
+            ViewTab(self.engine),
             AdvancedTab(self.engine)
         ]
         
@@ -128,5 +131,18 @@ class SettingsPage(QWidget):
         self.save_btn.setText(T("settings.save_btn"))
         self.settings_changed.emit()
         logger.info("Settings saved successfully.")
+
+    def refresh_style(self):
+        """Forces a re-application of styles to handling theme changes."""
+        self.sidebar.setStyleSheet(Theme.get_settings_sidebar_style())
+        self.nav_list.setStyleSheet(Theme.get_settings_nav_list_style())
+        self.save_btn.setStyleSheet(Theme.get_primary_button_style())
+        
+        for tab in self.tabs:
+            if hasattr(tab, 'refresh_style'):
+                tab.refresh_style()
+            # Also update scroll areas
+            if isinstance(tab.parent(), QScrollArea):
+                tab.parent().setStyleSheet(Theme.get_settings_content_style())
 
 from PySide6.QtWidgets import QFrame # Ensure QFrame is available

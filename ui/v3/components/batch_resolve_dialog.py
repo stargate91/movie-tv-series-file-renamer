@@ -103,9 +103,9 @@ class BatchResolveDialog(QDialog):
         
         # --- Search Type Selector ---
         self.search_type_combo = QComboBox()
-        self.search_type_combo.addItem("🎬 " + T("common.types.movie"), "movie")
-        self.search_type_combo.addItem("📺 " + T("common.types.tv"), "tv")
-        self.search_type_combo.addItem("🌈 " + T("common.types.both"), "both")
+        self.search_type_combo.addItem(T("common.types.movie"), "movie")
+        self.search_type_combo.addItem(T("common.types.tv"), "tv")
+        self.search_type_combo.addItem(T("common.types.both"), "both")
         self.search_type_combo.setFixedWidth(130)
         self.search_type_combo.setFixedHeight(40)
         self.search_type_combo.currentIndexChanged.connect(self._on_search_type_changed)

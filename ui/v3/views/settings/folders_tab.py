@@ -20,57 +20,85 @@ class FoldersTab(BaseSettingsTab):
         header.setStyleSheet(Theme.get_page_header_style())
         layout.addWidget(header)
 
+        # --- Master Toggle ---
+        self.enable_folders_cb = QCheckBox(T("settings.folders.fields.enable_folders"))
+        self.enable_folders_cb.setStyleSheet(Theme.get_master_toggle_style())
+        self.enable_folders_cb.setChecked(self.engine.config.settings.enable_folders)
+        layout.addWidget(self.enable_folders_cb)
+
+        layout.addSpacing(10)
+
+        # --- Content Container ---
+        self.content_container = QWidget()
+        content_layout = QVBoxLayout(self.content_container)
+        content_layout.setContentsMargins(0, 0, 0, 0)
+        content_layout.setSpacing(25)
+        layout.addWidget(self.content_container)
+
         # --- Section: Basic Logic ---
-        layout.addWidget(self._create_section_header(T("settings.folders.sections.logic")))
+        content_layout.addWidget(self._create_section_header(T("settings.folders.sections.logic")))
         self.move_files_cb = QCheckBox(T("settings.folders.fields.move_files"))
         self.move_files_cb.setChecked(self.engine.config.settings.move_files)
         # Style is handled by global theme
-        layout.addWidget(self.move_files_cb)
+        content_layout.addWidget(self.move_files_cb)
 
         self.base_path_input = self._create_path_input(T("settings.folders.fields.root_path"), self.engine.config.settings.base_target_path, "root", self._on_browse)
-        layout.addLayout(self.base_path_input['layout'])
+        content_layout.addLayout(self.base_path_input['layout'])
         self.base_path_input['edit'].setEnabled(self.engine.config.settings.move_files)
         self.move_files_cb.toggled.connect(self.base_path_input['edit'].setEnabled)
 
-        layout.addSpacing(10)
-        layout.addWidget(Theme.create_hline())
+        content_layout.addSpacing(10)
+        content_layout.addWidget(Theme.create_hline())
 
         # --- Section: Automatic Sorting ---
-        layout.addWidget(self._create_section_header(T("settings.folders.sections.sorting")))
+        content_layout.addWidget(self._create_section_header(T("settings.folders.sections.sorting")))
         self.auto_org_cb = QCheckBox(T("settings.folders.fields.auto_sort"))
         self.auto_org_cb.setChecked(self.engine.config.settings.auto_organize_by_type)
-        layout.addWidget(self.auto_org_cb)
+        content_layout.addWidget(self.auto_org_cb)
 
         sort_row = QHBoxLayout()
         self.movie_sub_name = self._create_input_group(T("settings.folders.fields.movies_sub"), self.engine.config.settings.movies_subfolder_name, "Movies")
         self.show_sub_name = self._create_input_group(T("settings.folders.fields.shows_sub"), self.engine.config.settings.shows_subfolder_name, "TV Shows")
         sort_row.addLayout(self.movie_sub_name['layout'])
         sort_row.addLayout(self.show_sub_name['layout'])
-        layout.addLayout(sort_row)
+        content_layout.addLayout(sort_row)
 
         self.auto_org_cb.toggled.connect(self.movie_sub_name['edit'].setEnabled)
         self.auto_org_cb.toggled.connect(self.show_sub_name['edit'].setEnabled)
         
-        layout.addSpacing(15)
-        layout.addWidget(Theme.create_hline())
+        content_layout.addSpacing(15)
+        content_layout.addWidget(Theme.create_hline())
 
         # --- Section: Folder Templates ---
-        layout.addWidget(self._create_section_header(T("settings.folders.sections.templates")))
+        content_layout.addWidget(self._create_section_header(T("settings.folders.sections.templates")))
+        
+        hint_row = QHBoxLayout()
+        hint_row.setSpacing(6)
+        hint_icon = QLabel()
+        hint_icon.setPixmap(Theme.get_pixmap("lightbulb", size=16, color=Theme.TEXT_DIM))
+        hint_icon.setStyleSheet("background: transparent; border: none;")
+        hint_icon.setFixedSize(16, 16)
+        hint_text = QLabel(T("settings.naming.fields.template_hint"))
+        hint_text.setWordWrap(True)
+        hint_text.setStyleSheet(Theme.get_hint_style())
+        hint_row.addWidget(hint_icon)
+        hint_row.addWidget(hint_text, 1)
+        content_layout.addLayout(hint_row)
         
         # Movies
         self.movie_folder_cb = QCheckBox(T("settings.folders.fields.movie_folder") or "Create Movie Folder")
         self.movie_folder_cb.setChecked(self.engine.config.settings.create_movie_folder)
-        layout.addWidget(self.movie_folder_cb)
+        content_layout.addWidget(self.movie_folder_cb)
         self.movie_folder_tpl = self._create_input_group(T("settings.folders.fields.movie_tpl") or "Movie Folder Template", self.engine.config.settings.movie_folder_template, "{Title} ({Year})", context="movie")
-        layout.addLayout(self.movie_folder_tpl['layout'])
+        content_layout.addLayout(self.movie_folder_tpl['layout'])
         
         # Collections (Box Sets)
-        layout.addSpacing(10)
-        self.collection_folder_cb = QCheckBox("Create Collection (Box Set) Folder")
+        content_layout.addSpacing(10)
+        self.collection_folder_cb = QCheckBox(T("settings.folders.fields.coll_folder"))
         self.collection_folder_cb.setChecked(self.engine.config.settings.create_collection_folder)
-        layout.addWidget(self.collection_folder_cb)
-        self.collection_folder_tpl = self._create_input_group("Collection Folder Template", self.engine.config.settings.collection_folder_template, "{Collection}", context="movie")
-        layout.addLayout(self.collection_folder_tpl['layout'])
+        content_layout.addWidget(self.collection_folder_cb)
+        self.collection_folder_tpl = self._create_input_group(T("settings.folders.fields.coll_tpl"), self.engine.config.settings.collection_folder_template, "{Collection}", context="collection")
+        content_layout.addLayout(self.collection_folder_tpl['layout'])
         
         def update_collection_state():
             self.collection_folder_tpl['edit'].setEnabled(self.collection_folder_cb.isChecked())
@@ -79,26 +107,26 @@ class FoldersTab(BaseSettingsTab):
         update_collection_state()
         
         # TV Shows
-        layout.addSpacing(10)
+        content_layout.addSpacing(10)
         self.show_folder_cb = QCheckBox(T("settings.folders.fields.show_folder"))
         self.show_folder_cb.setChecked(self.engine.config.settings.create_show_folder)
-        layout.addWidget(self.show_folder_cb)
-        self.show_folder_tpl = self._create_input_group(T("settings.folders.fields.show_tpl"), self.engine.config.settings.show_folder_template, "{ShowTitle}", context="tv")
-        layout.addLayout(self.show_folder_tpl['layout'])
+        content_layout.addWidget(self.show_folder_cb)
+        self.show_folder_tpl = self._create_input_group(T("settings.folders.fields.show_tpl"), self.engine.config.settings.show_folder_template, "{ShowTitle}", context="series")
+        content_layout.addLayout(self.show_folder_tpl['layout'])
 
         self.season_folder_cb = QCheckBox(T("settings.folders.fields.season_folder") or "Create Season Folder")
         self.season_folder_cb.setChecked(self.engine.config.settings.create_season_folder)
-        layout.addWidget(self.season_folder_cb)
-        self.season_folder_tpl = self._create_input_group(T("settings.folders.fields.season_tpl") or "Season Folder Template", self.engine.config.settings.season_folder_template, "Season {Season}", context="tv")
-        layout.addLayout(self.season_folder_tpl['layout'])
+        content_layout.addWidget(self.season_folder_cb)
+        self.season_folder_tpl = self._create_input_group(T("settings.folders.fields.season_tpl") or "Season Folder Template", self.engine.config.settings.season_folder_template, "Season {Season}", context="season")
+        content_layout.addLayout(self.season_folder_tpl['layout'])
 
         # Episodes
-        layout.addSpacing(10)
-        self.episode_folder_cb = QCheckBox("Create Episode Folder")
+        content_layout.addSpacing(10)
+        self.episode_folder_cb = QCheckBox(T("settings.folders.fields.episode_folder"))
         self.episode_folder_cb.setChecked(self.engine.config.settings.create_episode_folder)
-        layout.addWidget(self.episode_folder_cb)
-        self.episode_folder_tpl = self._create_input_group("Episode Folder Template", self.engine.config.settings.episode_folder_template, "{ShowTitle} - {Season}{Episode}", context="tv")
-        layout.addLayout(self.episode_folder_tpl['layout'])
+        content_layout.addWidget(self.episode_folder_cb)
+        self.episode_folder_tpl = self._create_input_group(T("settings.folders.fields.episode_tpl"), self.engine.config.settings.episode_folder_template, "{ShowTitle} - {Season}{Episode}", context="tv")
+        content_layout.addLayout(self.episode_folder_tpl['layout'])
         
         def update_episode_state():
             self.episode_folder_tpl['edit'].setEnabled(self.episode_folder_cb.isChecked())
@@ -106,18 +134,23 @@ class FoldersTab(BaseSettingsTab):
         self.episode_folder_cb.toggled.connect(update_episode_state)
         update_episode_state()
 
-        layout.addSpacing(15)
-        layout.addWidget(Theme.create_hline())
+        content_layout.addSpacing(15)
+        content_layout.addWidget(Theme.create_hline())
 
         # --- Section: Post-Processing ---
-        layout.addWidget(self._create_section_header(T("settings.advanced.sections.cleanup") or "Post-Processing Cleanup"))
+        content_layout.addWidget(self._create_section_header(T("settings.advanced.sections.cleanup") or "Post-Processing Cleanup"))
         self.cleanup_cb = QCheckBox(T("settings.advanced.fields.cleanup_folders") or "Remove empty folders after moving files")
         self.cleanup_cb.setChecked(self.engine.config.settings.cleanup_empty_folders)
-        layout.addWidget(self.cleanup_cb)
+        content_layout.addWidget(self.cleanup_cb)
+        
+        # Link master toggle to container
+        self.enable_folders_cb.toggled.connect(self.content_container.setEnabled)
+        self.content_container.setEnabled(self.engine.config.settings.enable_folders)
 
         layout.addStretch()
 
     def save_to_settings(self, s):
+        s.enable_folders = self.enable_folders_cb.isChecked()
         s.move_files = self.move_files_cb.isChecked()
         s.base_target_path = self.base_path_input['edit'].text()
         s.auto_organize_by_type = self.auto_org_cb.isChecked()

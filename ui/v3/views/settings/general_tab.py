@@ -108,7 +108,7 @@ class GeneralTab(BaseSettingsTab):
         current = edit_field.text()
         if not current or not os.path.exists(current):
             current = os.path.expanduser("~")
-        folder = QFileDialog.getExistingDirectory(self, "Select Directory", current)
+        folder = QFileDialog.getExistingDirectory(self, T("settings.folders.fields.select_dir"), current)
         if folder:
             edit_field.setText(folder)
 

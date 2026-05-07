@@ -221,6 +221,10 @@ class TagBuilder:
             "EpisodeCount": m.get('number_of_episodes', ""),
             "SeasonCount": m.get('number_of_seasons', ""),
             "SeriesOriginalTitle": m.get('original_title', ""),
+            "FirstAirDate": m.get('first_air_date', ""),
+            "LastAirDate": m.get('last_air_date', ""),
+            "SeriesStatus": (m.get('status') or "").capitalize(),
+            "SeriesType": (m.get('type') or "").capitalize(),
         })
         
         # Air Years
@@ -302,6 +306,7 @@ class TagBuilder:
             s_list = details.get('seasons', [])
             s_data = next((s for s in s_list if s.get('season_number') == season_num), None)
             if s_data:
+                context["SeasonTMDB_ID"] = s_data.get('id', "")
                 context["SeasonName"] = s_data.get('name', f"Season {season_num}")
                 context["SeasonEpisodeCount"] = s_data.get('episode_count', "")
                 s_air = s_data.get('air_date', "")

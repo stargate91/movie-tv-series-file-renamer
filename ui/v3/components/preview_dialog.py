@@ -168,7 +168,8 @@ class PreviewDialog(QDialog):
             item_layout.addWidget(new_lbl, 6)
                 
             # Add a global Remove button to the far right for EVERY item
-            btn_remove = QPushButton("🗑")
+            btn_remove = QPushButton()
+            btn_remove.setIcon(Theme.get_icon("trash-2", size=16, color=Theme.TEXT_DANGER))
             btn_remove.setCursor(Qt.PointingHandCursor)
             btn_remove.setFixedSize(28, 28)
             btn_remove.setToolTip(T("preview.remove_tooltip"))

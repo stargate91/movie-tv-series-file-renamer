@@ -53,10 +53,16 @@ class Formatter:
              
         category = file_data.get('category')
         if not links:
-            # Fallback for orphaned files
+            # Fallback for unidentified or orphaned files
             orig_name = os.path.splitext(file_data.get('file_name', ''))[0]
             if category == 'video':
                 return orig_name
+            
+            # If it has a parent, use the parent's name as a prefix even if unidentified
+            parent_id = file_data.get('parent_file_id')
+            if parent_id:
+                parent_name = self.generate_name(parent_id, settings, prefetched_data, _depth + 1)
+                return f"{parent_name} - {orig_name}"
             else:
                 return f"[ORPHAN] {category.capitalize()} - {orig_name}"
 
@@ -135,7 +141,7 @@ class Formatter:
         else:
             if settings.move_files and settings.base_target_path:
                 base_dir = settings.base_target_path
-                if settings.auto_organize_by_type:
+                if settings.enable_folders and settings.auto_organize_by_type:
                     sub = settings.movies_subfolder_name if media_type == 'movie' else settings.shows_subfolder_name
                     if sub: base_dir = os.path.join(base_dir, sub)
             else:
@@ -145,24 +151,25 @@ class Formatter:
             context = self.tags.build_context(file_data, links, settings.custom_variable, lang)
             folders = []
             
-            if media_type == 'movie':
-                if settings.create_collection_folder and context.get('Collection'):
-                    tpl_coll = self._apply_template(settings.collection_folder_template, context)
-                    folders.extend([f.strip() for f in re.split(r'[\\/]', tpl_coll) if f.strip()])
-                
-                if settings.create_movie_folder:
-                    tpl_res = self._apply_template(settings.movie_folder_template, context)
-                    folders.extend([f.strip() for f in re.split(r'[\\/]', tpl_res) if f.strip()])
-            elif media_type == 'tv':
-                if settings.create_show_folder:
-                    tpl_res = self._apply_template(settings.show_folder_template, context)
-                    folders.extend([f.strip() for f in re.split(r'[\\/]', tpl_res) if f.strip()])
-                if settings.create_season_folder:
-                    tpl_res = self._apply_template(settings.season_folder_template, context)
-                    folders.extend([f.strip() for f in re.split(r'[\\/]', tpl_res) if f.strip()])
-                if settings.create_episode_folder:
-                    tpl_res = self._apply_template(settings.episode_folder_template, context)
-                    folders.extend([f.strip() for f in re.split(r'[\\/]', tpl_res) if f.strip()])
+            if settings.enable_folders:
+                if media_type == 'movie':
+                    if settings.create_collection_folder and context.get('Collection'):
+                        tpl_coll = self._apply_template(settings.collection_folder_template, context)
+                        folders.extend([f.strip() for f in re.split(r'[\\/]', tpl_coll) if f.strip()])
+                    
+                    if settings.create_movie_folder:
+                        tpl_res = self._apply_template(settings.movie_folder_template, context)
+                        folders.extend([f.strip() for f in re.split(r'[\\/]', tpl_res) if f.strip()])
+                elif media_type == 'tv':
+                    if settings.create_show_folder:
+                        tpl_res = self._apply_template(settings.show_folder_template, context)
+                        folders.extend([f.strip() for f in re.split(r'[\\/]', tpl_res) if f.strip()])
+                    if settings.create_season_folder:
+                        tpl_res = self._apply_template(settings.season_folder_template, context)
+                        folders.extend([f.strip() for f in re.split(r'[\\/]', tpl_res) if f.strip()])
+                    if settings.create_episode_folder:
+                        tpl_res = self._apply_template(settings.episode_folder_template, context)
+                        folders.extend([f.strip() for f in re.split(r'[\\/]', tpl_res) if f.strip()])
         
         folders = [self.engine.sanitize_filename(f) for f in folders]
         target_dir = os.path.join(base_dir, *folders) if folders else base_dir

@@ -65,27 +65,24 @@ class NamingTab(BaseSettingsTab):
 
         layout.addWidget(Theme.create_hline())
 
+        # --- Template Hint ---
+        hint_row = QHBoxLayout()
+        hint_row.setSpacing(6)
+        hint_icon = QLabel()
+        hint_icon.setPixmap(Theme.get_pixmap("lightbulb", size=16, color=Theme.TEXT_DIM))
+        hint_icon.setStyleSheet("background: transparent; border: none;")
+        hint_icon.setFixedSize(16, 16)
+        hint_text = QLabel(T("settings.naming.fields.template_hint"))
+        hint_text.setWordWrap(True)
+        hint_text.setStyleSheet(Theme.get_hint_style())
+        hint_row.addWidget(hint_icon)
+        hint_row.addWidget(hint_text, 1)
+        layout.addLayout(hint_row)
+
         # --- Section: Movie Template ---
         layout.addWidget(self._create_section_header(T("settings.naming.sections.movie")))
         self.movie_tpl = self._create_input_group(T("settings.naming.fields.movie_tpl"), self.engine.config.settings.movie_template, "{Title} ({Year})", context="movie")
         layout.addLayout(self.movie_tpl['layout'])
-
-        layout.addSpacing(10)
-        
-        # --- Section: Collection Folder ---
-        coll_header_layout = QHBoxLayout()
-        coll_header_layout.addWidget(self._create_section_header(T("settings.naming.sections.collection") or "Movie Collection Folders"))
-        self.coll_folder_check = QCheckBox(T("settings.naming.fields.enable_coll_folder") or "Enable Collection Folders")
-        self.coll_folder_check.setChecked(self.engine.config.settings.create_collection_folder)
-        coll_header_layout.addSpacing(20)
-        coll_header_layout.addWidget(self.coll_folder_check)
-        coll_header_layout.addStretch()
-        layout.addLayout(coll_header_layout)
-        
-        self.coll_tpl = self._create_input_group(T("settings.naming.fields.coll_tpl") or "Collection Folder Template", self.engine.config.settings.collection_folder_template, "{Collection}", context="movie")
-        layout.addLayout(self.coll_tpl['layout'])
-        self.coll_tpl['edit'].setEnabled(self.coll_folder_check.isChecked())
-        self.coll_folder_check.toggled.connect(self.coll_tpl['edit'].setEnabled)
 
         layout.addSpacing(10)
 
@@ -164,8 +161,6 @@ class NamingTab(BaseSettingsTab):
         s.filename_case = self.casing_combo.currentData()
         s.separator = self.sep_combo.currentData()
         s.movie_template = self.movie_tpl['edit'].text()
-        s.create_collection_folder = self.coll_folder_check.isChecked()
-        s.collection_folder_template = self.coll_tpl['edit'].text()
         s.episode_template = self.episode_tpl['edit'].text()
         s.multi_part_keyword = self.part_keyword_combo.currentData()
         s.multi_part_style = self.part_style_combo.currentData()

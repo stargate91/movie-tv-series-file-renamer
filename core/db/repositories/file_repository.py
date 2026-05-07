@@ -57,6 +57,12 @@ class FileRepository(BaseRepository):
             row = conn.execute("SELECT * FROM media_files WHERE current_path = ?", (path,)).fetchone()
             return dict(row) if row else None
 
+    def get_file_by_path_insensitive(self, path):
+        """Case-insensitive lookup for Windows paths."""
+        with self._get_connection() as conn:
+            row = conn.execute("SELECT * FROM media_files WHERE current_path = ? COLLATE NOCASE", (path,)).fetchone()
+            return dict(row) if row else None
+
     def get_files_by_category(self, *categories):
         placeholders = ", ".join("?" for _ in categories)
         query = f"SELECT * FROM media_files WHERE category IN ({placeholders})"
@@ -165,6 +171,7 @@ class FileRepository(BaseRepository):
             LEFT JOIN tv_seasons s ON e.season_id = s.id
             WHERE f.category IN ({placeholders}) 
               AND f.status NOT IN ('renamed', 'deleted')
+            GROUP BY f.id
         """
         with self._get_connection() as conn:
             return [dict(row) for row in conn.execute(query, categories).fetchall()]

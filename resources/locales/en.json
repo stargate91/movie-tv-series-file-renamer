@@ -39,6 +39,7 @@
         "search_placeholder": "Find a file by name...",
         "tabs": {
             "library": "Review Center",
+            "all": "All Items",
             "conflicts": "Name Clashes",
             "extras": "Attached Files",
             "dropped": "Just Ingested",
@@ -65,15 +66,15 @@
             "clear_match": "Reset Identification"
         },
         "dropped": {
-            "import_all": "🚀 Move All to Review",
-            "import_selected": "📥 Move Selected",
-            "clear_list": "🧹 Empty List",
+            "import_all": "Move All to Review",
+            "import_selected": "Move Selected",
+            "clear_list": "Empty List",
             "clear_confirm_title": "Empty Ingested List",
             "clear_confirm_msg": "This will clear the list of recently found files.\n(Your physical files are safe and won't be touched!)"
         },
         "messages": {
             "rename_success": "Success! {count} files were renamed.",
-            "rename_success_notif": "✅ All set! {count} files renamed.",
+            "rename_success_notif": "All set! {count} files renamed.",
             "rename_empty": "Nothing to rename right now.",
             "rename_errors_title": "Oops! Something went wrong",
             "rename_errors_msg": "We couldn't rename {count} files. Check the details.",
@@ -99,21 +100,21 @@
             "global_conflicts_title": "Resolution Needed",
             "global_conflicts_msg": "You have {count} files with identical proposed names.\n\nHead over to the 'Name Clashes' tab and use 'Manual Batch Edit' to add Part numbers or Edition tags.",
             "select_dir": "Choose a folder to organize",
-            "drop_ingest": "🚀 Drag & Drop files here to start organizing",
+            "drop_ingest": "Drag & Drop files here to start organizing",
             "abort_btn": "Stop Now",
             "candidate_prefix": "Possible Match: {title}",
-            "omdb_auth_error": "⚠️ OMDb API Key failed! IMDb ratings and Rotten Tomatoes data are currently unavailable. Check your settings.",
+            "omdb_auth_error": "OMDb API Key failed! IMDb ratings and Rotten Tomatoes data are currently unavailable. Check your settings.",
             "ingesting": "Ingesting: {filename}",
             "moving": "Moving: {filename}",
             "restoring": "Restoring: {filename}"
         },
         "extras": {
             "tabs": {
-                "bonus": "🎁 Bonus / Extras",
-                "images": "🖼️ Images / Posters",
-                "metadata": "📝 Metadata / NFO",
-                "subtitles": "📄 Subtitles",
-                "audio": "🔊 Audio Tracks"
+                "bonus": "Bonus / Extras",
+                "images": "Images / Posters",
+                "metadata": "Metadata / NFO",
+                "subtitles": "Subtitles",
+                "audio": "Audio Tracks"
             },
             "subtypes": {
                 "all": "All",
@@ -142,10 +143,10 @@
             "file_selection": "1. File Selection / Order:",
             "configure_props": "2. Configure Properties:",
             "cards": {
-                "category": "📁 Category & Type Override",
-                "tv": "📺 TV Series & Episodes",
-                "parts": "✂️ Multi-part files",
-                "meta": "🏷️ Tags & Linking"
+                "category": "Category & Type Override",
+                "tv": "TV Series & Episodes",
+                "parts": "Multi-part files",
+                "meta": "Tags & Linking"
             },
             "fields": {
                 "override_cat": "Override main category:",
@@ -197,7 +198,7 @@
             "title": "Manual Resolve: {filename}",
             "back": "Back",
             "search_results": "Search Results",
-            "link_multiple": "🔗 Link Multiple",
+            "link_multiple": "Link Multiple",
             "search_placeholder": "Search Movie or Series...",
             "search_btn": "Search",
             "any_year": "Any Year",
@@ -219,7 +220,7 @@
             "add_basket": "Add to Basket",
             "match_btn": "Match & Save",
             "type_label": "Type: {type}",
-            "tv_options": "📺 TV Identification Options",
+            "tv_options": "TV Identification Options",
             "match_depth": "Match Depth:",
             "depth": {
                 "series": "Series Level Only",
@@ -230,12 +231,12 @@
             "lang_label": "Metadata Language:"
         },
         "batch": {
-            "clear": "🔄 Clear Metadata",
-            "ignore": "🗑️ Ignore Selection",
-            "identify": "🪄 Batch Identify"
+            "clear": "Clear Metadata",
+            "ignore": "Ignore Selection",
+            "identify": "Batch Identify"
         },
         "inspector": {
-            "check_data": "📋 Check Full Data",
+            "check_data": "Check Full Data",
             "sections": {
                 "technical": "TECHNICAL INFO",
                 "technical_header": "TECHNICAL",
@@ -276,13 +277,13 @@
                 "overview": "Overview:"
             },
             "data_sheet": {
-                "title": "📋 Data Sheet",
+                "title": "Data Sheet",
                 "tabs": {
-                    "media": "🎬 Media Info",
-                    "episodes": "📺 Episode(s)",
-                    "episode": "📺 Episode",
-                    "technical": "⚙️ Technical",
-                    "linked": "📎 Linked Files ({count})",
+                    "media": "Media Info",
+                    "episodes": "Episode(s)",
+                    "episode": "Episode",
+                    "technical": "Technical",
+                    "linked": "Linked Files ({count})",
                     "raw": "{ } Raw API"
                 },
                 "cols": {
@@ -305,7 +306,7 @@
             "drag_hint": "Drag & drop to set sequence for parts/episodes.",
             "search_results": "Search Results",
             "searching": "Searching...",
-            "back": "← Back",
+            "back": "Back",
             "search_placeholder": "Search Movie or Series...",
             "search_btn": "Search",
             "action_btn_default": "Identify All Files",
@@ -327,6 +328,7 @@
             "folders": "Folders",
             "extras": "Extras",
             "api": "API Keys",
+            "view": "Appearance",
             "advanced": "Advanced"
         },
         "save_btn": "Save All Changes",
@@ -372,7 +374,8 @@
                 "part_style": "Numbering Style",
                 "part_separator": "Inner Separator",
                 "custom_val": "Custom Tag Value ({Custom})",
-                "custom_placeholder": "e.g. GroupName"
+                "custom_placeholder": "e.g. GroupName",
+                "template_hint": "Click the { } button on the right side of a template field to browse and insert available variables."
             },
             "casing_options": {
                 "none": "Original",
@@ -382,6 +385,7 @@
             },
             "separator_options": {
                 "space": "Space",
+                "none": "No Separator",
                 "dot": "Dot (.)",
                 "dash": "Dash (-)",
                 "underscore": "Underscore (_)"
@@ -395,6 +399,7 @@
                 "templates": "FOLDER NAMING TEMPLATES"
             },
             "fields": {
+                "enable_folders": "Enable Folder Organization",
                 "move_files": "Move files to a central library (Recommended)",
                 "root_path": "Library Root Path",
                 "auto_sort": "Automatically sort by type (Movies / TV Shows subfolders)",
@@ -402,10 +407,14 @@
                 "shows_sub": "TV Shows Subfolder",
                 "movie_folder": "Create subfolder for each Movie",
                 "movie_tpl": "Movie Folder Template",
+                "coll_folder": "Create Collection (Box Set) Folder",
+                "coll_tpl": "Collection Folder Template",
                 "show_folder": "Create root folder for each Show",
                 "show_tpl": "Show Folder Template",
                 "season_folder": "Create Season subfolders",
                 "season_tpl": "Season Folder Template",
+                "episode_folder": "Create Episode Folder",
+                "episode_tpl": "Episode Folder Template",
                 "select_dir": "Select Directory"
             }
         },
@@ -428,6 +437,15 @@
                 "omdb_guide": "<b>How to get your OMDb Key (for IMDb ratings):</b><br>1. Go to <a href='http://www.omdbapi.com/apikey.aspx' style='color: #3b82f6;'>omdbapi.com/apikey.aspx</a><br>2. Choose 'FREE' and enter your email<br>3. Check your inbox and click the activation link<br>4. Copy the key from the email here."
             }
         },
+        "view": {
+            "header": "Application Appearance",
+            "theme_title": "Theme & Style",
+            "theme_label": "Application Theme:",
+            "theme_light": "Standard Light",
+            "theme_dark": "Premium Dark",
+            "icons_title": "Interface Details",
+            "icons_msg": "Modern Lucide icons are used throughout the application to ensure clarity."
+        },
         "advanced": {
             "header": "Advanced Engine Settings",
             "sections": {
@@ -445,13 +463,42 @@
                 "wipe_success": "Database has been wiped.",
                 "wipe_error_msg": "Failed to wipe database:"
             }
+        },
+        "extras": {
+            "header": "Extras Settings",
+            "sections": {
+                "extensions": "MONITORED EXTENSIONS",
+                "handling": "EXTRAS HANDLING",
+                "placement": "EXTRAS FOLDER PLACEMENT"
+            },
+            "fields": {
+                "enable_extras": "Enable Extras Handling",
+                "subtitles": "Subtitles",
+                "audio": "Audio Tracks",
+                "images": "Images",
+                "metadata": "Metadata / NFO",
+                "video_clips": "Video Clips",
+                "images_posters": "Images / Posters",
+                "folder_mode": "Folder Mode:",
+                "folder_name": "Extras Folder Name"
+            },
+            "actions": {
+                "rename": "Rename",
+                "skip": "Skip",
+                "delete": "Delete"
+            },
+            "modes": {
+                "none": "Next to the main video file",
+                "single": "Single 'Extras' folder",
+                "categorized": "Categorized subfolders"
+            }
         }
     },
     "edit_file": {
         "title": "Edit Properties: {filename}",
         "sections": {
-            "classification": "📁 Classification",
-            "details": "📝 Details"
+            "classification": "Classification",
+            "details": "Details"
         },
         "fields": {
             "primary_role": "Primary Role:",
@@ -532,6 +579,7 @@
         "undo_partial_title": "Partial Success"
     },
     "common": {
+        "browse": "Browse",
         "none": "None",
         "type": "Type:",
         "types": {

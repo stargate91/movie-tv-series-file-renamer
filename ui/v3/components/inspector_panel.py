@@ -1,5 +1,5 @@
 import logging
-from PySide6.QtWidgets import QFrame, QVBoxLayout, QPushButton
+from PySide6.QtWidgets import QFrame, QVBoxLayout, QPushButton, QWidget, QScrollArea
 from PySide6.QtCore import Qt, Signal
 
 from ui.v3.styles.theme import Theme
@@ -31,28 +31,50 @@ class InspectorPanel(QFrame):
 
     def _init_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 20, 20, 20)
-        layout.setSpacing(15)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(10)
+
+        # 1. Scroll Area for all content
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setStyleSheet("background: transparent; border: none;")
+        
+        container = QWidget()
+        container.setObjectName("InspectorContainer")
+        self.content_layout = QVBoxLayout(container)
+        self.content_layout.setContentsMargins(20, 20, 20, 20)
+        self.content_layout.setSpacing(10)
+        self.content_layout.setAlignment(Qt.AlignTop)
 
         # 1. Poster Carousel
         self.poster_carousel = PosterCarousel()
-        layout.addWidget(self.poster_carousel, alignment=Qt.AlignHCenter)
+        self.content_layout.addWidget(self.poster_carousel, alignment=Qt.AlignHCenter)
 
         # 2. Media Metadata Section
         self.media_section = MediaSection()
-        layout.addWidget(self.media_section, 1) # Give it stretch factor
+        self.content_layout.addWidget(self.media_section)
 
         # 3. Technical Section
         self.tech_section = TechnicalSection()
-        layout.addWidget(self.tech_section)
+        self.content_layout.addWidget(self.tech_section)
+        
+        scroll.setWidget(container)
+        layout.addWidget(scroll)
 
-        # 4. Check Data Button
+        # 4. Check Data Button (Keep at bottom)
         self.data_btn = QPushButton(T("discovery.inspector.check_data"))
         self.data_btn.setFixedHeight(40)
         self.data_btn.setCursor(Qt.PointingHandCursor)
         self.data_btn.setStyleSheet(Theme.get_secondary_ghost_button_style())
         self.data_btn.clicked.connect(self._on_check_data_clicked)
-        layout.addWidget(self.data_btn)
+        
+        btn_container = QWidget()
+        btn_layout = QVBoxLayout(btn_container)
+        btn_layout.setContentsMargins(20, 10, 20, 20)
+        btn_layout.addWidget(self.data_btn)
+        layout.addWidget(btn_container)
 
     def set_empty(self):
         self._current_file_data = None
@@ -66,20 +88,27 @@ class InspectorPanel(QFrame):
         self.tech_section.clear()
 
     def update_status(self, status):
+        # MediaSection.update_status is now a no-op as logic moved to poster
         self.media_section.update_status(status)
 
     def update_from_data(self, media_data):
         self._current_media_data = media_data
-        self.media_section.update_media(media_data)
+        # If we have episode info pending, wait for update_episode_info
+        if media_data.get('media_type') == 'movie':
+            self.media_section.update_movie(media_data)
 
     def update_episode_info(self, ep_data_list, season_data=None):
         self._current_episode_data = ep_data_list
         self._current_season_data = season_data
-        self.media_section.update_episode(ep_data_list)
+        if self._current_media_data:
+            self.media_section.update_episode(self._current_media_data, ep_data_list)
 
     def update_tech_info(self, file_data):
         self._current_file_data = file_data
         self.tech_section.update_info(file_data)
+        # If no match yet, show unmatched technical view
+        if not self._current_media_data:
+            self.media_section.update_unmatched(file_data)
 
     def _on_check_data_clicked(self):
         if not self._current_file_data: return
@@ -100,10 +129,18 @@ class InspectorPanel(QFrame):
 
     @property
     def title_label(self):
-        return self.media_section.title_lbl
+        return self.media_section.lbl_main
 
     class _PosterCompat:
         def __init__(self, carousel): self._carousel = carousel
         def clear(self): self._carousel.clear()
         def setPixmap(self, pixmap): self._carousel.set_single_poster(pixmap)
         def setText(self, text): self._carousel.clear()
+
+    def refresh_style(self):
+        """Re-applies styles to all sub-panels."""
+        self.setStyleSheet(Theme.get_inspector_style())
+        self.data_btn.setStyleSheet(Theme.get_secondary_ghost_button_style())
+        if hasattr(self.poster_carousel, 'refresh_style'): self.poster_carousel.refresh_style()
+        if hasattr(self.media_section, 'refresh_style'): self.media_section.refresh_style()
+        if hasattr(self.tech_section, 'refresh_style'): self.tech_section.refresh_style()

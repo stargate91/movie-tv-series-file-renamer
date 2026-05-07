@@ -38,9 +38,13 @@ class InspectorStyles:
     def get_status_badge_style(color):
         return f"""
             QLabel {{
-                color: {color}; background-color: {color}20;
-                border: 1px solid {color}50; border-radius: 12px;
-                font-weight: 800; font-size: 10px; padding: 2px 8px;
+                color: white; 
+                background-color: {color};
+                border-radius: 4px;
+                font-weight: 800; 
+                font-size: 10px; 
+                text-transform: uppercase;
+                border: none;
             }}
         """
 

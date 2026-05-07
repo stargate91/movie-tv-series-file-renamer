@@ -32,6 +32,10 @@ class DiscoveryPage(QWidget):
         self.engine = engine
         self.loader = None
         self.poster_worker = None
+        self.sync_worker = None
+        self.worker = None
+        self.plan_worker = None
+        self.undo_worker = None
         self.active_workers = [] 
         self.last_batch_id = None
         self._init_ui()
@@ -53,12 +57,14 @@ class DiscoveryPage(QWidget):
         self.search_box.setStyleSheet(Theme.get_input_style())
         self.search_box.textChanged.connect(self._on_search_changed)
 
-        self.scan_new_btn = QPushButton(f"  {T('discovery.actions.scan_new')}")
+        self.scan_new_btn = QPushButton(T('discovery.actions.scan_new'))
+        self.scan_new_btn.setIcon(Theme.get_icon("search", size=16, color=Theme.TEXT_MAIN))
         self.scan_new_btn.setFixedWidth(140)
         self.scan_new_btn.setStyleSheet(Theme.get_secondary_button_style())
         self.scan_new_btn.clicked.connect(self._on_manual_scan_triggered)
 
         refresh_btn = QPushButton(T("discovery.actions.refresh"))
+        refresh_btn.setIcon(Theme.get_icon("refresh", size=16, color=Theme.TEXT_MAIN))
         refresh_btn.setFixedWidth(120)
         refresh_btn.setStyleSheet(Theme.get_secondary_button_style())
         refresh_btn.clicked.connect(self.refresh_data)
@@ -136,10 +142,30 @@ class DiscoveryPage(QWidget):
         self.status_info.hide()
         
         # Abort Button (styled more subtly, placed away from the center)
-        self.abort_btn = QPushButton(T("discovery.messages.abort_btn"))
-        self.abort_btn.setFixedSize(110, 24)
+        self.abort_btn = QPushButton(T("discovery.buttons.abort"))
+        self.abort_btn.setObjectName("abort-btn")
         self.abort_btn.setCursor(Qt.PointingHandCursor)
-        self.abort_btn.setStyleSheet(Theme.get_abort_button_style())
+        self.abort_btn.setMinimumWidth(80)
+        self.abort_btn.setFixedHeight(24)
+        self.abort_btn.setStyleSheet("""
+            QPushButton#abort-btn {
+                background: transparent;
+                border: 1px solid #ef4444;
+                color: #ef4444;
+                border-radius: 4px;
+                padding: 2px 12px;
+                font-weight: 600;
+                font-size: 11px;
+                text-transform: uppercase;
+            }
+            QPushButton#abort-btn:hover {
+                background: #ef4444;
+                color: white;
+            }
+            QPushButton#abort-btn:pressed {
+                background: #b91c1c;
+            }
+        """)
         self.abort_btn.clicked.connect(self._on_abort_clicked)
         self.abort_btn.hide()
 
@@ -168,20 +194,24 @@ class DiscoveryPage(QWidget):
         bb_layout.setContentsMargins(20, 0, 20, 0)
         self.batch_label = QLabel(T("discovery.messages.items_selected", count=0))
         self.batch_label.setStyleSheet(Theme.get_batch_label_style())
-        self.batch_action_btn = QPushButton(f"  {T('discovery.actions.batch_actions')}")
+        self.batch_action_btn = QPushButton(T('discovery.actions.batch_actions'))
+        self.batch_action_btn.setIcon(Theme.get_icon("edit-3", size=16, color="#FFFFFF"))
         self.batch_action_btn.setStyleSheet(Theme.get_batch_button_style('primary'))
         self.batch_action_btn.clicked.connect(self._on_batch_actions_requested)
         self.batch_identify_btn = QPushButton(T("discovery.batch.identify"))
+        self.batch_identify_btn.setIcon(Theme.get_icon("wand-2", size=16, color="#FFFFFF"))
         self.batch_identify_btn.setStyleSheet(Theme.get_batch_button_style('identify'))
         self.batch_identify_btn.clicked.connect(self._on_batch_identify_requested)
 
         self.batch_restore_btn = QPushButton(T("discovery.actions.restore"))
+        self.batch_restore_btn.setIcon(Theme.get_icon("check", size=16, color="#FFFFFF"))
         self.batch_restore_btn.setStyleSheet(Theme.get_batch_button_style('success'))
         self.batch_restore_btn.clicked.connect(self._on_batch_restore_requested)
         self.batch_restore_btn.hide()
 
         # 3. Overflow Menu for Destructive Actions
-        self.batch_more_btn = QPushButton("•••")
+        self.batch_more_btn = QPushButton()
+        self.batch_more_btn.setIcon(Theme.get_icon("more-horizontal", size=20, color=Theme.TEXT_MAIN))
         self.batch_more_btn.setToolTip(T("common.more"))
         self.batch_more_btn.setFixedSize(54, 40)
         self.batch_more_btn.setCursor(Qt.PointingHandCursor)
@@ -190,10 +220,10 @@ class DiscoveryPage(QWidget):
         self.batch_menu = QMenu(self)
         self.batch_menu.setStyleSheet(Theme.get_context_menu_style())
         
-        clear_act = self.batch_menu.addAction(T("discovery.batch.clear"))
+        clear_act = self.batch_menu.addAction(Theme.get_icon("refresh", size=16, color=Theme.TEXT_MAIN), T("discovery.batch.clear"))
         clear_act.triggered.connect(self._on_batch_clear_requested)
         
-        ignore_act = self.batch_menu.addAction(T("discovery.batch.ignore"))
+        ignore_act = self.batch_menu.addAction(Theme.get_icon("trash-2", size=16, color=Theme.TEXT_MAIN), T("discovery.batch.ignore"))
         ignore_act.triggered.connect(self._on_batch_ignore_requested)
         
         self.batch_more_btn.setMenu(self.batch_menu)
@@ -258,7 +288,13 @@ class DiscoveryPage(QWidget):
         
         from PySide6.QtWidgets import QFileDialog
         
-        # Save as default if it's the first time or if requested (optional logic, but let's keep it simple)
+        start_dir = self.engine.config.settings.default_scan_path or os.path.expanduser("~")
+        path = QFileDialog.getExistingDirectory(self, T("discovery.messages.select_dir"), start_dir)
+        
+        if not path:
+            return
+
+        # Save as default if it's the first time
         if not self.engine.config.settings.default_scan_path:
             self.engine.config.settings.default_scan_path = path
             self.engine.config.save()
@@ -285,11 +321,14 @@ class DiscoveryPage(QWidget):
         
         # Check for OMDB failure
         if getattr(self.engine.resolver.library, '_omdb_auth_failed', False):
-            self.notif_bar.show_message(T("discovery.messages.omdb_auth_error"), type='error')
+            self.notif_bar.show_message(T("discovery.messages.omdb_auth_error"))
             
         self.refresh_data()
 
     def _on_data_ready(self, videos, poster_paths):
+        # Reset progress bar to normal mode for next use
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(0)
         self.progress_container.hide()
         self.progress_bar.hide()
 
@@ -379,6 +418,7 @@ class DiscoveryPage(QWidget):
             return
 
         row = selected[0].row()
+        self.inspector.set_empty() # Clear previous state
         file_id = table.item(row, 1).data(Qt.UserRole)
         file_data = self.engine.db.get_file_by_id(file_id)
         if file_data:
@@ -722,3 +762,33 @@ class DiscoveryPage(QWidget):
     def resizeEvent(self, event):
         super().resizeEvent(event)
         self.drop_overlay.setGeometry(self.rect())
+
+    def refresh_style(self):
+        """Forces a re-application of all dynamic styles."""
+        self.search_box.setStyleSheet(Theme.get_input_style())
+        
+        self.scan_new_btn.setStyleSheet(Theme.get_secondary_button_style())
+        self.scan_new_btn.setIcon(Theme.get_icon("search", size=16, color=Theme.TEXT_MAIN))
+        
+        self.refresh_btn.setStyleSheet(Theme.get_secondary_button_style())
+        self.refresh_btn.setIcon(Theme.get_icon("refresh", size=16, color=Theme.TEXT_MAIN))
+        
+        self.main_tabs.setStyleSheet(Theme.get_tab_widget_style())
+        self.apply_btn.setStyleSheet(Theme.get_primary_button_style())
+        
+        # Progress Bar
+        self.progress_bar.setStyleSheet(Theme.get_progress_bar_detailed_style())
+        self.status_info.setStyleSheet(Theme.get_status_label_style())
+        self.abort_btn.setStyleSheet(Theme.get_abort_button_style())
+        
+        # Batch Bar
+        self.batch_bar.setStyleSheet(Theme.get_batch_bar_style())
+        self.batch_label.setStyleSheet(Theme.get_batch_label_style())
+        
+        # Inspector
+        self.inspector.setStyleSheet(Theme.get_inspector_style())
+        if hasattr(self.inspector, 'refresh_style'):
+            self.inspector.refresh_style()
+        
+        # Overlay
+        self.drop_overlay.setStyleSheet(Theme.get_drop_overlay_style())

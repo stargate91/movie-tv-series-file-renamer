@@ -24,14 +24,17 @@ class DroppedView(QWidget):
         # Action Bar
         actions = QHBoxLayout()
         self.import_all_btn = QPushButton(T("discovery.dropped.import_all"))
+        self.import_all_btn.setIcon(Theme.get_icon("rocket", size=16, color="#FFFFFF"))
         self.import_all_btn.setStyleSheet(Theme.get_primary_button_style())
         self.import_all_btn.clicked.connect(self._on_import_all)
         
         self.import_sel_btn = QPushButton(T("discovery.dropped.import_selected"))
+        self.import_sel_btn.setIcon(Theme.get_icon("check", size=16, color=Theme.TEXT_MAIN))
         self.import_sel_btn.setStyleSheet(Theme.get_secondary_button_style())
         self.import_sel_btn.clicked.connect(self._on_import_selected)
         
         self.clear_btn = QPushButton(T("discovery.dropped.clear_list"))
+        self.clear_btn.setIcon(Theme.get_icon("trash-2", size=16, color="#FFFFFF"))
         self.clear_btn.setStyleSheet(Theme.get_danger_button_style())
         self.clear_btn.clicked.connect(self._on_clear_dropped)
         

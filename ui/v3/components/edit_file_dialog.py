@@ -116,6 +116,14 @@ class EditFileDialog(QDialog):
             self.combo_lang.addItem(T(f"common.languages.{code}"), code.upper())
         lang_lay.addWidget(self.combo_lang)
 
+        # Parent Link
+        self.link_group = QWidget()
+        link_lay = QVBoxLayout(self.link_group)
+        link_lay.setContentsMargins(0, 0, 0, 0)
+        link_lay.addWidget(QLabel(T("edit_file.fields.parent_link") or "Link to Parent:"))
+        self.combo_parent = QComboBox()
+        link_lay.addWidget(self.combo_parent)
+
         # Metadata Language Override
         self.metadata_lang_group = QWidget()
         ml_lay = QVBoxLayout(self.metadata_lang_group)
@@ -130,6 +138,7 @@ class EditFileDialog(QDialog):
         self.details_card.layout().addWidget(self.tv_group)
         self.details_card.layout().addWidget(self.movie_group)
         self.details_card.layout().addWidget(self.lang_group)
+        self.details_card.layout().addWidget(self.link_group)
         self.details_card.layout().addWidget(self.metadata_lang_group)
         layout.addWidget(self.details_card)
 

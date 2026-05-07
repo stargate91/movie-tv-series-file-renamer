@@ -48,7 +48,7 @@ class AdvancedTab(BaseSettingsTab):
         ):
             try:
                 # Actual wipe logic
-                self.engine.db.wipe_discovery_data()
+                self.engine.wipe_discovery_data()
                 self.database_wiped.emit()
                 ModernDialog.show_message(self, T("common.success"), T("settings.advanced.fields.wipe_success"), icon="check")
             except Exception as e:

@@ -35,6 +35,7 @@ GROUPS = {
         ("{VideoBitrate}", "Video bitrate"),
     ],
     "Extras & System": [
+        ("{ParentName}", "Parent movie/show name"),
         ("{Original}", "Original filename"),
         ("{Language}", "Extracted language code"),
         ("{ExtraCategory}", "Type of extra (e.g., Trailer)"),
@@ -46,11 +47,110 @@ GROUPS = {
     ]
 }
 
+# Flat tag lists for extras contexts (no submenus needed)
+EXTRAS_TAGS = [
+    ("{ParentName}", "Parent movie/show name"),
+    ("{ExtraCategory}", "Type of extra (e.g., Trailer)"),
+    ("{Original}", "Original filename"),
+]
+
+EXTRAS_LANG_TAGS = [
+    ("{ParentName}", "Parent movie/show name"),
+    ("{ExtraCategory}", "Type of extra (e.g., Trailer)"),
+    ("{Original}", "Original filename"),
+    ("{Language}", "Extracted language code"),
+]
+
+# Movie file/folder context: curated metadata + Technical submenu
+MOVIE_TAGS = [
+    ("{TMDB_ID}", "TMDB database ID"),
+    ("{IMDB_ID}", "IMDB database ID"),
+    ("{Title}", "Movie title"),
+    ("{Year}", "Release year"),
+    ("{RatingImdb}", "IMDB rating"),
+    ("{OriginalTitle}", "Original language title"),
+    ("{ReleaseDate}", "Full release date"),
+    ("{Part}", "Formatted part number (e.g., Part 1)"),
+    ("{PartRaw}", "Raw part number"),
+    ("{Custom}", "Custom user variable"),
+    ("{Edition}", "Release edition (e.g., Extended)"),
+]
+
+COLLECTION_TAGS = [
+    ("{Collection}", "Box Set or Collection name"),
+]
+
+# TV/Episode file/folder context: curated series+episode tags + Technical submenu
+TV_TAGS = [
+    ("{TMDB_ID}", "Series TMDB ID"),
+    ("{IMDB_ID}", "Series IMDB ID"),
+    ("{ShowTitle}", "Series title"),
+    ("{SeriesOriginalTitle}", "Series original title"),
+    ("{Network}", "TV Network or Streaming service"),
+    ("{EpisodeTMDB_ID}", "Episode TMDB ID"),
+    ("{EpisodeIMDB_ID}", "Episode IMDB ID"),
+    ("{Season}", "Formatted season (e.g., S01)"),
+    ("{Episode}", "Formatted episode (e.g., E01)"),
+    ("{EpisodeTitle}", "Title of the episode"),
+    ("{EpisodeAirDate}", "Episode air date"),
+    ("{EpisodeAirYear}", "Episode air year"),
+    ("{EpisodeRatingImdb}", "Episode IMDB rating"),
+    ("{Part}", "Formatted part number (e.g., Part 1)"),
+    ("{PartRaw}", "Raw part number"),
+    ("{Custom}", "Custom user variable"),
+]
+
+# Season folder context
+SEASON_FOLDER_TAGS = [
+    ("{SeasonTMDB_ID}", "Season TMDB ID"),
+    ("{Season}", "Formatted season (e.g., S01)"),
+    ("{SeasonName}", "Name of the season"),
+    ("{SeasonAirDate}", "Season air date"),
+    ("{SeasonEpisodeCount}", "Episode count for the season"),
+    ("{SeasonResolution}", "Mixed resolution for the season"),
+    ("{Custom}", "Custom user variable"),
+]
+
+# Series (show) folder context
+SERIES_FOLDER_TAGS = [
+    ("{TMDB_ID}", "Series TMDB ID"),
+    ("{IMDB_ID}", "Series IMDB ID"),
+    ("{ShowTitle}", "Series title"),
+    ("{Director}", "Director name"),
+    ("{SeriesRating}", "Series IMDB rating"),
+    ("{SeriesOriginalTitle}", "Series original title"),
+    ("{FirstAirDate}", "First air date"),
+    ("{LastAirDate}", "Last air date"),
+    ("{FirstAirYear}", "First air year"),
+    ("{LastAirYear}", "Last air year"),
+    ("{YearRange}", "Year range (e.g., 2010-2015)"),
+    ("{EpisodeCount}", "Total number of episodes"),
+    ("{SeasonCount}", "Total number of seasons"),
+    ("{SeriesStatus}", "Series status (e.g., Ended)"),
+    ("{SeriesType}", "Series type (e.g., Scripted)"),
+    ("{Network}", "TV Network or Streaming service"),
+    ("{SeriesResolution}", "Mixed resolution across series"),
+]
+
 def get_menu_items(context):
-    allowed = ["Technical", "Extras & System"]
-    if context in ("movie", "all"): allowed.insert(0, "Media Info")
-    if context in ("tv", "all"): allowed.insert(1, "TV Specific")
-    
+    # Simple flat contexts
+    if context == "extras":
+        return EXTRAS_TAGS
+    if context == "extras_lang":
+        return EXTRAS_LANG_TAGS
+    if context == "collection":
+        return COLLECTION_TAGS
+    if context == "season":
+        return SEASON_FOLDER_TAGS
+    if context == "series":
+        return SERIES_FOLDER_TAGS
+    if context == "movie":
+        return {"_flat": MOVIE_TAGS, "Technical": GROUPS["Technical"]}
+    if context == "tv":
+        return {"_flat": TV_TAGS, "Technical": GROUPS["Technical"]}
+
+    # Fallback for "all" or unknown contexts
+    allowed = ["Media Info", "TV Specific", "Technical", "Extras & System"]
     res = {}
     for k in allowed:
         if k in GROUPS: res[k] = GROUPS[k]
@@ -90,11 +190,23 @@ class TemplateLineEdit(QLineEdit):
         
     def _populate_menu(self):
         items = get_menu_items(self.context)
-        for group, vars in items.items():
-            sub = self.menu.addMenu(group)
-            for var, desc in vars:
-                action = sub.addAction(f"{var}  —  {desc}")
+        if isinstance(items, list):
+            # Flat list — no submenus
+            for var, desc in items:
+                action = self.menu.addAction(f"{var}  —  {desc}")
                 action.setData(var)
+        else:
+            for group, tags in items.items():
+                if group == "_flat":
+                    # Top-level flat tags (no submenu)
+                    for var, desc in tags:
+                        action = self.menu.addAction(f"{var}  —  {desc}")
+                        action.setData(var)
+                else:
+                    sub = self.menu.addMenu(group)
+                    for var, desc in tags:
+                        action = sub.addAction(f"{var}  —  {desc}")
+                        action.setData(var)
         self.menu.triggered.connect(self._on_action)
 
     def _on_action(self, action):

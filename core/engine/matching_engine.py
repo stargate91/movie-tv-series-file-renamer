@@ -93,6 +93,7 @@ class MatchingEngine:
                     results.append({
                         'tmdb_id': r['id'],
                         'title': r.get('title', ''),
+                        'original_title': r.get('original_title', ''),
                         'year': self._extract_year(r.get('release_date', '')),
                         'media_type': 'movie',
                         'poster_path': r.get('poster_path'),
@@ -105,6 +106,7 @@ class MatchingEngine:
                     results.append({
                         'tmdb_id': r['id'],
                         'title': r.get('name', ''),
+                        'original_title': r.get('original_name', ''),
                         'year': self._extract_year(r.get('first_air_date', '')),
                         'media_type': 'tv',
                         'poster_path': r.get('poster_path'),
@@ -119,19 +121,24 @@ class MatchingEngine:
         """
         Returns (is_confident, is_super_confident).
         Super confident means exact title (normalized) AND exact year.
+        Checks against both translated and original titles.
         """
         result_title = result.get('title', '')
+        original_title = result.get('original_title', '')
         result_year = result.get('year')
         
         norm_search = self._normalize(search_title)
         norm_result = self._normalize(result_title)
+        norm_original = self._normalize(original_title)
         
-        if not norm_search or not norm_result:
+        if not norm_search or (not norm_result and not norm_original):
             return False, False
         
         # Title check: normalized containment
-        title_exact = (norm_search == norm_result)
-        title_ok = title_exact or (norm_search in norm_result) or (norm_result in norm_search)
+        title_exact = (norm_search == norm_result) or (norm_search == norm_original)
+        title_ok = title_exact or \
+                  (norm_search in norm_result) or (norm_result in norm_search) or \
+                  (norm_search in norm_original) or (norm_original in norm_search)
         
         # Exact year match
         exact_year = str(search_year) == str(result_year) if search_year and result_year else False

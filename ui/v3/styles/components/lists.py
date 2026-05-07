@@ -79,3 +79,11 @@ class ListStyles:
                 margin: 4px 10px;
             }}
         """
+
+    @staticmethod
+    def get_result_item_title_style():
+        return f"color: {Palette.TEXT_MAIN}; font-weight: 700; font-size: 13px;"
+
+    @staticmethod
+    def get_result_item_meta_style():
+        return f"color: {Palette.TEXT_MUTED}; font-size: 11px;"

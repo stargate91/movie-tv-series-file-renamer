@@ -20,13 +20,12 @@ class ResultItemWidget(QWidget):
         # 1. Icon / Indicator
         icon_lbl = QLabel()
         m_type = self.data.get('media_type', 'movie')
-        if m_type == 'tv': icon_text = "📺"
-        elif m_type == 'season': icon_text = "📂"
-        elif m_type == 'episode': icon_text = "📄"
-        else: icon_text = "🎬"
+        if m_type == 'tv': icon_name = "tv"
+        elif m_type == 'season': icon_name = "folder"
+        elif m_type == 'episode': icon_name = "file-text"
+        else: icon_name = "movie"
         
-        icon_lbl.setText(icon_text)
-        icon_lbl.setStyleSheet("font-size: 18px;")
+        icon_lbl.setPixmap(Theme.get_pixmap(icon_name, size=18, color=Theme.TEXT_MUTED))
         layout.addWidget(icon_lbl)
 
         # 2. Text Info

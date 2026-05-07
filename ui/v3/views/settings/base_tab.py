@@ -2,6 +2,7 @@ from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEd
 from PySide6.QtCore import Qt
 from ui.v3.styles.theme import Theme
 from ui.v3.components.template_input import TemplateLineEdit
+from core.i18n import T
 
 class BaseSettingsTab(QWidget):
     """
@@ -47,9 +48,9 @@ class BaseSettingsTab(QWidget):
         edit.setFixedHeight(40)
         edit.setStyleSheet(Theme.get_settings_input_style())
         
-        btn = QPushButton("Browse")
+        btn = QPushButton(T("common.browse"))
         btn.setStyleSheet(Theme.get_secondary_button_style())
-        btn.setFixedSize(80, 40)
+        btn.setFixedHeight(40)
         btn.clicked.connect(lambda: browse_callback(category, edit))
         
         row.addWidget(edit)

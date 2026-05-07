@@ -34,7 +34,7 @@ class PremiumDelegate(QStyledItemDelegate):
             painter.drawLine(option.rect.left() + 10, option.rect.top(), option.rect.right() - 10, option.rect.top())
 
         painter.restore()
-        if index.column() not in (0, 4):
+        if index.column() != 0:
             super().paint(painter, option, index)
 
 class DiscoveryTable(QTableWidget):
@@ -55,12 +55,11 @@ class DiscoveryTable(QTableWidget):
         self._init_setup()
 
     def _init_setup(self):
-        self.setColumnCount(6)
+        self.setColumnCount(5)
         self.setHorizontalHeaderLabels([
             T("discovery.table.status"), 
             T("discovery.table.original_name"), 
             T("discovery.table.type"), 
-            "Part",
             T("discovery.table.new_name"), 
             T("discovery.table.actions")
         ])
@@ -86,11 +85,9 @@ class DiscoveryTable(QTableWidget):
         header.setSectionResizeMode(1, QHeaderView.Stretch)
         header.setSectionResizeMode(2, QHeaderView.Fixed)
         self.setColumnWidth(2, 100)
-        header.setSectionResizeMode(3, QHeaderView.Fixed)
-        self.setColumnWidth(3, 80)
-        header.setSectionResizeMode(4, QHeaderView.Stretch)
-        header.setSectionResizeMode(5, QHeaderView.Fixed)
-        self.setColumnWidth(5, 300) # Maximum spacious width
+        header.setSectionResizeMode(3, QHeaderView.Stretch)
+        header.setSectionResizeMode(4, QHeaderView.Fixed)
+        self.setColumnWidth(4, 300) # Maximum spacious width
         header.setDefaultAlignment(Qt.AlignLeft)
         self.verticalHeader().setDefaultSectionSize(72) # Maximum 72px row height
         
@@ -159,20 +156,12 @@ class DiscoveryTable(QTableWidget):
                     type_item.setData(Qt.UserRole + 1, True)
                 self.setItem(i, 2, type_item)
 
-                # 3. Part
-                part_val = vid.get('part', '')
-                part_item = QTableWidgetItem(str(part_val) if part_val else "")
-                part_item.setTextAlignment(Qt.AlignCenter)
-                if is_new_group:
-                    part_item.setData(Qt.UserRole + 1, True)
-                self.setItem(i, 3, part_item)
-
-                # 4. New Name Preview
+                # 3. New Name Preview
                 ident_text = vid.get('_new_name') or "-"
                 preview_item = QTableWidgetItem(ident_text)
                 if is_new_group:
                     preview_item.setData(Qt.UserRole + 1, True)
-                self.setItem(i, 4, preview_item)
+                self.setItem(i, 3, preview_item)
 
                 # 4. Actions
                 actions_widget = QWidget()
@@ -184,7 +173,8 @@ class DiscoveryTable(QTableWidget):
                 primary_btn = None
                 if status == 'IGNORED':
                     # Restore Button for Trash
-                    primary_btn = QPushButton("📥")
+                    primary_btn = QPushButton()
+                    primary_btn.setIcon(Theme.get_icon("refresh", size=20, color="white"))
                     primary_btn.setToolTip(T("discovery.actions.restore"))
                     primary_btn.setFixedSize(54, 46)
                     primary_btn.setCursor(Qt.PointingHandCursor)
@@ -192,7 +182,8 @@ class DiscoveryTable(QTableWidget):
                     primary_btn.clicked.connect(lambda checked=False, fid=vid['id']: self.restore_requested.emit(fid, i))
                 elif raw_cat == 'video':
                     # API Resolve Button (Only for videos)
-                    primary_btn = QPushButton("🛠️")
+                    primary_btn = QPushButton()
+                    primary_btn.setIcon(Theme.get_icon("wand", size=20, color="white"))
                     primary_btn.setToolTip(T("discovery.actions.fix"))
                     primary_btn.setFixedSize(54, 46)
                     primary_btn.setCursor(Qt.PointingHandCursor)
@@ -206,7 +197,8 @@ class DiscoveryTable(QTableWidget):
                     actions_layout.addWidget(primary_btn)
                     
                     # 2. Open Folder
-                    open_btn = QPushButton("📂")
+                    open_btn = QPushButton()
+                    open_btn.setIcon(Theme.get_icon("folder", size=20, color=Theme.TEXT_MAIN))
                     open_btn.setToolTip(T("discovery.actions.open_folder"))
                     open_btn.setFixedSize(54, 46)
                     open_btn.setCursor(Qt.PointingHandCursor)
@@ -220,7 +212,8 @@ class DiscoveryTable(QTableWidget):
                     
                     # --- 2. Base Edit Button (Only for videos) ---
                     if raw_cat == 'video':
-                        edit_btn = QPushButton("✏️")
+                        edit_btn = QPushButton()
+                        edit_btn.setIcon(Theme.get_icon("pencil", size=20, color=Theme.TEXT_MAIN))
                         edit_btn.setToolTip(T("discovery.actions.edit"))
                         edit_btn.setFixedSize(54, 46)
                         edit_btn.setCursor(Qt.PointingHandCursor)
@@ -229,7 +222,8 @@ class DiscoveryTable(QTableWidget):
                         actions_layout.addWidget(edit_btn)
 
                     # --- 3. Overflow Menu (...) ---
-                    overflow_btn = QPushButton("•••")
+                    overflow_btn = QPushButton()
+                    overflow_btn.setIcon(Theme.get_icon("more-horizontal", size=20, color=Theme.TEXT_MAIN))
                     overflow_btn.setToolTip(T("common.more"))
                     overflow_btn.setFixedSize(54, 46)
                     overflow_btn.setCursor(Qt.PointingHandCursor)
@@ -238,7 +232,7 @@ class DiscoveryTable(QTableWidget):
                     actions_layout.addWidget(overflow_btn)
 
                 actions_layout.addStretch()
-                self.setCellWidget(i, 5, actions_widget)
+                self.setCellWidget(i, 4, actions_widget)
 
             except Exception as row_err:
                 import logging
@@ -283,12 +277,12 @@ class DiscoveryTable(QTableWidget):
             # Trash Context Menu: Minimal
             is_multi = len(set(item.row() for item in self.selectedItems())) > 1
             
-            restore_act = menu.addAction("📥  " + T("discovery.actions.restore"))
+            restore_act = menu.addAction(Theme.get_icon("refresh", size=16, color=Theme.TEXT_MAIN), T("discovery.actions.restore"))
             restore_act.triggered.connect(lambda: self.restore_requested.emit(file_id, 0))
             
             if not is_multi:
                 menu.addSeparator()
-                open_act = menu.addAction("📂  " + T("discovery.actions.open_folder"))
+                open_act = menu.addAction(Theme.get_icon("folder", size=16, color=Theme.TEXT_MAIN), T("discovery.actions.open_folder"))
                 if path:
                     open_act.triggered.connect(lambda: self.open_folder_requested.emit(path))
                 else:
@@ -301,8 +295,8 @@ class DiscoveryTable(QTableWidget):
                 # 1. API Fix / Identify
                 if raw_cat == 'video':
                     label = T("discovery.actions.batch_identify") if is_multi else T("discovery.actions.fix")
-                    icon = "🪄" if is_multi else "🛠️"
-                    fix_act = menu.addAction(f"{icon}  {label}")
+                    icon_name = "wand"
+                    fix_act = menu.addAction(Theme.get_icon(icon_name, size=16, color=Theme.TEXT_MAIN), label)
                     
                     if is_multi:
                         fix_act.triggered.connect(self.batch_identify_requested.emit)
@@ -314,8 +308,8 @@ class DiscoveryTable(QTableWidget):
                 
                 # 2. Manual Edit (For all)
                 edit_label = T("discovery.actions.batch_actions") if is_multi else T("discovery.actions.edit")
-                edit_icon = "🪄" if is_multi else "✏️"
-                edit_act = menu.addAction(f"{edit_icon}  {edit_label}")
+                edit_icon = "wand" if is_multi else "pencil"
+                edit_act = menu.addAction(Theme.get_icon(edit_icon, size=16, color=Theme.TEXT_MAIN), edit_label)
                 
                 if is_multi:
                     edit_act.triggered.connect(self.batch_edit_requested.emit)
@@ -327,7 +321,7 @@ class DiscoveryTable(QTableWidget):
                 menu.addSeparator()
 
             # 3. Folder Action
-            open_act = menu.addAction("📂  " + T("discovery.actions.open_folder"))
+            open_act = menu.addAction(Theme.get_icon("folder", size=16, color=Theme.TEXT_MAIN), T("discovery.actions.open_folder"))
             if path:
                 open_act.triggered.connect(lambda: self.open_folder_requested.emit(path))
             else:
@@ -335,14 +329,14 @@ class DiscoveryTable(QTableWidget):
                 
             # 4. Clear Match Action (Only for videos)
             if raw_cat == 'video':
-                clear_act = menu.addAction("🔄  " + T("discovery.actions.clear_match"))
+                clear_act = menu.addAction(Theme.get_icon("refresh", size=16, color=Theme.TEXT_MAIN), T("discovery.actions.clear_match"))
                 clear_act.setEnabled(status == 'MATCHED')
                 clear_act.triggered.connect(lambda: self.clear_match_requested.emit(file_id))
             
             menu.addSeparator()
             
             # 5. Ignore Action
-            ignore_act = menu.addAction("🗑️  " + T("discovery.actions.ignore"))
+            ignore_act = menu.addAction(Theme.get_icon("trash-2", size=16, color=Theme.TEXT_MAIN), T("discovery.actions.ignore"))
             ignore_act.triggered.connect(lambda: self.ignore_requested.emit(file_id))
         
         menu.exec(global_pos)
@@ -415,11 +409,7 @@ class DiscoveryTable(QTableWidget):
                 # Update Preview
                 new_name = engine.formatter.generate_name(file_id, engine.config.settings)
                 preview = f"{new_name}{os.path.splitext(file_data.get('file_name', ''))[1]}" if new_name else "-"
-                self.setItem(row, 4, QTableWidgetItem(preview))
-                
-                # Update Part
-                part_val = file_data.get('part', '')
-                self.setItem(row, 3, QTableWidgetItem(str(part_val) if part_val else ""))
+                self.setItem(row, 3, QTableWidgetItem(preview))
                 break
 
     def _get_type_display(self, raw_cat, mtype, sub_cat):

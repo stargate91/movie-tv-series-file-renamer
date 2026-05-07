@@ -20,40 +20,58 @@ class AssetLinker:
         return results
 
     def _build_index(self, video_paths):
-        """Groups video files by directory and pre-fetches sizes."""
+        """Groups video files by directory and pre-fetches sizes with strict normalization."""
         index = {}
         for v in video_paths:
-            d = os.path.normpath(os.path.dirname(v)).lower()
+            # Force absolute path, consistent separators and lower case for the key
+            v_norm = os.path.normpath(os.path.abspath(v))
+            d = os.path.dirname(v_norm).lower()
             if d not in index: index[d] = []
-            try: size = os.path.getsize(v)
-            except: size = 0
-            index[d].append({'path': v, 'name': os.path.splitext(os.path.basename(v))[0].lower(), 'size': size})
+            try: 
+                size = os.path.getsize(v_norm)
+            except: 
+                size = 0
+            index[d].append({
+                'path': v_norm, 
+                'name': os.path.splitext(os.path.basename(v_norm))[0].lower(), 
+                'size': size
+            })
         return index
 
     def _find_in_index(self, asset_path, video_index):
-        asset_dir = os.path.normpath(os.path.dirname(asset_path)).lower()
+        # Normalize paths for cross-platform and case-insensitive comparison
+        asset_path = os.path.normpath(os.path.abspath(asset_path))
+        asset_dir = os.path.dirname(asset_path).lower()
         asset_name = os.path.splitext(os.path.basename(asset_path))[0].lower()
-        target = asset_name.replace('sample', '').replace('trailer', '').replace('bonus', '').strip(' -._')
+        
+        # Clean target string (remove common extra/sample keywords)
+        target = asset_name
+        for kw in ['sample', 'trailer', 'bonus', 'minta', 'extra']:
+            target = target.replace(kw, '')
+        target = target.strip(' -._')
         
         current_lookup = asset_dir
         for _ in range(3):
             folder_vids = video_index.get(current_lookup, [])
             if folder_vids:
-                # 1. Name match
-                for v in folder_vids:
-                    if target and (target in v['name'] or v['name'] in target):
-                        return v['path']
+                # 1. Name match (prioritize specific naming)
+                if target and len(target) > 1:
+                    for v in folder_vids:
+                        v_name = v['name']
+                        if target in v_name or v_name in target:
+                            return v['path']
                 
-                # 2. Heuristics (Largest)
-                if len(folder_vids) == 1: return folder_vids[0]['path']
-                
-                # Sort by pre-fetched size
-                folder_vids.sort(key=lambda x: x['size'], reverse=True)
-                return folder_vids[0]['path']
+                # 2. Heuristics (Largest file in directory)
+                # Filter out ourself (using normalized path)
+                candidates = [v for v in folder_vids if v['path'].lower() != asset_path.lower()]
+                if candidates:
+                    # Sort by size to pick the most likely "Main Feature"
+                    candidates.sort(key=lambda x: x['size'], reverse=True)
+                    return candidates[0]['path']
 
-            # Move up
+            # Move up to parent directory
             new_dir = os.path.dirname(current_lookup)
-            if new_dir == current_lookup or not new_dir: break
+            if new_dir == current_lookup or not new_dir or len(new_dir) < 3: break
             current_lookup = new_dir
-            
+
         return None

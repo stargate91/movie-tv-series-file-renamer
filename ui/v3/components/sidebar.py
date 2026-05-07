@@ -102,3 +102,32 @@ class Sidebar(QFrame):
         }
         if index in buttons:
             buttons[index].setChecked(True)
+
+    def refresh_style(self):
+        """Re-applies all styles to handle theme changes."""
+        self.setStyleSheet(Theme.get_settings_sidebar_style())
+        
+        # 1. Branding
+        for i in range(self.layout().count()):
+            w = self.layout().itemAt(i).widget()
+            if isinstance(w, QLabel):
+                if w.text() == T("app.name"):
+                    w.setStyleSheet(Theme.get_sidebar_title_style())
+                elif w.text() == T("app.subtitle"):
+                    w.setStyleSheet(Theme.get_sidebar_subtitle_style())
+
+        # 2. Nav Buttons
+        nav_buttons = [
+            (self.btn_dash, "home"),
+            (self.btn_lib, "folder"),
+            (self.btn_hist, "history"),
+            (self.btn_sett, "settings")
+        ]
+        for btn, icon in nav_buttons:
+            btn.setIcon(Theme.get_icon(icon, size=18, color=Theme.TEXT_MUTED))
+            # QSS handles the rest via #NavButton selector in main stylesheet
+
+        # 3. Support & System
+        self.btn_support.setStyleSheet(Theme.get_support_button_style())
+        self.btn_restart.setIcon(Theme.get_icon("refresh", size=16, color=Theme.TEXT_MUTED))
+        self.btn_quit.setIcon(Theme.get_icon("logout", size=16, color=Theme.TEXT_MUTED))

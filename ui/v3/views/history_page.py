@@ -48,7 +48,8 @@ class HistoryBatchCard(QFrame):
         header_layout.addStretch()
 
         # Undo Button
-        self.undo_btn = QPushButton(f"🔄 {T('history.undo_btn')}")
+        self.undo_btn = QPushButton(T('history.undo_btn'))
+        self.undo_btn.setIcon(Theme.get_icon("refresh", size=16, color=Theme.TEXT_MAIN))
         self.undo_btn.setCursor(Qt.PointingHandCursor)
         self.undo_btn.setStyleSheet(Theme.get_history_undo_button_style())
         self.undo_btn.clicked.connect(lambda: self.undo_requested.emit(self.batch_id))

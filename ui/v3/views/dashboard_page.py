@@ -58,6 +58,48 @@ class DashboardPage(QWidget):
         layout.addLayout(content_layout)
         layout.addStretch()
 
+    def refresh_data(self):
+        """Fetches latest stats from database and updates labels."""
+        try:
+            m_count = self.engine.db.media.get_count('movie')
+            s_count = self.engine.db.media.get_count('tv')
+        except:
+            m_count, s_count = 0, 0
+            
+        self.movie_val.setText(str(m_count))
+        self.movie_txt.setText(T("common.types.movie") if m_count == 1 else (T("common.types.movies") or "Movies"))
+        
+        self.show_val.setText(str(s_count))
+        self.show_txt.setText(T("common.types.tv") if s_count == 1 else (T("common.types.tv_shows") or "TV Shows"))
+
+    def refresh_style(self):
+        """Updates the internal cards to use the new theme colors."""
+        self.greeting_label.setStyleSheet(f"letter-spacing: 1px; {Theme.get_h2_style()}")
+        self.title_label.setStyleSheet(f"font-size: 32px; {Theme.get_h1_style()}")
+        
+        # We don't need to recreate cards, just update the stylesheet of existing ones
+        self.scan_card.setStyleSheet(f"""
+            QFrame#ActionCard {{
+                background-color: {Theme.SURFACE};
+                border: 1px solid {Theme.BORDER};
+                border-bottom: 4px solid {Theme.PRIMARY};
+                border-radius: 16px;
+            }}
+            QFrame#ActionCard:hover {{
+                background-color: {Theme.SURFACE_LIGHT};
+                border-color: {Theme.PRIMARY};
+            }}
+        """)
+        self.stats_card.setStyleSheet(f"""
+            QFrame#StatsCard {{
+                background-color: {Theme.SURFACE};
+                border: 1px solid {Theme.BORDER};
+                border-radius: 16px;
+            }}
+        """)
+        # Refresh pixmaps in stat items would require more tracking, 
+        # but the main colors are updated via setStyleSheet on the page.
+
     def _get_greeting(self):
         hour = datetime.datetime.now().hour
         if 5 <= hour < 12: greeting = T("greeting.morning")
@@ -144,8 +186,14 @@ class DashboardPage(QWidget):
         except:
             m_count, s_count = 0, 0
 
-        stats_grid.addLayout(self._create_stat_item("movie", m_count, T("common.types.movie") if m_count == 1 else (T("common.types.movies") or "Movies")))
-        stats_grid.addLayout(self._create_stat_item("tv", s_count, T("common.types.tv") if s_count == 1 else (T("common.types.tv_shows") or "TV Shows")))
+        # Movies
+        m_lay, self.movie_val, self.movie_txt = self._create_stat_item("movie", m_count, T("common.types.movie") if m_count == 1 else (T("common.types.movies") or "Movies"))
+        stats_grid.addLayout(m_lay)
+        
+        # Shows
+        s_lay, self.show_val, self.show_txt = self._create_stat_item("tv", s_count, T("common.types.tv") if s_count == 1 else (T("common.types.tv_shows") or "TV Shows"))
+        stats_grid.addLayout(s_lay)
+        
         stats_grid.addStretch()
         
         layout.addLayout(stats_grid)
@@ -162,7 +210,7 @@ class DashboardPage(QWidget):
         icon_lbl.setStyleSheet("margin-bottom: 5px; border: none; background: transparent;")
         
         val_lbl = QLabel(str(value))
-        val_lbl.setStyleSheet(f"font-size: 36px; font-weight: 800; color: {Theme.PRIMARY};")
+        val_lbl.setStyleSheet(Theme.get_stat_value_style())
         
         txt_lbl = QLabel(label)
         txt_lbl.setStyleSheet(f"text-transform: uppercase; letter-spacing: 1px; {Theme.get_hint_style()}")
@@ -170,4 +218,4 @@ class DashboardPage(QWidget):
         lay.addWidget(icon_lbl)
         lay.addWidget(val_lbl)
         lay.addWidget(txt_lbl)
-        return lay
+        return lay, val_lbl, txt_lbl

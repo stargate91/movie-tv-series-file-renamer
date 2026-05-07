@@ -1,7 +1,29 @@
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame, QScrollArea
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QSize
+from PySide6.QtGui import QFontMetrics
 from ui.v3.styles.theme import Theme
 from core.i18n import T
+
+class ElidedLabel(QLabel):
+    """Custom label that elides text with '...' if it's too long for the available space."""
+    def __init__(self, text="", parent=None):
+        super().__init__(text, parent)
+        self.setMinimumWidth(1) # Allow it to shrink
+        self._full_text = text
+
+    def setText(self, text):
+        self._full_text = text
+        self._update_elision()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._update_elision()
+
+    def _update_elision(self):
+        metrics = QFontMetrics(self.font())
+        elided = metrics.elidedText(self._full_text, Qt.ElideRight, self.width())
+        super().setText(elided)
+        self.setToolTip(self._full_text if elided != self._full_text else "")
 
 class MediaSection(QWidget):
     """
@@ -12,50 +34,28 @@ class MediaSection(QWidget):
         self._init_ui()
 
     def _init_ui(self):
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(12)
+        self.content_layout = QVBoxLayout(self)
+        self.content_layout.setContentsMargins(0, 0, 0, 0)
+        self.content_layout.setSpacing(5)
 
-        # 1. Title & Status Row
-        title_row = QHBoxLayout()
-        self.title_lbl = QLabel(T("discovery.inspector.empty.title"))
-        self.title_lbl.setStyleSheet(Theme.get_inspector_title_style())
-        self.title_lbl.setWordWrap(True)
-        title_row.addWidget(self.title_lbl)
-        layout.addLayout(title_row)
+        # Labels for the vertical stack (Each is one line, elided if too long)
+        self.lbl_main = ElidedLabel("")
+        self.lbl_main.setStyleSheet(Theme.get_inspector_title_style())
+        self.content_layout.addWidget(self.lbl_main)
 
-        # 2. Year & Status Badge
-        sub_row = QHBoxLayout()
-        self.year_lbl = QLabel("")
-        self.year_lbl.setStyleSheet(Theme.get_inspector_year_style())
-        sub_row.addWidget(self.year_lbl)
-        
-        self.status_badge = QLabel("")
-        self.status_badge.setAlignment(Qt.AlignCenter)
-        self.status_badge.hide()
-        sub_row.addStretch()
-        sub_row.addWidget(self.status_badge)
-        layout.addLayout(sub_row)
+        self.lbl_year = ElidedLabel("")
+        self.lbl_year.setStyleSheet(Theme.get_inspector_year_style())
+        self.content_layout.addWidget(self.lbl_year)
 
-        # 3. Episode Frame (TV specific)
-        self.ep_frame = QFrame()
-        self.ep_frame.setStyleSheet(Theme.get_inspector_ep_frame_style())
-        ep_layout = QVBoxLayout(self.ep_frame)
-        ep_layout.setContentsMargins(14, 12, 14, 12)
-        ep_layout.setSpacing(4)
+        self.lbl_id = ElidedLabel("")
+        self.lbl_id.setStyleSheet(Theme.get_inspector_ep_id_style())
+        self.content_layout.addWidget(self.lbl_id)
 
-        self.ep_id_lbl = QLabel("")
-        self.ep_id_lbl.setStyleSheet(Theme.get_inspector_ep_id_style())
-        self.ep_title_lbl = QLabel("")
-        self.ep_title_lbl.setWordWrap(True)
-        self.ep_title_lbl.setStyleSheet(Theme.get_inspector_ep_title_style())
-        
-        ep_layout.addWidget(self.ep_id_lbl)
-        ep_layout.addWidget(self.ep_title_lbl)
-        self.ep_frame.hide()
-        layout.addWidget(self.ep_frame)
+        self.lbl_sub = ElidedLabel("")
+        self.lbl_sub.setStyleSheet(Theme.get_inspector_ep_title_style())
+        self.content_layout.addWidget(self.lbl_sub)
 
-        # 4. Overview
+        # Overview Section
         self.overview_lbl = QLabel(T("discovery.inspector.empty.overview"))
         self.overview_lbl.setWordWrap(True)
         self.overview_lbl.setStyleSheet(Theme.get_inspector_overview_style())
@@ -65,46 +65,69 @@ class MediaSection(QWidget):
         scroll.setFrameShape(QFrame.NoFrame)
         scroll.setStyleSheet(Theme.get_scroll_area_style())
         scroll.setWidget(self.overview_lbl)
-        layout.addWidget(scroll, 1)
+        self.content_layout.addWidget(scroll, 1)
 
-    def update_media(self, data):
-        if not data: return
-        self.title_lbl.setText(data.get('title', T("common.none"))) # Or unknown
-        self.year_lbl.setText(str(data.get('year', '')))
-        self.overview_lbl.setText(data.get('overview', T("discovery.inspector.empty.no_description")))
+    def update_unmatched(self, file_data):
+        if not file_data: return
+        self.clear()
+        self.lbl_main.setText(file_data.get('file_name', T("common.none")))
+        self.lbl_main.show()
+        self.overview_lbl.setText(T("discovery.inspector.empty.overview"))
 
-    def update_episode(self, ep_data_list):
-        if not ep_data_list:
-            self.ep_frame.hide()
-            return
+    def update_movie(self, media_data):
+        if not media_data: return
+        self.clear()
+        self.lbl_main.setText(media_data.get('title', T("common.none")))
+        self.lbl_main.show()
+        year = str(media_data.get('year', ''))
+        self.lbl_year.setText(year)
+        self.lbl_year.setVisible(bool(year))
+        self.overview_lbl.setText(media_data.get('overview', T("discovery.inspector.empty.overview")))
+
+    def update_episode(self, media_data, ep_data_list):
+        if not media_data or not ep_data_list: return
+        self.clear()
+        if not isinstance(ep_data_list, list): ep_data_list = [ep_data_list]
         
-        if not isinstance(ep_data_list, list):
-            ep_data_list = [ep_data_list]
-            
+        # 1. Series Title
+        self.lbl_main.setText(media_data.get('title', ''))
+        self.lbl_main.show()
+        
+        # 2. Episode Year
+        year = ep_data_list[0].get('air_date', '')[:4] or str(media_data.get('year', ''))
+        self.lbl_year.setText(year)
+        self.lbl_year.setVisible(bool(year))
+        
+        # 3. S/E (IDs)
         ids = []
-        titles = []
+        ep_titles = []
         for ep in ep_data_list:
             s = ep.get('season_number', '?')
             e = ep.get('episode_number', '?')
             ids.append(f"S{str(s).zfill(2)}E{str(e).zfill(2)}")
-            titles.append(ep.get('name', 'Untitled Episode'))
-            
-        self.ep_id_lbl.setText(", ".join(ids))
-        self.ep_title_lbl.setText(" / ".join(titles))
-        self.ep_frame.show()
+            if ep.get('name'):
+                ep_titles.append(ep.get('name'))
+        
+        self.lbl_id.setText(", ".join(ids))
+        self.lbl_id.setVisible(bool(ids))
+        
+        # 4. Episode Title
+        self.lbl_sub.setText(" / ".join(ep_titles))
+        self.lbl_sub.setVisible(bool(ep_titles))
+        self.overview_lbl.setText(media_data.get('overview', T("discovery.inspector.empty.overview")))
 
     def update_status(self, status):
-        if not status:
-            self.status_badge.hide()
-            return
-        color = Theme.STATUS_COLORS.get(status, '#64748B')
-        self.status_badge.setText(status)
-        self.status_badge.setStyleSheet(Theme.get_status_badge_style(color))
-        self.status_badge.show()
+        # Now handled by PosterCarousel
+        pass
 
     def clear(self):
-        self.title_lbl.setText(T("discovery.inspector.empty.title"))
-        self.year_lbl.setText("")
+        self.lbl_main.setText("")
+        self.lbl_main.hide()
+        self.lbl_year.setText("")
+        self.lbl_year.hide()
+        self.lbl_id.setText("")
+        self.lbl_id.hide()
+        self.lbl_sub.setText("")
+        self.lbl_sub.hide()
         self.overview_lbl.setText(T("discovery.inspector.empty.overview"))
-        self.status_badge.hide()
-        self.ep_frame.hide()
+

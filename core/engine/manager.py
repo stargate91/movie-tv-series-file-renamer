@@ -90,3 +90,9 @@ class RenamerEngineV3:
         Returns recent rename history.
         """
         return self.db.history.get_recent(limit)
+
+    def wipe_discovery_data(self):
+        """Clears all discovery data from DB and resets in-memory caches."""
+        self.db.wipe_discovery_data()
+        if hasattr(self.resolver, 'library'):
+            self.resolver.library._enriched_ids.clear()

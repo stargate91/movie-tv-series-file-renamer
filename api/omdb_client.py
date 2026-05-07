@@ -13,7 +13,7 @@ class OMDBClient(BaseClient, BaseMediaProvider):
     def get_by_imdb_id(self, imdb_id):
         if not imdb_id: return None
         cache_key = f"imdb-{imdb_id}"
-        api_url = f"http://www.omdbapi.com/?i={imdb_id}&apikey={self.api_key}"
+        api_url = f"https://www.omdbapi.com/?i={imdb_id}&apikey={self.api_key}"
         return self._get_from_api(api_url, cache_key)
 
     # --- BaseMediaProvider Implementation ---
@@ -24,7 +24,7 @@ class OMDBClient(BaseClient, BaseMediaProvider):
         if year: params["y"] = year
         if media_type == "tv": params["type"] = "series"
         
-        raw = self._get_from_api("http://www.omdbapi.com/", cache_key, params=params)
+        raw = self._get_from_api("https://www.omdbapi.com/", cache_key, params=params)
         results = []
         if raw and raw.get("Response") == "True":
             for item in raw.get("Search", []):

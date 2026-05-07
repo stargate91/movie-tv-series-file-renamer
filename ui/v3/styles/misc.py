@@ -204,3 +204,25 @@ class MiscStyles:
                 background: {Palette.SURFACE_LIGHT};
             }}
         """
+
+    @staticmethod
+    def get_master_toggle_style():
+        """Bold primary-colored checkbox used as a section master toggle."""
+        return f"QCheckBox {{ font-weight: 700; font-size: 15px; color: {Palette.PRIMARY}; }}"
+
+    @staticmethod
+    def get_info_box_style():
+        """Bordered card-like box for grouped info (e.g., extension lists)."""
+        return f"""
+            QFrame {{
+                background-color: {Palette.SURFACE_LIGHT};
+                border: 1px solid {Palette.BORDER};
+                border-radius: 8px;
+                padding: 15px;
+            }}
+        """
+
+    @staticmethod
+    def get_stat_value_style():
+        """Large bold number for dashboard stat cards."""
+        return f"font-size: 36px; font-weight: 800; color: {Palette.PRIMARY};"

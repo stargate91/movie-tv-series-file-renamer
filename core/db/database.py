@@ -37,6 +37,7 @@ class LibraryDB:
         conn = sqlite3.connect(self.db_path, timeout=30.0)
         conn.row_factory = sqlite3.Row
         try:
+            conn.execute("PRAGMA busy_timeout = 30000")
             conn.execute("PRAGMA journal_mode=WAL")
             conn.execute("PRAGMA synchronous=NORMAL")
         except sqlite3.Error:
@@ -263,15 +264,30 @@ class LibraryDB:
     def get_history(self, limit=100): return self.history.get_recent(limit)
     
     def wipe_discovery_data(self):
-        """Clears all data except settings."""
+        """Clears all data except settings using an immediate transaction to handle locks."""
+        # Use a fresh connection and try to force a checkpoint first
         with self._get_connection() as conn:
-            conn.execute("DELETE FROM media_files")
-            conn.execute("DELETE FROM media_items")
-            conn.execute("DELETE FROM file_media_links")
-            conn.execute("DELETE FROM tv_seasons")
-            conn.execute("DELETE FROM tv_episodes")
-            conn.execute("DELETE FROM rename_history")
-            conn.execute("DELETE FROM match_candidates")
-            conn.execute("DELETE FROM api_cache")
-            conn.commit()
+            try:
+                # Force-clear any pending WAL data
+                conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+                
+                conn.execute("BEGIN IMMEDIATE")
+                # Order matters for foreign keys if enabled, but we do all
+                conn.execute("DELETE FROM file_media_links")
+                conn.execute("DELETE FROM match_candidates")
+                conn.execute("DELETE FROM tv_episodes")
+                conn.execute("DELETE FROM tv_seasons")
+                conn.execute("DELETE FROM rename_history")
+                conn.execute("DELETE FROM media_items")
+                conn.execute("DELETE FROM media_files")
+                conn.execute("DELETE FROM api_cache")
+                
+                conn.commit()
+                # Final cleanup
+                conn.execute("PRAGMA wal_checkpoint(FULL)")
+                conn.execute("VACUUM") 
+            except sqlite3.Error as e:
+                conn.rollback()
+                logger.error(f"Wipe failed: {e}")
+                raise e
     # ... add more wrappers as needed or refactor callers to use .files, .media etc.

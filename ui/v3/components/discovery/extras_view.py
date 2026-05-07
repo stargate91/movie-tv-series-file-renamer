@@ -1,4 +1,5 @@
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTabWidget
+from PySide6.QtCore import QSize
 from ui.v3.styles.theme import Theme
 from ui.v3.components.discovery_table import DiscoveryTable
 from core.i18n import T
@@ -22,6 +23,7 @@ class ExtrasView(QWidget):
         
         self.tabs = QTabWidget()
         self.tabs.setStyleSheet(Theme.get_inner_tab_widget_style())
+        self.tabs.setIconSize(QSize(16, 16))
         
         self.tables = {
             "extra": DiscoveryTable(),
@@ -32,14 +34,23 @@ class ExtrasView(QWidget):
         }
         
         self.tabs.addTab(self._wrap_with_filter("extra", self.tables["extra"], 
-            ["all", "sample", "trailer", "behind the scenes", "deleted", "interview", "featurette"]), T("discovery.extras.tabs.bonus"))
+            ["all", "sample", "trailer", "behind the scenes", "deleted", "interview", "featurette"]), 
+            Theme.get_icon("gift", size=16, color=Theme.TEXT_MUTED), T("discovery.extras.tabs.bonus"))
+            
         self.tabs.addTab(self._wrap_with_filter("image", self.tables["image"], 
-            ["all", "poster", "fanart", "background", "banner", "thumb", "logo", "disc"]), T("discovery.extras.tabs.images"))
-        self.tabs.addTab(self.tables["metadata"], T("discovery.extras.tabs.metadata"))
+            ["all", "poster", "fanart", "background", "banner", "thumb", "logo", "disc"]), 
+            Theme.get_icon("image", size=16, color=Theme.TEXT_MUTED), T("discovery.extras.tabs.images"))
+            
+        self.tabs.addTab(self.tables["metadata"], 
+            Theme.get_icon("file-text", size=16, color=Theme.TEXT_MUTED), T("discovery.extras.tabs.metadata"))
+            
         self.tabs.addTab(self._wrap_with_filter("subtitle", self.tables["subtitle"], 
-            ["all", "forced", "full"]), T("discovery.extras.tabs.subtitles"))
+            ["all", "forced", "full"]), 
+            Theme.get_icon("languages", size=16, color=Theme.TEXT_MUTED), T("discovery.extras.tabs.subtitles"))
+            
         self.tabs.addTab(self._wrap_with_filter("audio", self.tables["audio"], 
-            ["all", "dub", "commentary", "music"]), T("discovery.extras.tabs.audio"))
+            ["all", "dub", "commentary", "music"]), 
+            Theme.get_icon("music", size=16, color=Theme.TEXT_MUTED), T("discovery.extras.tabs.audio"))
         
         layout.addWidget(self.tabs)
 

@@ -1,4 +1,5 @@
 import sys
+import logging
 from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
                              QPushButton, QLabel, QFrame, QStackedWidget, QFileDialog)
 from PySide6.QtCore import Qt, QSize, QThread, Signal
@@ -11,6 +12,8 @@ from ui.v3.components.sidebar import Sidebar
 from ui.v3.workers.scan_worker import ScanWorker
 from core.engine.manager import RenamerEngineV3
 from core.i18n import T
+
+logger = logging.getLogger(__name__)
 
 class MainWindowV3(QMainWindow):
     def __init__(self):
@@ -25,7 +28,9 @@ class MainWindowV3(QMainWindow):
         
         self.setWindowTitle(f"{T('app.name')} - {T('app.subtitle')}")
         self.setMinimumSize(1100, 700)
-        self.setStyleSheet(Theme.get_main_stylesheet())
+        
+        # Apply initial theme
+        self._apply_theme(self.engine.config.settings.ui_theme)
         
         self._init_ui()
 
@@ -66,12 +71,53 @@ class MainWindowV3(QMainWindow):
         self.dashboard_page.scan_clicked.connect(self._on_scan_clicked)
         
         # Connect Settings Signals
-        self.settings_view.database_wiped.connect(self.discovery_page.refresh_data)
-        self.settings_view.settings_changed.connect(self.discovery_page.refresh_data)
+        self.settings_view.database_wiped.connect(self._on_database_wiped)
+        self.settings_view.settings_changed.connect(self._on_settings_changed)
+
+    def _on_database_wiped(self):
+        """Refreshes all pages when database is wiped."""
+        self.discovery_page.refresh_data()
+        self.dashboard_page.refresh_data()
+        self.history_page.refresh_data()
+
+    def _on_settings_changed(self):
+        """Called when settings are saved."""
+        # 1. Update Theme
+        new_theme = self.engine.config.settings.ui_theme
+        self._apply_theme(new_theme)
+        
+        # 2. Refresh Data
+        self.discovery_page.refresh_data()
+        self.dashboard_page.refresh_data()
+
+    def _apply_theme(self, mode):
+        """Updates the global palette and refreshes the stylesheet."""
+        Theme.apply_theme(mode)
+        
+        # 1. Update Global Stylesheet
+        self.setStyleSheet(Theme.get_main_stylesheet())
+        
+        # 2. Propagate to Sidebar
+        if hasattr(self, 'sidebar'):
+            self.sidebar.refresh_style()
+            
+        # 3. Propagate to Content Pages
+        if hasattr(self, 'discovery_page'):
+            self.discovery_page.refresh_style()
+        if hasattr(self, 'dashboard_page') and hasattr(self.dashboard_page, 'refresh_style'):
+            self.dashboard_page.refresh_style()
+        if hasattr(self, 'history_page') and hasattr(self.history_page, 'refresh_style'):
+            self.history_page.refresh_style()
+        if hasattr(self, 'settings_view') and hasattr(self.settings_view, 'refresh_style'):
+            self.settings_view.refresh_style()
+            
+        logger.info(f"Theme applied: {mode}")
 
     def _on_nav_requested(self, index):
         self.content_stack.setCurrentIndex(index)
-        if index == 3: # History
+        if index == 0: # Dashboard
+            self.dashboard_page.refresh_data()
+        elif index == 3: # History
             self.history_page.refresh_data()
 
     def _on_scan_clicked(self):
@@ -91,6 +137,8 @@ class MainWindowV3(QMainWindow):
         
         # 2. Prepare UI
         self.content_stack.setCurrentWidget(self.discovery_page)
+        self.discovery_page.progress_container.show()
+        self.discovery_page.progress_bar.setRange(0, 100)
         self.discovery_page.progress_bar.show()
         self.discovery_page.status_info.show()
         self.discovery_page.progress_bar.setValue(0)
@@ -105,6 +153,10 @@ class MainWindowV3(QMainWindow):
         self.worker.start()
 
     def _on_scan_progress(self, val, text):
+        # Ensure we are not in indeterminate mode
+        if self.discovery_page.progress_bar.maximum() == 0:
+            self.discovery_page.progress_bar.setRange(0, 100)
+            
         self.discovery_page.progress_bar.setValue(val)
         self.discovery_page.status_info.setText(text)
 

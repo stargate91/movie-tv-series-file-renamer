@@ -1,6 +1,8 @@
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QTabWidget
+from PySide6.QtCore import QSize
 from ui.v3.styles.theme import Theme
 from ui.v3.components.discovery_table import DiscoveryTable
+from core.i18n import T
 
 class ReviewView(QWidget):
     """
@@ -17,6 +19,7 @@ class ReviewView(QWidget):
         
         self.tabs = QTabWidget()
         self.tabs.setStyleSheet(Theme.get_inner_tab_widget_style())
+        self.tabs.setIconSize(QSize(16, 16))
         
         self.tables = {
             "review": DiscoveryTable(),
@@ -24,9 +27,12 @@ class ReviewView(QWidget):
             "shows": DiscoveryTable()
         }
         
-        self.tabs.addTab(self.tables["review"], "📥 Review")
-        self.tabs.addTab(self.tables["movies"], "🎬 Movies")
-        self.tabs.addTab(self.tables["shows"], "📺 TV Shows")
+        self.tabs.addTab(self.tables["review"], 
+            Theme.get_icon("package", size=16, color=Theme.TEXT_MUTED), T("discovery.tabs.all") or "All Items")
+        self.tabs.addTab(self.tables["movies"], 
+            Theme.get_icon("movie", size=16, color=Theme.TEXT_MUTED), T("common.types.movies") or "Movies")
+        self.tabs.addTab(self.tables["shows"], 
+            Theme.get_icon("tv", size=16, color=Theme.TEXT_MUTED), T("common.types.tv_shows") or "TV Shows")
         
         layout.addWidget(self.tabs)
 

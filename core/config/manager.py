@@ -24,6 +24,7 @@ class AppSettings:
     # Personalization
     user_name: str = ""
     app_language: str = "en"
+    ui_theme: str = "light" # light | dark
     
     # Global Organization
     move_files: bool = False
@@ -66,6 +67,7 @@ class AppSettings:
     separator: str = "space"   # space, dot, dash, underscore
     
     # Folder Structure
+    enable_folders: bool = True
     target_dir_movies: str = ""
     target_dir_shows: str = ""
     
@@ -185,6 +187,7 @@ class ConfigManager:
                     if val and val not in placeholders:
                         if isinstance(val, str) and fld.name in env_mapping:
                             val = val.strip()
+                            logger.info(f"Loaded {fld.name} from Database (starts with: {val[:2]}...)")
                         setattr(self.settings, fld.name, val)
                         continue
                 except Exception:
@@ -194,4 +197,6 @@ class ConfigManager:
             if fld.name in env_mapping:
                 env_val = os.getenv(env_mapping[fld.name])
                 if env_val:
-                    setattr(self.settings, fld.name, env_val.strip())
+                    val = env_val.strip()
+                    logger.info(f"Loaded {fld.name} from .env (starts with: {val[:2]}...)")
+                    setattr(self.settings, fld.name, val)

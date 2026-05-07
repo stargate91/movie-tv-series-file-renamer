@@ -2,7 +2,7 @@ import logging
 import json
 from PySide6.QtCore import Qt, QSize, Signal, Slot
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLineEdit, QWidget,
-                             QScrollArea, QSpinBox, QMessageBox, QComboBox, QPushButton, QLabel, QFrame, QListWidget)
+                             QScrollArea, QSpinBox, QMessageBox, QComboBox, QPushButton, QLabel, QFrame, QListWidget, QListWidgetItem)
 from PySide6.QtGui import QPixmap
 
 from ui.v3.styles.theme import Theme
@@ -46,7 +46,8 @@ class ManualResolveDialog(QDialog):
 
         # 1. Header Bar
         header = QHBoxLayout()
-        self.back_btn = QPushButton(f"← {T('manual_resolve.back')}")
+        self.back_btn = QPushButton(T('manual_resolve.back'))
+        self.back_btn.setIcon(Theme.get_icon("arrow-left", size=16, color=Theme.TEXT_MAIN))
         self.back_btn.setObjectName("SecondaryButton")
         self.back_btn.setFixedWidth(80)
         self.back_btn.setVisible(False)
@@ -84,9 +85,9 @@ class ManualResolveDialog(QDialog):
         self.search_btn.clicked.connect(self._on_search_clicked)
         
         self.search_type_combo = QComboBox()
-        self.search_type_combo.addItem("🎬 " + T("common.types.movie"), "movie")
-        self.search_type_combo.addItem("📺 " + T("common.types.tv"), "tv")
-        self.search_type_combo.setFixedWidth(130)
+        self.search_type_combo.addItem(T("common.types.movie"), "movie")
+        self.search_type_combo.addItem(T("common.types.tv"), "tv")
+        self.search_type_combo.addItem(T("common.types.both"), "both")
         self.search_type_combo.setFixedHeight(40)
         self.search_type_combo.currentIndexChanged.connect(self._on_search_type_changed)
 

@@ -291,15 +291,15 @@ class CommonStyles:
             image: url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IndoaXRlIiBzdHJva2Utd2lkdGg9IjMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHBvbHlsaW5lIHBvaW50cz0iMjAgNiA5IDE3IDQgMTIiPjwvcG9seWxpbmU+PC9zdmc+);
         }}
 
-        /* Context Menus - Windows No-Gap Whiteout */
+        /* Context Menus */
         QMenu {{
-            background-color: white;
+            background-color: {Palette.SURFACE};
             border: 1px solid {Palette.BORDER};
             padding: 0px;
             margin: 0px;
         }}
         QMenu::item {{
-            background-color: white;
+            background-color: {Palette.SURFACE};
             padding: 8px 30px 8px 25px;
             color: {Palette.TEXT_MAIN};
             margin: 0px;
