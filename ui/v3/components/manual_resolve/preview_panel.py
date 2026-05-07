@@ -19,7 +19,7 @@ class PreviewPanel(QFrame):
         self.poster.setFixedSize(250, 375)
         self.poster.setStyleSheet(Theme.get_batch_card_style())
         
-        self.title = QLabel(T("discovery.manual_resolve.select_result"))
+        self.title = QLabel(T("manual_resolve.select_result"))
         self.title.setWordWrap(True)
         self.title.setStyleSheet(Theme.get_preview_title_style())
         

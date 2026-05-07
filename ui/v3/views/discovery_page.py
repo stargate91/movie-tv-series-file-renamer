@@ -242,24 +242,16 @@ class DiscoveryPage(QWidget):
             self.engine.config.settings.default_scan_path = path
             self.engine.config.save()
 
-        self.progress_container.show()
-        self.progress_bar.show()
-        self.abort_btn.show()
-        self.abort_btn.setEnabled(True)
-        self.status_info.show()
-        self._set_controls_enabled(False)
-        self.progress_bar.setRange(0, 100)
-        self.progress_bar.setValue(0)
-        self.status_info.setText(T("discovery.messages.starting_pipeline"))
-        
-        self.sync_worker = SyncWorker(self.engine, path)
-        self.sync_worker.progress.connect(self._on_worker_progress)
-        self.sync_worker.finished.connect(self._on_sync_finished)
-        self.sync_worker.start()
+        # Use centralized controller for the scan
+        self.controller.start_scan(path)
 
 
 
     # --- Table Event Handlers ---
+    def refresh_data(self):
+        """Proxy for the controller's refresh logic."""
+        self.controller.refresh_data()
+
     def _setup_table_signals(self, table):
         table.itemSelectionChanged.connect(self._on_selection_changed)
         table.action_triggered.connect(self._on_action_triggered)
