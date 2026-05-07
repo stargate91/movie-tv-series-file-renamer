@@ -3,6 +3,7 @@ from PySide6.QtWidgets import (QTableWidget, QTableWidgetItem, QHeaderView, QLab
 from PySide6.QtGui import QColor, QLinearGradient, QPainter, QPalette
 from PySide6.QtCore import Qt, QSize, QRect, Signal, Slot
 from ui.v3.styles.theme import Theme
+from ui.v3.logic.action_registry import ActionRegistry, ActionDefinition
 from core.i18n import T
 
 class PremiumDelegate(QStyledItemDelegate):
@@ -40,6 +41,9 @@ class PremiumDelegate(QStyledItemDelegate):
 class DiscoveryTable(QTableWidget):
     """Handles all table operations: rendering rows, cell widgets, and filtering."""
     
+    action_triggered = Signal(str, list) # action_id, item_ids
+    
+    # Legacy signals for backward compatibility during refactor
     fix_requested = Signal(dict)
     manual_edit_requested = Signal(dict)
     open_folder_requested = Signal(str)
@@ -170,65 +174,24 @@ class DiscoveryTable(QTableWidget):
                 actions_layout.setContentsMargins(8, 8, 8, 8)
                 actions_layout.setSpacing(10)
 
-                # --- 1. Primary Action Button ---
-                primary_btn = None
-                if status == 'IGNORED':
-                    # Restore Button for Trash
-                    primary_btn = QPushButton()
-                    primary_btn.setIcon(Theme.get_icon("refresh", size=20, color=Theme.TEXT_MAIN))
-                    primary_btn.setToolTip(T("discovery.actions.restore"))
-                    primary_btn.setFixedSize(54, 46)
-                    primary_btn.setCursor(Qt.PointingHandCursor)
-                    primary_btn.setStyleSheet(Theme.get_discovery_action_btn_style('success'))
-                    primary_btn.clicked.connect(lambda checked=False, fid=vid['id']: self.restore_requested.emit(fid, i))
-                elif raw_cat == 'video':
-                    # API Resolve Button (Only for videos)
-                    primary_btn = QPushButton()
-                    primary_btn.setIcon(Theme.get_icon("wand", size=20, color=Theme.TEXT_MAIN))
-                    primary_btn.setToolTip(T("discovery.actions.fix"))
-                    primary_btn.setFixedSize(54, 46)
-                    primary_btn.setCursor(Qt.PointingHandCursor)
-                    variant = 'danger' if status == 'CONFLICT' else 'neutral'
-                    primary_btn.setStyleSheet(Theme.get_discovery_action_btn_style(variant))
-                    primary_btn.clicked.connect(lambda checked=False, v=vid: self.fix_requested.emit(v))
+                # Actions
+                is_trash = status == 'IGNORED'
                 
-                if status == 'IGNORED':
-                    # Special Trash View: Just Restore and Open Folder, no Edit/Fix or Overflow
-                    # 1. Restore
-                    actions_layout.addWidget(primary_btn)
-                    
-                    # 2. Open Folder
-                    open_btn = QPushButton()
-                    open_btn.setIcon(Theme.get_icon("folder", size=20, color=Theme.TEXT_MAIN))
-                    open_btn.setToolTip(T("discovery.actions.open_folder"))
-                    open_btn.setFixedSize(54, 46)
-                    open_btn.setCursor(Qt.PointingHandCursor)
-                    open_btn.setStyleSheet(Theme.get_discovery_action_btn_style('neutral'))
-                    open_btn.clicked.connect(lambda checked=False, p=vid['current_path']: self.open_folder_requested.emit(p))
-                    actions_layout.addWidget(open_btn)
-                else:
-                    # Regular View logic
-                    if primary_btn:
-                        actions_layout.addWidget(primary_btn)
-                    
-                    # --- 2. Base Edit Button (Only for videos) ---
-                    if raw_cat == 'video':
-                        edit_btn = QPushButton()
-                        edit_btn.setIcon(Theme.get_icon("pencil", size=20, color=Theme.TEXT_MAIN))
-                        edit_btn.setToolTip(T("discovery.actions.edit"))
-                        edit_btn.setFixedSize(54, 46)
-                        edit_btn.setCursor(Qt.PointingHandCursor)
-                        edit_btn.setStyleSheet(Theme.get_discovery_action_btn_style('neutral'))
-                        edit_btn.clicked.connect(lambda checked=False, v=vid: self._on_manual_edit_clicked(v))
-                        actions_layout.addWidget(edit_btn)
+                # 1. Primary Buttons
+                primary_actions = ActionRegistry.get_actions_for_surface('row_primary', raw_cat, is_trash, is_multi=False)
+                for action in primary_actions:
+                    btn_style = action.style
+                    if action.id == 'fix' and status == 'CONFLICT':
+                        btn_style = 'danger'
+                        
+                    btn = self._create_action_btn(action.icon, action.label_key, btn_style)
+                    btn.clicked.connect(lambda checked=False, aid=action.id, v=vid: self._trigger_action(aid, v))
+                    actions_layout.addWidget(btn)
 
-                    # --- 3. Overflow Menu (...) ---
-                    overflow_btn = QPushButton()
-                    overflow_btn.setIcon(Theme.get_icon("more-horizontal", size=20, color=Theme.TEXT_MAIN))
-                    overflow_btn.setToolTip(T("common.more"))
-                    overflow_btn.setFixedSize(54, 46)
-                    overflow_btn.setCursor(Qt.PointingHandCursor)
-                    overflow_btn.setStyleSheet(Theme.get_discovery_action_btn_style('neutral'))
+                # 2. Overflow Menu (if any)
+                overflow_actions = ActionRegistry.get_actions_for_surface('row_overflow', raw_cat, is_trash, is_multi=False)
+                if overflow_actions:
+                    overflow_btn = self._create_action_btn("more-horizontal", "common.more")
                     overflow_btn.clicked.connect(lambda checked=False, b=overflow_btn, v=vid: self._show_row_menu(b, v))
                     actions_layout.addWidget(overflow_btn)
 
@@ -243,6 +206,23 @@ class DiscoveryTable(QTableWidget):
 
         self.setSortingEnabled(True)
         self.setUpdatesEnabled(True)
+
+    def _trigger_action(self, action_id, vid):
+        """Unified internal dispatcher for all actions."""
+        file_id = vid['id']
+        
+        # 1. Emit unified signal
+        self.action_triggered.emit(action_id, [file_id])
+
+    def _create_action_btn(self, icon_name, tooltip_key, variant='neutral'):
+        btn = QPushButton()
+        # Use Theme helper if variant is provided, else default to neutral
+        btn.setIcon(Theme.get_icon(icon_name, size=20, color=Theme.TEXT_MAIN if variant != 'danger' else '#ffffff'))
+        btn.setToolTip(T(tooltip_key))
+        btn.setFixedSize(54, 46)
+        btn.setCursor(Qt.PointingHandCursor)
+        btn.setStyleSheet(Theme.get_discovery_action_btn_style(variant))
+        return btn
 
     def _on_manual_edit_clicked(self, vid):
         self.manual_edit_requested.emit(vid)
@@ -267,83 +247,58 @@ class DiscoveryTable(QTableWidget):
             status = vid.get('match_status', 'pending').upper()
             raw_cat = vid.get('category', 'video')
             path = vid['current_path']
+            
+            # Find row
+            row = -1
+            for r in range(self.rowCount()):
+                it = self.item(r, 1)
+                if it and it.data(Qt.UserRole) == file_id:
+                    row = r
+                    break
+            if row == -1: return
 
         menu = QMenu(self)
         menu.setWindowFlags(menu.windowFlags() | Qt.FramelessWindowHint)
         menu.setAttribute(Qt.WA_TranslucentBackground)
-        # Apply a clean dark style to the menu
         menu.setStyleSheet(Theme.get_context_menu_style())
-        
-        if status == 'IGNORED':
-            # Trash Context Menu: Minimal
-            is_multi = len(set(item.row() for item in self.selectedItems())) > 1
-            
-            restore_act = menu.addAction(Theme.get_icon("refresh", size=16, color=Theme.TEXT_MAIN), T("discovery.actions.restore"))
-            restore_act.triggered.connect(lambda: self.restore_requested.emit(file_id, 0))
-            
-            if not is_multi:
-                menu.addSeparator()
-                open_act = menu.addAction(Theme.get_icon("folder", size=16, color=Theme.TEXT_MAIN), T("discovery.actions.open_folder"))
-                if path:
-                    open_act.triggered.connect(lambda: self.open_folder_requested.emit(path))
-                else:
-                    open_act.setEnabled(False)
-        else:
-            # --- PRIMARY ACTIONS (Only shown in Right-Click context menu to avoid redundancy with row buttons) ---
-            if is_context:
-                is_multi = len(set(item.row() for item in self.selectedItems())) > 1
-                
-                # 1. API Fix / Identify
-                if raw_cat == 'video':
-                    label = T("discovery.actions.batch_identify") if is_multi else T("discovery.actions.fix")
-                    icon_name = "wand"
-                    fix_act = menu.addAction(Theme.get_icon(icon_name, size=16, color=Theme.TEXT_MAIN), label)
-                    
-                    if is_multi:
-                        fix_act.triggered.connect(self.batch_identify_requested.emit)
-                    elif vid:
-                        fix_act.triggered.connect(lambda: self.fix_requested.emit(vid))
-                    else:
-                        # Try to find vid from selected row
-                        fix_act.triggered.connect(lambda: self.fix_requested.emit({'id': file_id, 'category': 'video'}))
-                
-                # 2. Manual Edit (For all)
-                edit_label = T("discovery.actions.batch_actions") if is_multi else T("discovery.actions.edit")
-                edit_icon = "wand" if is_multi else "pencil"
-                edit_act = menu.addAction(Theme.get_icon(edit_icon, size=16, color=Theme.TEXT_MAIN), edit_label)
-                
-                if is_multi:
-                    edit_act.triggered.connect(self.batch_edit_requested.emit)
-                elif vid:
-                    edit_act.triggered.connect(lambda: self._on_manual_edit_clicked(vid))
-                else:
-                    edit_act.triggered.connect(lambda: self._on_manual_edit_clicked({'id': file_id}))
-                
-                menu.addSeparator()
 
-            # 3. Folder Action
-            open_act = menu.addAction(Theme.get_icon("folder", size=16, color=Theme.TEXT_MAIN), T("discovery.actions.open_folder"))
-            if path:
-                open_act.triggered.connect(lambda: self.open_folder_requested.emit(path))
+        # Determine Context
+        if not is_context:
+            is_multi = False
+        else:
+            selected_rows = set(item.row() for item in self.selectedItems())
+            is_multi = len(selected_rows) > 1
+        is_trash = status == 'IGNORED'
+        
+        surface = 'context' if is_context else 'row_overflow'
+        available_actions = ActionRegistry.get_actions_for_surface(surface, raw_cat, is_trash, is_multi=is_multi)
+        
+        for action in available_actions:
+            # Separator Logic
+            if action.id in ('ignore', 'batch_ignore', 'clear_match'):
+                menu.addSeparator()
+            
+            # Skip primary actions in overflow menu to avoid redundancy (but KEEP in right-click)
+            primary_field = 'row_primary_trash' if is_trash else 'row_primary'
+            if not is_context and getattr(action, primary_field, False):
+                continue
+
+            icon = Theme.get_icon(action.icon, size=16, color=Theme.TEXT_MAIN)
+            label_key = action.label_key_multi if is_multi and action.label_key_multi else action.label_key
+            label = T(label_key)
+            
+            act = menu.addAction(icon, label)
+            
+            if is_multi:
+                # Batch connection
+                act.triggered.connect(lambda checked=False, aid=action.id: self.action_triggered.emit(aid, self.get_selected_ids()))
             else:
-                open_act.setEnabled(False)
-                
-            # 4. Fetch Missing Language Action (Only for videos)
-            if raw_cat == 'video':
-                fetch_lang_act = menu.addAction(Theme.get_icon("globe", size=16, color=Theme.TEXT_MAIN), T("discovery.batch.fetch_language") if "discovery.batch.fetch_language" != T("discovery.batch.fetch_language") else "Fetch Missing Language")
-                fetch_lang_act.triggered.connect(lambda: self.fetch_language_requested.emit(self.get_selected_ids()))
-            
-            # 5. Clear Match Action (Only for videos)
-            if raw_cat == 'video':
-                clear_act = menu.addAction(Theme.get_icon("refresh", size=16, color=Theme.TEXT_MAIN), T("discovery.actions.clear_match"))
-                clear_act.setEnabled(status == 'MATCHED')
-                clear_act.triggered.connect(lambda: self.clear_match_requested.emit(file_id))
-            
-            menu.addSeparator()
-            
-            # 5. Ignore Action
-            ignore_act = menu.addAction(Theme.get_icon("trash-2", size=16, color=Theme.TEXT_MAIN), T("discovery.actions.ignore"))
-            ignore_act.triggered.connect(lambda: self.ignore_requested.emit(file_id))
+                # Single connection
+                act.triggered.connect(lambda checked=False, aid=action.id, v=vid if vid else {'id': file_id, 'current_path': path}: self._trigger_action(aid, v))
+
+            # Enable/Disable logic
+            if action.id == 'clear_match':
+                act.setEnabled(status == 'MATCHED')
         
         menu.exec(global_pos)
 
@@ -437,17 +392,16 @@ class DiscoveryTable(QTableWidget):
 
     def get_selected_ids(self):
         """Returns unique database IDs for all selected rows that are VISIBLE."""
+        rows = set(item.row() for item in self.selectedItems())
         ids = []
-        for item in self.selectedItems():
-            row = item.row()
+        for row in rows:
             if self.isRowHidden(row):
                 continue
-                
-            # ID is stored in the UserRole of column 1
-            if item.column() == 1:
+            item = self.item(row, 1) # ID is always in column 1
+            if item:
                 fid = item.data(Qt.UserRole)
                 if fid: ids.append(fid)
-        return list(set(ids))
+        return ids
 
     def keyPressEvent(self, event):
         if event.key() == Qt.Key_Delete:
@@ -457,9 +411,3 @@ class DiscoveryTable(QTableWidget):
             self.selectAll()
         else:
             super().keyPressEvent(event)
-
-    def contextMenuEvent(self, event):
-        """Triggers the context menu on right click."""
-        item = self.itemAt(event.pos())
-        if item:
-            self._show_actions_menu(event.globalPos(), is_context=True)

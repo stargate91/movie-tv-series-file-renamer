@@ -226,3 +226,25 @@ class MiscStyles:
     def get_stat_value_style():
         """Large bold number for dashboard stat cards."""
         return f"font-size: 36px; font-weight: 800; color: {Palette.PRIMARY};"
+
+    @staticmethod
+    def get_abort_button_style():
+        return f"""
+            QPushButton {{
+                background: transparent;
+                border: 1px solid {Palette.ERROR};
+                color: {Palette.ERROR};
+                border-radius: 4px;
+                padding: 2px 12px;
+                font-weight: 600;
+                font-size: 11px;
+                text-transform: uppercase;
+            }}
+            QPushButton:hover {{
+                background: {Palette.ERROR};
+                color: white;
+            }}
+            QPushButton:pressed {{
+                background: {Palette.ERROR};
+            }}
+        """

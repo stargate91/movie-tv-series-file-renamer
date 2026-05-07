@@ -69,6 +69,21 @@ class MediaSection(QWidget):
         scroll.setWidget(self.overview_lbl)
         self.content_layout.addWidget(scroll, 1)
 
+    def update_uncertain(self, candidates):
+        """Displays a notice when multiple candidates are available for a file."""
+        if not candidates: return
+        self.clear()
+        
+        count = len(candidates)
+        self.lbl_main.setText(T("discovery.messages.uncertain_title") if T("discovery.messages.uncertain_title") != "discovery.messages.uncertain_title" else "Ambiguous Match")
+        self.lbl_main.show()
+        
+        self.lbl_sub.setText(T("discovery.messages.uncertain_count", count=count) if T("discovery.messages.uncertain_count", count=count) != "discovery.messages.uncertain_count" else f"{count} potential matches found")
+        self.lbl_sub.show()
+        
+        msg = T("discovery.messages.uncertain_msg") if T("discovery.messages.uncertain_msg") != "discovery.messages.uncertain_msg" else "This file has multiple potential matches. Click 'Fix' to manually select the correct one."
+        self.overview_lbl.setText(msg)
+
     def update_unmatched(self, file_data):
         if not file_data: return
         self.clear()

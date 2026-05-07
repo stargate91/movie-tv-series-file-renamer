@@ -7,7 +7,8 @@ logger = logging.getLogger(__name__)
 
 class DataLoader(QThread):
     """Background thread for loading data and collecting poster paths."""
-    data_ready = Signal(list, list)  # videos, poster_paths
+    finished = Signal(list, list)  # videos, poster_paths
+    progress = Signal(int, str)
 
     def __init__(self, engine):
         super().__init__()
@@ -44,10 +45,10 @@ class DataLoader(QThread):
                 except:
                     pass
 
-            self.data_ready.emit(videos, poster_paths)
+            self.finished.emit(videos, poster_paths)
         except Exception as e:
             logger.error(f"DataLoader Error: {e}")
-            self.data_ready.emit([], [])
+            self.finished.emit([], [])
 
 class PosterPrefetcher(QThread):
     """Prefetches poster images in the background."""
@@ -116,8 +117,9 @@ class UndoWorker(QThread):
 
 class PlanWorker(QThread):
     """Handles the heavy lifting of generating the rename plan."""
-    plan_ready = Signal(list)
+    finished = Signal(list)
     error = Signal(str)
+    progress = Signal(int, str)
 
     def __init__(self, engine):
         super().__init__()
@@ -126,9 +128,10 @@ class PlanWorker(QThread):
     def run(self):
         try:
             plan = self.engine.get_rename_plan()
-            self.plan_ready.emit(plan)
+            self.finished.emit(plan)
         except Exception as e:
             self.error.emit(str(e))
+            self.finished.emit([])
 
 class DropProcessor(QThread):
     """Processes dropped files/folders, checks duplicates, and enriches data."""

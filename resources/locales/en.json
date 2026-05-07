@@ -52,19 +52,37 @@
             "new_name": "PROPOSED NEW NAME",
             "actions": "ACTIONS"
         },
+        "subtabs": {
+            "videos": "Videos",
+            "extras": "Extras"
+        },
         "actions": {
             "apply": "Execute Renames",
-            "batch_identify": "Smart Identify All",
-            "batch_actions": "Manual Batch Edit",
+            "batch_identify": "Smart Match (Batch)",
+            "batch_actions": "Edit Details (Batch)",
             "scan_new": "Find More Files",
             "refresh": "Refresh List",
-            "fix": "Solve Clash",
-            "edit": "Edit Info",
-            "restore": "Put back to Review",
+            "fix": "Find Match",
+            "edit": "Edit Details",
+            "restore": "Restore to Review",
+            "restore_multi": "Restore to Review (Batch)",
             "ignore": "Move to Trash",
+            "ignore_multi": "Move to Trash (Batch)",
+            "delete": "Permanently Delete",
             "open_folder": "Show in Folder",
-            "clear_match": "Reset Identification",
-            "fetch": "Fetch Missing"
+            "clear_match": "Reset Metadata",
+            "clear_match_multi": "Reset Metadata (Batch)",
+            "fetch": "Fetch Language",
+            "fetch_multi": "Fetch Language (Batch)"
+        },
+        "buttons": {
+            "abort": "Stop Process"
+        },
+        "batch": {
+            "identify": "Smart Match",
+            "fetch_language": "Fetch Language",
+            "clear": "Reset Metadata",
+            "ignore": "Move to Trash"
         },
         "dropped": {
             "import_all": "Move All to Review",
@@ -87,11 +105,19 @@
             "undo_errors_title": "Revert Errors",
             "undo_errors_msg": "We couldn't revert {count} files.",
             "ignore_confirm": "Move {count} files to the Trash?",
+            "batch_ignore_confirm": "Move {count} selected files to the Trash?",
             "restore_confirm": "Move {count} files back to the Review Center?",
+            "batch_restore_confirm": "Move {count} selected files back to the Review Center?",
+            "delete_confirm": "Permanently remove '{filename}' from the database?",
+            "batch_delete_confirm": "Permanently remove {count} selected files from the database?",
             "clear_confirm": "Are you sure you want to reset the identification for {count} files?",
             "collision_detected": "{count} NAME CLASHES",
             "collision_tooltip": "Please give these unique names (e.g. Part 1, Part 2) before executing.",
             "aborting": "Stopping... please wait a moment.",
+            "restoring": "Moving items back to Review...",
+            "ignoring": "Moving items to Trash...",
+            "deleting": "Permanently deleting items...",
+            "clearing": "Resetting identification for selected items...",
             "initializing": "Getting things ready...",
             "refreshing": "Updating your list...",
             "generating_plan": "Calculating new names...",
@@ -111,7 +137,10 @@
             "api_limit_reached": "OMDb API limit reached (1000/day)! Some ratings or metadata details might be missing for the remaining files.",
             "language_changed": "Language changed to {lang}. Fetch new metadata?",
             "fetch_complete": "Language fetching complete.",
-            "up_to_date": "Language metadata is already up to date."
+            "up_to_date": "Language metadata is already up to date.",
+            "uncertain_title": "Multiple Matches Found",
+            "uncertain_count": "{count} potential candidates",
+            "uncertain_msg": "This file has several ambiguous matches in the database. Use 'Solve Clash' or 'Manual Edit' to pick the correct identity."
         },
         "extras": {
             "tabs": {
@@ -198,42 +227,6 @@
                 }
             },
             "apply_btn": "Apply to Selected"
-        },
-        "manual_resolve": {
-            "title": "Manual Resolve: {filename}",
-            "back": "Back",
-            "search_results": "Search Results",
-            "link_multiple": "Link Multiple",
-            "search_placeholder": "Search Movie or Series...",
-            "search_btn": "Search",
-            "any_year": "Any Year",
-            "year_label": "Filter Year:",
-            "searching": "Searching...",
-            "no_results": "No results found.",
-            "save_btn": "Save Identification",
-            "no_selection_title": "No Selection",
-            "no_selection_msg": "Please select a media item to associate with this file.",
-            "success_msg": "File '{filename}' manually identified.",
-            "select_result": "Select a result",
-            "browsing": "Browsing...",
-            "candidates_found": "{count} Candidates Found",
-            "no_selection": "No Selection",
-            "basket": "Selected Items:",
-            "clear": "Clear",
-            "confirm_all": "Confirm All",
-            "no_poster": "No Poster",
-            "add_basket": "Add to Basket",
-            "match_btn": "Match & Save",
-            "type_label": "Type: {type}",
-            "tv_options": "TV Identification Options",
-            "match_depth": "Match Depth:",
-            "depth": {
-                "series": "Series Level Only",
-                "season": "Series + Season",
-                "sequential": "Series + Season + Sequential Episodes"
-            },
-            "link_sequential": "Link to S{s}E{e} (Sequential Start)",
-            "lang_label": "Metadata Language:"
         },
         "batch": {
             "clear": "Clear Metadata",
@@ -325,6 +318,43 @@
             "no_poster": "No Poster",
             "success_msg": "Identified {count} files."
         }
+    },
+    "manual_resolve": {
+        "title": "Manual Resolve: {filename}",
+        "back": "Back",
+        "search_results": "Search Results",
+        "link_multiple": "Link Multiple Items",
+        "search_placeholder": "Search title... (e.g. 'The Matrix')",
+        "search_btn": "Search",
+        "any_year": "Any Year",
+        "year_label": "Year:",
+        "match_btn": "Match This Item",
+        "add_basket": "+ Add to Basket",
+        "no_selection": "No Selection",
+        "select_result": "Select a result",
+        "no_poster": "No Poster",
+        "searching": "Searching API...",
+        "browsing": "Browsing...",
+        "candidates_found": "{count} Candidates Found",
+        "no_matches": "No matches found.",
+        "basket": "Basket",
+        "clear": "Clear",
+        "confirm_all": "Confirm & Link All",
+        "type_label": "Type: {type}",
+        "save_btn": "Save Identification",
+        "no_results": "No results found.",
+        "no_selection_title": "No Selection",
+        "no_selection_msg": "Please select a media item to associate with this file.",
+        "success_msg": "File '{filename}' manually identified.",
+        "tv_options": "TV Identification Options",
+        "match_depth": "Match Depth:",
+        "depth": {
+            "series": "Series Level Only",
+            "season": "Series + Season",
+            "sequential": "Series + Season + Sequential Episodes"
+        },
+        "link_sequential": "Link to S{s}E{e} (Sequential Start)",
+        "lang_label": "Metadata Language:"
     },
     "settings": {
         "title": "Settings",
@@ -563,6 +593,7 @@
     },
     "common": {
         "browse": "Browse",
+        "more": "More",
         "none": "None",
         "type": "Type:",
         "types": {

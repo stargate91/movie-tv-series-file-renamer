@@ -58,7 +58,7 @@ class BatchResolveDialog(QDialog):
         
         hint = QLabel(T("discovery.batch_resolve.drag_hint"))
         hint.setWordWrap(True)
-        hint.setStyleSheet(Theme.get_hint_label_style())
+        hint.setStyleSheet(Theme.get_hint_style())
         left_layout.addWidget(hint)
         
         self.main_layout.addWidget(left_pane)

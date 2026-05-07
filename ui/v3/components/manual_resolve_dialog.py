@@ -33,7 +33,7 @@ class ManualResolveDialog(QDialog):
         self.nav_stack = [] # History of (mode, parent_id, season_num, title)
         self.multi_match_mode = False
 
-        self.setWindowTitle(T("discovery.manual_resolve.title", filename=self.file_name))
+        self.setWindowTitle(T("manual_resolve.title", filename=self.file_name))
         self.setMinimumSize(850, 750)
         self.setStyleSheet(Theme.get_main_stylesheet())
         
@@ -133,7 +133,7 @@ class ManualResolveDialog(QDialog):
         self.results_list.itemDoubleClicked.connect(self._on_item_double_clicked)
         res_col.addWidget(self.results_list)
         
-        self.action_btn = QPushButton(T("discovery.manual_resolve.save_btn"))
+        self.action_btn = QPushButton(T("manual_resolve.save_btn"))
         self.action_btn.setFixedHeight(45)
         self.action_btn.setEnabled(False)
         self.action_btn.setStyleSheet(Theme.get_primary_button_style())
@@ -199,7 +199,7 @@ class ManualResolveDialog(QDialog):
             self.search_worker.wait()
 
         self.results_list.clear()
-        self.results_list.addItem(T("discovery.manual_resolve.searching"))
+        self.results_list.addItem(T("manual_resolve.searching"))
         self.action_btn.setEnabled(False)
         
         if mode == "search":
@@ -239,7 +239,7 @@ class ManualResolveDialog(QDialog):
             self.results_list.setItemWidget(item, widget)
             
         if not results:
-            self.results_list.addItem(T("discovery.manual_resolve.no_results"))
+            self.results_list.addItem(T("manual_resolve.no_results"))
             return
 
     def _on_selection_changed(self):
@@ -291,7 +291,7 @@ class ManualResolveDialog(QDialog):
 
     def _on_action_clicked(self):
         if not self.selected_media and not self.basket:
-            QMessageBox.warning(self, T("discovery.manual_resolve.no_selection_title"), T("discovery.manual_resolve.no_selection_msg"))
+            QMessageBox.warning(self, T("manual_resolve.no_selection_title"), T("manual_resolve.no_selection_msg"))
             return
         m = self.selected_media
         vals = self.tv_selector.get_values()
@@ -345,7 +345,7 @@ class ManualResolveDialog(QDialog):
             ep_val = str(all_episodes[0]) if len(all_episodes) == 1 else str(sorted(list(set(all_episodes))))
             try:
                 self.engine.db.files.bulk_update_files(updates_list)
-                QMessageBox.information(self, T("common.success"), T("discovery.manual_resolve.success_msg", filename=self.file_name))
+                QMessageBox.information(self, T("common.success"), T("manual_resolve.success_msg", filename=self.file_name))
                 self.accept()
             except:
                 pass
