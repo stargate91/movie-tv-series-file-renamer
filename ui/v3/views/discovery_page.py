@@ -110,6 +110,7 @@ class DiscoveryPage(QWidget):
         content_layout.addWidget(self.main_tabs, 7)
         
         self.inspector = InspectorPanel()
+        self.inspector.set_preferred_language(self.engine.config.settings.metadata_language)
         content_layout.addWidget(self.inspector, 3)
         layout.addLayout(content_layout)
 
@@ -196,16 +197,16 @@ class DiscoveryPage(QWidget):
         self.batch_label = QLabel(T("discovery.messages.items_selected", count=0))
         self.batch_label.setStyleSheet(Theme.get_batch_label_style())
         self.batch_action_btn = QPushButton(T('discovery.actions.batch_actions'))
-        self.batch_action_btn.setIcon(Theme.get_icon("edit-3", size=16, color="#FFFFFF"))
+        self.batch_action_btn.setIcon(Theme.get_icon("edit-3", size=16, color=Theme.TEXT_MAIN))
         self.batch_action_btn.setStyleSheet(Theme.get_batch_button_style('primary'))
         self.batch_action_btn.clicked.connect(self._on_batch_actions_requested)
         self.batch_identify_btn = QPushButton(T("discovery.batch.identify"))
-        self.batch_identify_btn.setIcon(Theme.get_icon("wand-2", size=16, color="#FFFFFF"))
+        self.batch_identify_btn.setIcon(Theme.get_icon("wand-2", size=16, color=Theme.TEXT_MAIN))
         self.batch_identify_btn.setStyleSheet(Theme.get_batch_button_style('identify'))
         self.batch_identify_btn.clicked.connect(self._on_batch_identify_requested)
 
         self.batch_restore_btn = QPushButton(T("discovery.actions.restore"))
-        self.batch_restore_btn.setIcon(Theme.get_icon("check", size=16, color="#FFFFFF"))
+        self.batch_restore_btn.setIcon(Theme.get_icon("check", size=16, color=Theme.TEXT_MAIN))
         self.batch_restore_btn.setStyleSheet(Theme.get_batch_button_style('success'))
         self.batch_restore_btn.clicked.connect(self._on_batch_restore_requested)
         self.batch_restore_btn.hide()
@@ -761,6 +762,7 @@ class DiscoveryPage(QWidget):
 
     def notify_language_changed(self, new_lang):
         """Triggered from MainWindow when settings change the language."""
+        self.inspector.set_preferred_language(new_lang)
         msg = T("discovery.messages.language_changed", lang=new_lang) if "discovery.messages.language_changed" != T("discovery.messages.language_changed") else f"Language changed to {new_lang}. Fetch new metadata?"
         self.notif_bar.show_custom_action(msg, T("discovery.actions.fetch") if "discovery.actions.fetch" != T("discovery.actions.fetch") else "Fetch", payload="smart_fetch")
 

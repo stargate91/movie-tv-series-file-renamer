@@ -144,3 +144,17 @@ class InspectorPanel(QFrame):
         if hasattr(self.poster_carousel, 'refresh_style'): self.poster_carousel.refresh_style()
         if hasattr(self.media_section, 'refresh_style'): self.media_section.refresh_style()
         if hasattr(self.tech_section, 'refresh_style'): self.tech_section.refresh_style()
+
+    def set_preferred_language(self, lang):
+        self.media_section.set_preferred_language(lang)
+        # If we have an active selection, refresh it
+        self.refresh()
+
+    def refresh(self):
+        if self._current_media_data:
+            if self._current_episode_data:
+                self.update_episode_info(self._current_episode_data, self._current_season_data)
+            else:
+                self.update_from_data(self._current_media_data)
+        elif self._current_file_data:
+            self.update_tech_info(self._current_file_data)

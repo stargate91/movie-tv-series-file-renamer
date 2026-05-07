@@ -39,7 +39,7 @@
         "search_placeholder": "Find a file by name...",
         "tabs": {
             "library": "Review Center",
-            "all": "All Items",
+            "all": "Pending Review",
             "conflicts": "Name Clashes",
             "extras": "Attached Files",
             "dropped": "Just Ingested",

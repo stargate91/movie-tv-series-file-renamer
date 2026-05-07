@@ -28,7 +28,7 @@ class ReviewView(QWidget):
         }
         
         self.tabs.addTab(self.tables["review"], 
-            Theme.get_icon("package", size=16, color=Theme.TEXT_MUTED), T("discovery.tabs.all") or "All Items")
+            Theme.get_icon("package", size=16, color=Theme.TEXT_MUTED), T("discovery.tabs.all") or "Pending Review")
         self.tabs.addTab(self.tables["movies"], 
             Theme.get_icon("movie", size=16, color=Theme.TEXT_MUTED), T("common.types.movies") or "Movies")
         self.tabs.addTab(self.tables["shows"], 

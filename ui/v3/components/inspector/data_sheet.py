@@ -18,19 +18,71 @@ class DataSheetDialog(QDialog):
         layout.setContentsMargins(20, 20, 20, 20)
 
         tabs = QTabWidget()
+        tabs.setDocumentMode(True) # Premium look
 
         is_extra = file_data and file_data.get('category') in ('extra', 'subtitle', 'audio', 'metadata', 'image')
 
+        # 1. Media Section (Multi-language aware)
         if media_data and not is_extra:
-            tabs.addTab(self._build_tree_tab(self._media_to_tree(media_data)), T("discovery.inspector.data_sheet.tabs.media"))
+            details = {}
+            if media_data.get('details_json'):
+                try:
+                    parsed = json.loads(media_data['details_json'])
+                    if isinstance(parsed, dict) and 'tmdb_id' not in parsed: # It's a lang-mapped dict
+                        details = parsed
+                except: pass
 
+            if details:
+                media_lang_tabs = QTabWidget()
+                for lang, lang_data in details.items():
+                    lang_label = lang # Could be mapped to friendly name
+                    media_lang_tabs.addTab(self._build_tree_tab(self._media_to_tree(media_data, lang_data)), lang_label)
+                tabs.addTab(media_lang_tabs, T("discovery.inspector.data_sheet.tabs.media"))
+            else:
+                tabs.addTab(self._build_tree_tab(self._media_to_tree(media_data)), T("discovery.inspector.data_sheet.tabs.media"))
+
+        # 2. Episode Section (Multi-language aware)
         if (ep_data_list or season_data) and not is_extra:
+            # For simplicity, we check the first episode's languages if ep_list exists
+            ep_details = {}
+            if ep_data_list and ep_data_list[0].get('details_json'):
+                try:
+                    parsed = json.loads(ep_data_list[0]['details_json'])
+                    if isinstance(parsed, dict) and 'tmdb_id' not in parsed:
+                        ep_details = parsed
+                except: pass
+            
             count = len(ep_data_list or [])
             label = T("discovery.inspector.data_sheet.tabs.episodes") if count > 1 else T("discovery.inspector.data_sheet.tabs.episode")
-            tabs.addTab(self._build_tree_tab(self._episode_to_tree(ep_data_list, season_data)), label)
+            
+            if ep_details:
+                ep_lang_tabs = QTabWidget()
+                # We need to collect ALL languages available across episodes if possible, 
+                # but usually they are fetched together.
+                for lang in ep_details.keys():
+                    # Build tree for this language
+                    lang_ep_list = []
+                    for ep in ep_data_list:
+                        ep_parsed = {}
+                        try:
+                            ep_details_raw = ep.get('details_json')
+                            if ep_details_raw:
+                                p = json.loads(ep_details_raw)
+                                if isinstance(p, dict) and lang in p:
+                                    ep_parsed = p[lang]
+                        except: pass
+                        lang_ep_list.append((ep, ep_parsed))
+                    
+                    ep_lang_tabs.addTab(self._build_tree_tab(self._episode_to_tree(lang_ep_list, season_data)), lang)
+                tabs.addTab(ep_lang_tabs, label)
+            else:
+                # Wrap existing ep_list into (ep, None) tuple list for helper
+                simple_list = [(ep, None) for ep in ep_data_list] if ep_data_list else []
+                tabs.addTab(self._build_tree_tab(self._episode_to_tree(simple_list, season_data)), label)
 
+        # 3. Technical & Other
         tabs.addTab(self._build_tree_tab(self._tech_to_tree(file_data)), T("discovery.inspector.data_sheet.tabs.technical"))
-        # ... rest same
+        
         if children:
             tabs.addTab(self._build_children_tab(children), T("discovery.inspector.data_sheet.tabs.linked", count=len(children)))
 
@@ -84,8 +136,17 @@ class DataSheetDialog(QDialog):
             raw.setPlainText(str(data))
         return raw
 
-    def _media_to_tree(self, m):
+    def _media_to_tree(self, m, lang_data=None):
         items = []
+        
+        # Merge language data if provided
+        data = m.copy()
+        if lang_data:
+            data.update(lang_data)
+            # TMDB name vs title consistency
+            if 'name' in lang_data and 'title' not in lang_data:
+                data['title'] = lang_data['name']
+
         for key, label in [
             ('title', T('discovery.inspector.fields.title')), 
             ('original_title', T('discovery.inspector.fields.original_title')), 
@@ -113,12 +174,13 @@ class DataSheetDialog(QDialog):
             ('tmdb_id', T('discovery.inspector.fields.tmdb_id')), 
             ('imdb_id', T('discovery.inspector.fields.imdb_id')),
         ]:
-            val = m.get(key)
+            val = data.get(key)
             if val is not None and val != "":
                 items.append((label, str(val)))
         return items
 
     def _episode_to_tree(self, ep_list, season):
+        """ep_list is now a list of (ep_flat, ep_lang_data) tuples."""
         items = []
         if season:
             for key, label in [
@@ -134,8 +196,13 @@ class DataSheetDialog(QDialog):
                     items.append((label, str(val)))
         
         if ep_list:
-            for ep in ep_list:
-                items.append(('', T('discovery.inspector.fields.episode_divider', count=ep.get("episode_number"))))
+            for ep_flat, ep_lang in ep_list:
+                # Merge lang data
+                data = ep_flat.copy()
+                if ep_lang:
+                    data.update(ep_lang)
+                
+                items.append(('', T('discovery.inspector.fields.episode_divider', count=data.get("episode_number"))))
                 for key, label in [
                     ('name', T('discovery.inspector.fields.episode_title')), 
                     ('season_number', T('edit_file.fields.season')), 
@@ -149,7 +216,7 @@ class DataSheetDialog(QDialog):
                     ('still_path', 'Episode Still Path'),
                     ('overview', T('discovery.inspector.fields.overview'))
                 ]:
-                    val = ep.get(key)
+                    val = data.get(key)
                     if val is not None and val != "":
                         items.append((label, str(val)))
         return items

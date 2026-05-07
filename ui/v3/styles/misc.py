@@ -144,11 +144,11 @@ class MiscStyles:
 
     @staticmethod
     def get_batch_bar_style():
-        return f"background-color: {Palette.SURFACE_DARK}; border-top: 2px solid {Palette.PRIMARY}; padding: 10px;"
+        return f"background-color: {Palette.SURFACE_DARK}; border: none; padding: 10px;"
 
     @staticmethod
     def get_batch_label_style():
-        return CommonStyles.get_typography_style('h4', 'bold')
+        return f"color: {Palette.PRIMARY}; {CommonStyles.get_typography_style('h4', 'black')}"
 
     @staticmethod
     def get_drop_overlay_style():

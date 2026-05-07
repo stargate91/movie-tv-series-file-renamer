@@ -175,7 +175,7 @@ class DiscoveryTable(QTableWidget):
                 if status == 'IGNORED':
                     # Restore Button for Trash
                     primary_btn = QPushButton()
-                    primary_btn.setIcon(Theme.get_icon("refresh", size=20, color="white"))
+                    primary_btn.setIcon(Theme.get_icon("refresh", size=20, color=Theme.TEXT_MAIN))
                     primary_btn.setToolTip(T("discovery.actions.restore"))
                     primary_btn.setFixedSize(54, 46)
                     primary_btn.setCursor(Qt.PointingHandCursor)
@@ -184,7 +184,7 @@ class DiscoveryTable(QTableWidget):
                 elif raw_cat == 'video':
                     # API Resolve Button (Only for videos)
                     primary_btn = QPushButton()
-                    primary_btn.setIcon(Theme.get_icon("wand", size=20, color="white"))
+                    primary_btn.setIcon(Theme.get_icon("wand", size=20, color=Theme.TEXT_MAIN))
                     primary_btn.setToolTip(T("discovery.actions.fix"))
                     primary_btn.setFixedSize(54, 46)
                     primary_btn.setCursor(Qt.PointingHandCursor)

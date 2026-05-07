@@ -1,3 +1,4 @@
+import json
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame, QScrollArea
 from PySide6.QtCore import Qt, QSize
 from PySide6.QtGui import QFontMetrics
@@ -31,6 +32,7 @@ class MediaSection(QWidget):
     """
     def __init__(self, parent=None):
         super().__init__(parent)
+        self._preferred_language = "en-US"
         self._init_ui()
 
     def _init_ui(self):
@@ -77,12 +79,16 @@ class MediaSection(QWidget):
     def update_movie(self, media_data):
         if not media_data: return
         self.clear()
-        self.lbl_main.setText(media_data.get('title', T("common.none")))
+        
+        title = self._get_translated(media_data, 'title', T("common.none"))
+        overview = self._get_translated(media_data, 'overview', T("discovery.inspector.empty.overview"))
+        
+        self.lbl_main.setText(title)
         self.lbl_main.show()
         year = str(media_data.get('year', ''))
         self.lbl_year.setText(year)
         self.lbl_year.setVisible(bool(year))
-        self.overview_lbl.setText(media_data.get('overview', T("discovery.inspector.empty.overview")))
+        self.overview_lbl.setText(overview)
 
     def update_episode(self, media_data, ep_data_list):
         if not media_data or not ep_data_list: return
@@ -90,7 +96,8 @@ class MediaSection(QWidget):
         if not isinstance(ep_data_list, list): ep_data_list = [ep_data_list]
         
         # 1. Series Title
-        self.lbl_main.setText(media_data.get('title', ''))
+        title = self._get_translated(media_data, 'title', '')
+        self.lbl_main.setText(title)
         self.lbl_main.show()
         
         # 2. Episode Year
@@ -105,8 +112,10 @@ class MediaSection(QWidget):
             s = ep.get('season_number', '?')
             e = ep.get('episode_number', '?')
             ids.append(f"S{str(s).zfill(2)}E{str(e).zfill(2)}")
-            if ep.get('name'):
-                ep_titles.append(ep.get('name'))
+            
+            ep_title = self._get_translated(ep, 'name')
+            if ep_title:
+                ep_titles.append(ep_title)
         
         self.lbl_id.setText(", ".join(ids))
         self.lbl_id.setVisible(bool(ids))
@@ -114,7 +123,16 @@ class MediaSection(QWidget):
         # 4. Episode Title
         self.lbl_sub.setText(" / ".join(ep_titles))
         self.lbl_sub.setVisible(bool(ep_titles))
-        self.overview_lbl.setText(media_data.get('overview', T("discovery.inspector.empty.overview")))
+        
+        # 5. Overview (Use episode overview if single, otherwise show series overview)
+        if len(ep_data_list) == 1:
+            ep_ov = self._get_translated(ep_data_list[0], 'overview')
+            if ep_ov:
+                self.overview_lbl.setText(ep_ov)
+            else:
+                self.overview_lbl.setText(self._get_translated(media_data, 'overview', T("discovery.inspector.empty.overview")))
+        else:
+            self.overview_lbl.setText(self._get_translated(media_data, 'overview', T("discovery.inspector.empty.overview")))
 
     def update_status(self, status):
         # Now handled by PosterCarousel
@@ -130,4 +148,24 @@ class MediaSection(QWidget):
         self.lbl_sub.setText("")
         self.lbl_sub.hide()
         self.overview_lbl.setText(T("discovery.inspector.empty.overview"))
+
+    def set_preferred_language(self, lang):
+        self._preferred_language = lang
+
+    def _get_translated(self, data, field, default=""):
+        if not data: return default
+        details_json = data.get('details_json')
+        if details_json:
+            try:
+                details = json.loads(details_json)
+                if isinstance(details, dict) and self._preferred_language in details:
+                    lang_data = details[self._preferred_language]
+                    # TMDB fields: title (movie) vs name (tv/episode)
+                    if field in ('title', 'name'):
+                        val = lang_data.get('title') or lang_data.get('name')
+                    else:
+                        val = lang_data.get(field)
+                    if val: return val
+            except: pass
+        return data.get(field, default)
 
