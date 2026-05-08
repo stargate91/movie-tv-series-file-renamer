@@ -2,7 +2,9 @@ import sys
 import logging
 from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
                              QPushButton, QLabel, QFrame, QStackedWidget, QFileDialog)
+from PySide6.QtGui import QIcon, QPixmap
 from PySide6.QtCore import Qt, QSize, QThread, Signal
+import os
 from ui.v3.styles.theme import Theme
 from ui.v3.views.discovery_page import DiscoveryPage
 from ui.v3.views.settings_page import SettingsPage
@@ -201,8 +203,21 @@ class MainWindowV3(QMainWindow):
 
 def start_v3_ui():
     from PySide6.QtWidgets import QApplication
+    from PySide6.QtGui import QIcon
+    import os
+    
     app = QApplication(sys.argv)
     app.setStyleSheet(Theme.get_main_stylesheet())
+    
+    # Set Global App Icon
+    root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+    ico_path = os.path.join(root_dir, "favicon.ico")
+    png_path = os.path.join(root_dir, "favicon", "96x96.png")
+    
+    if os.path.exists(ico_path):
+        app.setWindowIcon(QIcon(ico_path))
+    elif os.path.exists(png_path):
+        app.setWindowIcon(QIcon(png_path))
     
     window = MainWindowV3()
     window.showMaximized()

@@ -1,12 +1,12 @@
 import logging
 import json
-from PySide6.QtCore import Qt, QSize, Signal, Slot
+from PySide6.QtCore import Qt, QSize, Signal, Slot, QThreadPool
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLineEdit, QWidget,
                              QScrollArea, QSpinBox, QMessageBox, QComboBox, QPushButton, QLabel, QFrame, QListWidget, QListWidgetItem)
 from PySide6.QtGui import QPixmap
 
 from ui.v3.styles.theme import Theme
-from ui.v3.components.image_loader import ImageDownloader
+from ui.v3.components.image_loader import ImageLoader
 from .manual_resolve.searcher import SearchWorker
 from .manual_resolve.tv_selector import TVMetadataSelector
 from .manual_resolve.result_widget import ResultItemWidget
@@ -29,7 +29,7 @@ class ManualResolveDialog(QDialog):
         self.selected_media = None
         self.basket = []
         self.search_worker = None
-        self.poster_worker = None
+        self.poster_loader = None
         self.nav_stack = [] # History of (mode, parent_id, season_num, title)
         self.multi_match_mode = False
 
@@ -356,7 +356,7 @@ class ManualResolveDialog(QDialog):
             self.engine.db.files.update_file(self.file_id, target_language=target_lang)
 
             # Finalize using resolver
-            mid = self.engine.resolver.library.store_result(actual_res, language_override=target_lang)
+            mid = self.engine.resolver.library.store_result(actual_res, language_override=target_lang, priority_seasons=[s_num])
             vid_mock = self.engine.db.files.get_file_by_id(self.file_id)
             vid_mock['fn_season'], vid_mock['fn_episode'], vid_mock['fn_media_type'] = s_num, str(e_num), actual_res['media_type']
             self.engine.resolver._finalize_match(self.file_id, mid, actual_res, vid_mock, status='matched', language_override=target_lang)
@@ -382,18 +382,16 @@ class ManualResolveDialog(QDialog):
             return
             
         # Safely handle previous poster downloader
-        if hasattr(self, 'poster_worker') and self.poster_worker and self.poster_worker.isRunning():
-            try:
-                self.poster_worker.finished.disconnect()
-                if not hasattr(self, '_worker_graveyard'): self._worker_graveyard = []
-                self._worker_graveyard.append(self.poster_worker)
+        if self.poster_loader:
+            self.poster_loader.stop()
+            try: self.poster_loader.signals.finished.disconnect()
             except: pass
 
         url = f"https://image.tmdb.org/t/p/w200{poster_path}"
         self.preview_panel.set_loading()
-        self.poster_worker = ImageDownloader(url, local_path)
-        self.poster_worker.finished.connect(self._on_poster_loaded)
-        self.poster_worker.start()
+        self.poster_loader = ImageLoader(url, local_path)
+        self.poster_loader.signals.finished.connect(self._on_poster_loaded)
+        QThreadPool.globalInstance().start(self.poster_loader)
 
     def _on_poster_loaded(self, pixmap):
         self.preview_panel.set_poster(pixmap)

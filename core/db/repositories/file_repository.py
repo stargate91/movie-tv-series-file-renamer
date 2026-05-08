@@ -175,16 +175,16 @@ class FileRepository(BaseRepository):
             LEFT JOIN tv_episodes e ON l.tv_episode_id = e.id
             LEFT JOIN tv_seasons s ON e.season_id = s.id
             WHERE f.category IN ({placeholders}) 
-              AND f.status NOT IN ('renamed', 'deleted')
+              AND (f.status IS NULL OR f.status NOT IN ('renamed', 'deleted'))
             GROUP BY f.id
         """
         with self._get_connection() as conn:
             return [dict(row) for row in conn.execute(query, categories).fetchall()]
 
-    def get_library_files(self, search_query=None):
-        """Fetches all renamed or manually organized files with their metadata."""
+    def get_library_files(self, media_type=None, search_query=None):
+        """Fetches renamed or organized files filtered by media type and search query."""
         query = """
-            SELECT f.*, 
+            SELECT f.*, m.tmdb_id as tmdb_id,
                    m.media_type as media_item_type, m.title as media_title, m.poster_path as media_poster,
                    e.name as episode_title, e.still_path as episode_poster,
                    s.name as season_name, s.poster_path as season_poster
@@ -197,6 +197,10 @@ class FileRepository(BaseRepository):
               AND f.status IN ('renamed', 'organized')
         """
         params = []
+        if media_type:
+            query += " AND m.media_type = ?"
+            params.append(media_type)
+            
         if search_query:
             query += " AND (m.title LIKE ? OR f.file_name LIKE ?)"
             params.extend([f"%{search_query}%", f"%{search_query}%"])
@@ -205,3 +209,96 @@ class FileRepository(BaseRepository):
         
         with self._get_connection() as conn:
             return [dict(row) for row in conn.execute(query, params).fetchall()]
+
+    def get_library_movies(self, search_query=None):
+        """Returns unique movies in the library."""
+        query = """
+            SELECT m.*, m.tmdb_id as tmdb_id, f.current_path,
+                   m.media_type as media_item_type, m.title as media_title, m.poster_path as media_poster
+            FROM media_items m
+            JOIN file_media_links l ON m.id = l.media_item_id
+            JOIN media_files f ON l.file_id = f.id
+            WHERE m.media_type = 'movie' AND f.status IN ('renamed', 'organized')
+        """
+        params = []
+        if search_query:
+            query += " AND (m.title LIKE ? OR f.file_name LIKE ?)"
+            params.extend([f"%{search_query}%", f"%{search_query}%"])
+        query += " GROUP BY m.id ORDER BY m.title ASC"
+        with self._get_connection() as conn:
+            return [dict(row) for row in conn.execute(query, params).fetchall()]
+
+    def get_library_series(self, search_query=None):
+        """Returns unique TV series in the library."""
+        query = """
+            SELECT m.*, m.tmdb_id as tmdb_id,
+                   m.media_type as media_item_type, m.title as media_title, m.poster_path as media_poster
+            FROM media_items m
+            JOIN file_media_links l ON m.id = l.media_item_id
+            JOIN media_files f ON l.file_id = f.id
+            WHERE m.media_type = 'tv' AND f.status IN ('renamed', 'organized')
+        """
+        params = []
+        if search_query:
+            query += " AND (m.title LIKE ? OR f.file_name LIKE ?)"
+            params.extend([f"%{search_query}%", f"%{search_query}%"])
+        query += " GROUP BY m.id ORDER BY m.title ASC"
+        with self._get_connection() as conn:
+            return [dict(row) for row in conn.execute(query, params).fetchall()]
+
+    def get_library_seasons(self, media_item_id):
+        """Returns unique seasons for a specific series present in the library."""
+        query = """
+            SELECT s.*, m.tmdb_id as tmdb_id, m.media_type as media_item_type,
+                   m.title as media_title, m.poster_path as media_poster, m.details_json as media_details,
+                   s.name as season_name, s.poster_path as season_poster, s.details_json as season_details
+            FROM tv_seasons s
+            JOIN tv_episodes e ON s.id = e.season_id
+            JOIN file_media_links l ON e.id = l.tv_episode_id
+            JOIN media_files f ON l.file_id = f.id
+            JOIN media_items m ON s.media_item_id = m.id
+            WHERE s.media_item_id = ? 
+              AND f.status IN ('renamed', 'organized')
+            GROUP BY s.id ORDER BY s.season_number ASC
+        """
+        with self._get_connection() as conn:
+            return [dict(row) for row in conn.execute(query, (media_item_id,)).fetchall()]
+
+    def get_library_episodes(self, media_item_id, season_number):
+        """Returns all files for a specific season in the library."""
+        query = """
+            SELECT f.*, m.tmdb_id as tmdb_id,
+                   m.title as media_title, m.poster_path as media_poster, m.media_type as media_item_type,
+                   m.details_json as media_details,
+                   e.name as episode_title, e.still_path as episode_poster, e.details_json as episode_details,
+                   s.name as season_name, s.poster_path as season_poster, s.details_json as season_details
+            FROM media_files f
+            JOIN file_media_links l ON f.id = l.file_id
+            JOIN media_items m ON l.media_item_id = m.id
+            JOIN tv_episodes e ON l.tv_episode_id = e.id
+            JOIN tv_seasons s ON e.season_id = s.id
+            WHERE m.id = ? AND s.season_number = ? 
+              AND f.status IN ('renamed', 'organized')
+            ORDER BY e.episode_number ASC
+        """
+        with self._get_connection() as conn:
+            return [dict(row) for row in conn.execute(query, (media_item_id, season_number)).fetchall()]
+
+    def get_library_counts(self):
+        """Returns counts of unique movies and series in the library."""
+        with self._get_connection() as conn:
+            movies = conn.execute("""
+                SELECT COUNT(DISTINCT m.id) FROM media_items m
+                JOIN file_media_links l ON m.id = l.media_item_id
+                JOIN media_files f ON l.file_id = f.id
+                WHERE m.media_type = 'movie' AND f.status IN ('renamed', 'organized')
+            """).fetchone()[0]
+            
+            series = conn.execute("""
+                SELECT COUNT(DISTINCT m.id) FROM media_items m
+                JOIN file_media_links l ON m.id = l.media_item_id
+                JOIN media_files f ON l.file_id = f.id
+                WHERE m.media_type = 'tv' AND f.status IN ('renamed', 'organized')
+            """).fetchone()[0]
+            
+            return {'movie': movies, 'tv': series}

@@ -20,12 +20,13 @@ class HistoryManager:
         """Saves a rename operation to the history."""
         self.db.history.add_history(batch_id, file_id, old_path, new_path)
 
-    def undo_batch(self, batch_id, progress_callback=None):
+    def undo_batch(self, batch_id, settings, progress_callback=None):
         """Reverses all operations in a specific batch."""
         history = self.db.history.get_batch(batch_id)
         if not history: return 0, 0, ["No history found."]
 
         success, failed, errors = 0, 0, []
+        dirs_to_check = set()
         total = len(history)
 
         for i, entry in enumerate(history):
@@ -34,6 +35,12 @@ class HistoryManager:
                     errors.append("Undo aborted by user.")
                     break
             
+            # Collect the directory we are moving FROM (the one that might become empty)
+            import os
+            new_path = entry.get('new_path')
+            if new_path:
+                dirs_to_check.add(os.path.dirname(os.path.normpath(new_path)))
+
             ok, msg = self.undo_single(entry)
             if ok: 
                 success += 1
@@ -42,6 +49,10 @@ class HistoryManager:
             else:
                 failed += 1
                 errors.append(msg)
+
+        # Cleanup empty folders if enabled
+        if settings.cleanup_empty_folders:
+            self.operator.cleanup_empty_dirs(dirs_to_check, settings)
 
         return success, failed, errors
 
@@ -53,6 +64,13 @@ class HistoryManager:
         
         ok, error = self.operator.move_file(new_path, old_path)
         if ok:
-            self.db.files.update_file(history_entry['file_id'], current_path=old_path, status='restored')
+            # Restore to MATCHED status so it goes back to Movies/Shows tab
+            # and clear the status so it's no longer 'renamed'
+            self.db.files.update_file(
+                history_entry['file_id'], 
+                current_path=old_path, 
+                status=None, 
+                match_status='MATCHED'
+            )
             return True, "Restored."
         return False, error

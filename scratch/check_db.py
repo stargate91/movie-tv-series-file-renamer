@@ -1,29 +1,45 @@
-"""Simulate manual resolve for a movie and check enrichment."""
-import sys, os, json
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from core.engine.manager import RenamerEngineV3
+import sqlite3
+import os
 
-engine = RenamerEngineV3()
-resolver = engine.resolver
+db_path = r"e:\projects\python\movie-tv-series-file-renamer\data\renda.db"
 
-# 1. Simulate search result (lean object)
-search_result = {
-    'tmdb_id': 27205, # Inception
-    'title': 'Inception',
-    'year': 2010,
-    'media_type': 'movie',
-    'poster_path': '/xQH69n9pY96039vN4D5U14N91V.jpg'
-}
+if not os.path.exists(db_path):
+    print(f"DB not found at {db_path}")
+    exit()
 
-# 2. Call the NEW logic from ManualResolveDialog
-print("=== Simulating Manual Resolve Enrichment ===")
-media_item_id = resolver._store_result(search_result)
-print(f"Enriched Media Item ID: {media_item_id}")
+conn = sqlite3.connect(db_path)
+conn.row_factory = sqlite3.Row
+cursor = conn.cursor()
 
-# 3. Check DB
-conn = engine.db._get_connection()
-row = conn.execute('SELECT director, "cast", overview FROM media_items WHERE id = ?', (media_item_id,)).fetchone()
-print(f"Director: {row['director']}")
-print(f"Cast: {row['cast'][:50]}...")
-print(f"Overview: {row['overview'][:50]}...")
+print("--- media_files status counts ---")
+rows = cursor.execute("SELECT status, COUNT(*) as count FROM media_files GROUP BY status").fetchall()
+for row in rows:
+    print(f"{row['status']}: {row['count']}")
+
+print("\n--- media_items type counts ---")
+rows = cursor.execute("SELECT media_type, COUNT(*) as count FROM media_items GROUP BY media_type").fetchall()
+for row in rows:
+    print(f"{row['media_type']}: {row['count']}")
+
+print("\n--- file_media_links count ---")
+row = cursor.execute("SELECT COUNT(*) as count FROM file_media_links").fetchone()
+print(f"Total links: {row['count']}")
+
+print("\n--- library counts (query from FileRepository) ---")
+movies = cursor.execute("""
+    SELECT COUNT(DISTINCT m.id) FROM media_items m
+    JOIN file_media_links l ON m.id = l.media_item_id
+    JOIN media_files f ON l.file_id = f.id
+    WHERE m.media_type = 'movie' AND f.status IN ('renamed', 'organized')
+""").fetchone()[0]
+
+series = cursor.execute("""
+    SELECT COUNT(DISTINCT m.id) FROM media_items m
+    JOIN file_media_links l ON m.id = l.media_item_id
+    JOIN media_files f ON l.file_id = f.id
+    WHERE m.media_type = 'tv' AND f.status IN ('renamed', 'organized')
+""").fetchone()[0]
+print(f"Movies in library: {movies}")
+print(f"Series in library: {series}")
+
 conn.close()

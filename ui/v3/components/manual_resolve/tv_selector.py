@@ -23,11 +23,11 @@ class TVMetadataSelector(QWidget):
         tv_layout.setContentsMargins(0, 0, 0, 0)
         tv_layout.setSpacing(10)
 
-        tv_layout.addWidget(QLabel("S:"))
+        tv_layout.addWidget(QLabel(T("edit_file.fields.season_short") or "S:"))
         self.season_spin = self._create_spin(0, 999, T("common.none"))
         tv_layout.addWidget(self.season_spin)
 
-        tv_layout.addWidget(QLabel("E:"))
+        tv_layout.addWidget(QLabel(T("edit_file.fields.episode_short") or "E:"))
         self.episode_spin = self._create_spin(0, 999, T("common.none"))
         tv_layout.addWidget(self.episode_spin)
 

@@ -98,18 +98,49 @@ class NotificationBar(QWidget):
         self.timer.setSingleShot(True)
         self.timer.timeout.connect(self.hide_notification)
 
-    def show_message(self, message, batch_id=None, duration=8000):
+    def show_message(self, message, batch_id=None, duration=8000, type='info', show_undo=None):
         self.is_custom = False
         self.label.setText(message)
         self.batch_id = batch_id
+        
+        # Border Color based on type
+        border_color = Theme.PRIMARY
+        if type == 'success': border_color = Theme.SUCCESS
+        elif type == 'warning': border_color = Theme.WARNING
+        elif type == 'error': border_color = Theme.ERROR
+        
+        self.container.setStyleSheet(f"""
+            QWidget#NotifContainer {{
+                background-color: #1E293B;
+                border: 1px solid {border_color};
+                border-radius: 20px;
+            }}
+        """)
+        
         self.undo_btn.setText(T("common.undo") if T("common.undo") != "common.undo" else "Undo")
-        self.undo_btn.setVisible(batch_id is not None)
+        
+        # Determine visibility
+        should_show_undo = batch_id is not None
+        if show_undo is not None:
+            should_show_undo = show_undo
+            
+        self.undo_btn.setVisible(should_show_undo)
         self._show_animated(duration)
 
     def show_custom_action(self, message, button_text, payload=None, duration=15000):
         self.is_custom = True
         self.label.setText(message)
         self.custom_payload = payload
+        
+        # Reset to primary border for custom actions
+        self.container.setStyleSheet(f"""
+            QWidget#NotifContainer {{
+                background-color: #1E293B;
+                border: 1px solid {Theme.PRIMARY};
+                border-radius: 20px;
+            }}
+        """)
+        
         self.undo_btn.setText(button_text)
         self.undo_btn.setVisible(True)
         self._show_animated(duration)

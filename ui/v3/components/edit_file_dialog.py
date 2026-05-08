@@ -101,7 +101,7 @@ class EditFileDialog(QDialog):
         part_lay.setContentsMargins(0, 5, 0, 0)
         part_lay.addWidget(QLabel(T("edit_file.fields.part") or "Part ID (1, A, II):", styleSheet=Theme.get_status_label_style()))
         self.edit_part = QLineEdit()
-        self.edit_part.setPlaceholderText("e.g. 1, A, II")
+        self.edit_part.setPlaceholderText(T("edit_file.placeholders.part") or "e.g. 1, A, II")
         part_lay.addWidget(self.edit_part)
         mv_lay.addLayout(part_lay)
 

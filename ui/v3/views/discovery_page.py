@@ -55,6 +55,7 @@ class DiscoveryPage(QWidget):
         self.controller.operation_finished.connect(self._on_operation_finished)
         self.controller.progress_updated.connect(self._on_worker_progress)
         self.controller.error_occurred.connect(lambda t, m: QMessageBox.critical(self, t, m))
+        self.controller.prefetch_progress.connect(self._on_prefetch_progress)
     def _init_ui(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(30, 30, 30, 30)
@@ -99,6 +100,10 @@ class DiscoveryPage(QWidget):
         title = QLabel(T("discovery.title"))
         title.setStyleSheet(Theme.get_page_header_style())
         
+        self.prefetch_lbl = QLabel("")
+        self.prefetch_lbl.setStyleSheet(f"color: {Theme.TEXT_DIM}; font-size: 11px; font-style: italic;")
+        self.prefetch_lbl.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        
         self.search_box = QLineEdit()
         self.search_box.setPlaceholderText(T("discovery.search_placeholder"))
         self.search_box.setFixedWidth(300)
@@ -119,6 +124,8 @@ class DiscoveryPage(QWidget):
 
         header.addWidget(title)
         header.addStretch()
+        header.addWidget(self.prefetch_lbl)
+        header.addSpacing(10)
         header.addWidget(self.search_box)
         header.addWidget(self.scan_new_btn)
         header.addWidget(self.refresh_btn)
@@ -575,6 +582,12 @@ class DiscoveryPage(QWidget):
         self.progress_bar.setValue(val)
         self.status_info.setText(text)
 
+    def _on_prefetch_progress(self, name):
+        if not name:
+            self.prefetch_lbl.setText("")
+        else:
+            self.prefetch_lbl.setText(f"{T('common.syncing') or 'Syncing'}: {name}")
+
     def notify_language_changed(self, new_lang):
         """Triggered from MainWindow when settings change the language."""
         self.inspector.set_preferred_language(new_lang)
@@ -612,6 +625,9 @@ class DiscoveryPage(QWidget):
         self.refresh_btn.setStyleSheet(Theme.get_secondary_button_style())
         self.main_tabs.setStyleSheet(Theme.get_tab_widget_style())
         self.apply_btn.setStyleSheet(Theme.get_primary_button_style())
+        
+        # Prefetch Label
+        self.prefetch_lbl.setStyleSheet(f"color: {Theme.TEXT_MUTED}; font-size: 11px; font-style: italic;")
         
         # Progress Bar
         self.progress_bar.setStyleSheet(Theme.get_progress_bar_detailed_style())

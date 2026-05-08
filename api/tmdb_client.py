@@ -43,25 +43,25 @@ class TMDBClient(BaseClient, BaseMediaProvider):
             params["first_air_date_year"] = year
         return self._get_from_api(api_url, cache_key, self.headers, params=params)
 
-    def get_movie_details(self, id, language="hu-HU"):
+    def get_movie_details(self, id, language="hu-HU", force_refresh=False):
         cache_key = f"movie-detail-{id}-{language}"
         api_url = f"https://api.themoviedb.org/3/movie/{id}?api_key={self.api_key}&language={language}&append_to_response=credits"
-        return self._get_from_api(api_url, cache_key, self.headers, required_keys=['credits'])
+        return self._get_from_api(api_url, cache_key, self.headers, required_keys=['credits'], bypass_cache=force_refresh)
 
-    def get_tv_details(self, id, language="hu-HU"):
+    def get_tv_details(self, id, language="hu-HU", force_refresh=False):
         cache_key = f"tv-detail-{id}-{language}"
         api_url = f"https://api.themoviedb.org/3/tv/{id}?api_key={self.api_key}&language={language}&append_to_response=credits,external_ids"
-        return self._get_from_api(api_url, cache_key, self.headers, required_keys=['credits', 'external_ids'])
+        return self._get_from_api(api_url, cache_key, self.headers, required_keys=['credits', 'external_ids'], bypass_cache=force_refresh)
 
-    def get_season_details(self, id, season_number, language="hu-HU"):
+    def get_season_details(self, id, season_number, language="hu-HU", force_refresh=False):
         cache_key = f"season-{id}-{season_number}-{language}"
         api_url = f"https://api.themoviedb.org/3/tv/{id}/season/{season_number}?api_key={self.api_key}&language={language}&append_to_response=external_ids"
-        return self._get_from_api(api_url, cache_key, self.headers, required_keys=['episodes'])
+        return self._get_from_api(api_url, cache_key, self.headers, required_keys=['episodes'], bypass_cache=force_refresh)
 
-    def get_episode_details(self, id, season_number, episode_number, language="hu-HU"):
+    def get_episode_details(self, id, season_number, episode_number, language="hu-HU", force_refresh=False):
         cache_key = f"episode-{id}-{season_number}-{episode_number}-{language}"
         api_url = f"https://api.themoviedb.org/3/tv/{id}/season/{season_number}/episode/{episode_number}?api_key={self.api_key}&language={language}&append_to_response=external_ids"
-        return self._get_from_api(api_url, cache_key, self.headers, required_keys=['external_ids'])
+        return self._get_from_api(api_url, cache_key, self.headers, required_keys=['external_ids'], bypass_cache=force_refresh)
 
     def get_tv_external_ids(self, id):
         cache_key = f"tv-external-{id}"

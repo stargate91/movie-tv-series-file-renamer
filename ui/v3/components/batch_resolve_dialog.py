@@ -1,5 +1,5 @@
 import logging
-from PySide6.QtCore import Qt, QSize, Signal, Slot
+from PySide6.QtCore import Qt, QSize, Signal, Slot, QThreadPool
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLineEdit, QWidget,
                              QPushButton, QListWidget, QListWidgetItem, QLabel, QFrame, 
                              QScrollArea, QSpinBox, QMessageBox, QAbstractItemView, QComboBox)
@@ -7,7 +7,7 @@ from PySide6.QtGui import QPixmap
 
 from ui.v3.styles.theme import Theme
 from core.i18n import T
-from ui.v3.components.image_loader import ImageDownloader
+from ui.v3.components.image_loader import ImageLoader
 from .manual_resolve.searcher import SearchWorker
 from .manual_resolve.tv_selector import TVMetadataSelector
 from .manual_resolve.result_widget import ResultItemWidget
@@ -25,6 +25,7 @@ class BatchResolveDialog(QDialog):
         self.selected_files = selected_files
         self.selected_media = None
         self.search_worker = None
+        self.poster_loader = None
         self.nav_stack = [] 
 
         self.setWindowTitle(T("discovery.batch_resolve.title", count=len(selected_files)))
@@ -432,10 +433,17 @@ class BatchResolveDialog(QDialog):
         if os.path.exists(local_path):
             self._on_poster_loaded(QPixmap(local_path))
             return
+            
+        # Stop existing loader if any
+        if self.poster_loader:
+            self.poster_loader.stop()
+            try: self.poster_loader.signals.finished.disconnect()
+            except: pass
+
         url = f"https://image.tmdb.org/t/p/w200{poster_path}"
-        self.poster_worker = ImageDownloader(url, local_path)
-        self.poster_worker.finished.connect(self._on_poster_loaded)
-        self.poster_worker.start()
+        self.poster_loader = ImageLoader(url, local_path)
+        self.poster_loader.signals.finished.connect(self._on_poster_loaded)
+        QThreadPool.globalInstance().start(self.poster_loader)
 
     def _on_poster_loaded(self, pixmap):
         if not pixmap.isNull():

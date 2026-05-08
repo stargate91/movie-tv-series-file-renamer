@@ -152,8 +152,15 @@ class InspectorPanel(QFrame):
                 # Periodic cleanup of finished workers from graveyard
                 self._worker_graveyard = [w for w in self._worker_graveyard if w.isRunning()]
 
+            # Extract priority season from current file
+            p_seasons = []
+            s_val = file_data.get('fn_season') if file_data.get('fn_season') is not None else file_data.get('fd_season')
+            if s_val is not None:
+                try: p_seasons.append(int(s_val))
+                except: pass
+
             # Trigger background enrich
-            self.enrich_worker = SingleEnrichWorker(engine, media_data['tmdb_id'], media_data['media_type'], active_lang)
+            self.enrich_worker = SingleEnrichWorker(engine, media_data['tmdb_id'], media_data['media_type'], active_lang, priority_seasons=p_seasons)
             # Use a safe callback that only refreshes if the file is STILL selected
             def on_enriched(fid=file_id):
                 if self._current_file_data and self._current_file_data.get('id') == fid:

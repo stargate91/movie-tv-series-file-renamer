@@ -46,7 +46,7 @@ class LibraryManager:
         """Always get the current language from settings."""
         return getattr(self.s, 'metadata_language', 'en-US')
 
-    def store_result(self, result, language_override=None):
+    def store_result(self, result, language_override=None, force_refresh=False, priority_seasons=None):
         """
         Enriches TMDB search result with full details and saves to media_items.
         Returns the new/existing media_item_id.
@@ -59,9 +59,25 @@ class LibraryManager:
         fetched = (existing.get('fetched_languages') or "") if existing else ""
         fetched_list = [l.strip() for l in fetched.split(',') if l.strip()]
         
+        # Determine if we need to fetch from TMDB
+        # (Always fetch if force_refresh or if language not yet fetched)
+        needs_tmdb = force_refresh or target_lang not in fetched_list
+
+        # ... (rest of metadata extraction logic remains similar, but use priority_seasons)
+        # For brevity, I'll keep the core logic but optimize the season loop at the end
+        
+        # [Simplified for replacement, but ensuring core logic is preserved]
+        # (I will use multi_replace if I need to change many parts, but let's try to fit the logic)
+        
+        # Actually, let's keep the existing logic but just fix the loop at the end.
+        # I'll re-read the middle part to make sure I don't break anything.
+        # Line 58 to 226 is the core metadata extraction.
+        
+        # Let's do it properly. I'll use multi_replace for safety.
+        
         # Robust check: if it's a TV show, we might need to refresh seasons/episodes even if series exists
         is_tv = result.get('media_type') == 'tv' or (existing and existing.get('media_type') == 'tv')
-        if existing and target_lang in fetched_list and not is_tv:
+        if existing and target_lang in fetched_list and not is_tv and not force_refresh:
             return existing['id']
 
         # Enrichment
@@ -237,16 +253,34 @@ class LibraryManager:
                 
                 details = details_all.get(l_key) if isinstance(details_all, dict) else details_all
                 if details and 'seasons' in details:
-                    for s in details['seasons']:
+                    # Sort seasons: priority first, then numeric
+                    all_seasons = details['seasons']
+                    priority = set(priority_seasons or [])
+                    
+                    # Group by priority
+                    p_list = []
+                    others = []
+                    for s in all_seasons:
                         s_num = s.get('season_number')
-                        if s_num is not None:
-                            self.fetch_and_store_season(tmdb_id, s_num, target_lang)
+                        if s_num is None: continue
+                        if s_num in priority: p_list.append(s_num)
+                        else: others.append(s_num)
+                    
+                    # Fetch in parallel (priority first)
+                    # We use a small pool for SQLite safety
+                    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+                        # 1. Priority seasons
+                        if p_list:
+                            list(executor.map(lambda sn: self.fetch_and_store_season(tmdb_id, sn, target_lang, force_refresh=force_refresh), p_list))
+                        
+                        # 2. Others (in background/parallel)
+                        executor.map(lambda sn: self.fetch_and_store_season(tmdb_id, sn, target_lang, force_refresh=force_refresh), others)
             except Exception as e:
                 logger.warning(f"Season hydration failed: {e}")
             
         return item_id
 
-    def fetch_and_store_season(self, tmdb_id, season_number, language_override=None):
+    def fetch_and_store_season(self, tmdb_id, season_number, language_override=None, force_refresh=False):
         """Fetches a full season from TMDB and stores episodes."""
         try:
             target_lang = language_override or self.language
@@ -254,8 +288,9 @@ class LibraryManager:
             fetched = (existing_season.get('fetched_languages') or "") if existing_season else ""
             fetched_list = [l.strip() for l in fetched.split(',') if l.strip()]
             
-            # We proceed to update episodes/details even if the season record exists, 
-            # to ensure all languages are synchronized.
+            # Skip only if not forced and already fetched in this lang
+            if existing_season and target_lang in fetched_list and not force_refresh:
+                return existing_season['id']
 
             data = self.api.tmdb.get_season_details(tmdb_id, season_number, target_lang)
             if not data: return
@@ -286,6 +321,10 @@ class LibraryManager:
                 'fetched_languages': fetched_languages
             }
             season_id = self.db.media.upsert_season(**season_data)
+            
+            # Pre-download season poster
+            if season_data['poster_path']:
+                self.pre_download_poster(season_data['poster_path'])
             
             for ep in data.get('episodes', []):
                 ep_num = ep.get('episode_number')
@@ -318,6 +357,10 @@ class LibraryManager:
                     'fetched_languages': ep_fetched_languages
                 }
                 self.db.media.upsert_episode(**episode_data)
+                
+                # Pre-download episode still
+                if episode_data['still_path']:
+                    self.pre_download_poster(episode_data['still_path'])
 
         except Exception as e:
             logger.warning(f"Season fetch failed: {e}")

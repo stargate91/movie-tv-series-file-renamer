@@ -19,6 +19,7 @@ class DiscoveryController(QObject):
     operation_started = Signal(str)      # message
     operation_finished = Signal(dict)    # results
     error_occurred = Signal(str, str)    # title, message
+    prefetch_progress = Signal(str)      # current poster path/name
     
     def __init__(self, engine):
         super().__init__()
@@ -214,6 +215,7 @@ class DiscoveryController(QObject):
         if poster_paths:
             from ui.v3.workers.discovery_workers import PosterPrefetcher
             p_worker = PosterPrefetcher(self.engine, poster_paths)
+            p_worker.progress.connect(self.prefetch_progress.emit)
             p_worker.start()
             self.active_workers.append(p_worker)
             

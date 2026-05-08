@@ -4,6 +4,7 @@ from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
                              QPushButton, QTreeWidget, QTreeWidgetItem, QMessageBox)
 from PySide6.QtCore import Qt
 from ui.v3.styles.theme import Theme
+from core.i18n import T
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +17,7 @@ class CleanupDialog(QDialog):
         super().__init__(parent)
         self.leftovers = leftovers
         self.engine = engine
-        self.setWindowTitle("Cleanup Leftovers")
+        self.setWindowTitle(T("cleanup.title"))
         self.setMinimumSize(600, 400)
         self.setStyleSheet(Theme.get_main_stylesheet())
         self._init_ui()
@@ -29,7 +30,7 @@ class CleanupDialog(QDialog):
         total_dirs = len(self.leftovers)
         total_files = sum(len(files) for files in self.leftovers.values())
         
-        header_lbl = QLabel(f"Rename successful! Left with {total_dirs} folder(s) containing a total of {total_files} potentially unnecessary file(s).")
+        header_lbl = QLabel(T("cleanup.header", dirs=total_dirs, files=total_files))
         header_lbl.setWordWrap(True)
         header_lbl.setStyleSheet("font-size: 14px; font-weight: bold; color: #E0E0E0;")
         layout.addWidget(header_lbl)
@@ -53,11 +54,11 @@ class CleanupDialog(QDialog):
         # Buttons
         btn_layout = QHBoxLayout()
         
-        self.btn_leave = QPushButton("Leave them be")
+        self.btn_leave = QPushButton(T("cleanup.btn_leave"))
         self.btn_leave.setStyleSheet(Theme.get_secondary_button_style())
         self.btn_leave.clicked.connect(self.reject)
         
-        self.btn_delete = QPushButton("Move to Recycle Bin")
+        self.btn_delete = QPushButton(T("cleanup.btn_delete"))
         self.btn_delete.setStyleSheet(Theme.get_danger_button_style())
         self.btn_delete.clicked.connect(self._on_delete_clicked)
         
@@ -70,12 +71,12 @@ class CleanupDialog(QDialog):
         try:
             import send2trash
         except ImportError:
-            QMessageBox.critical(self, "Error", "send2trash module not found! Please install it: pip install send2trash")
+            QMessageBox.critical(self, T("common.error"), "send2trash module not found! Please install it: pip install send2trash")
             return
 
         reply = QMessageBox.question(
-            self, 'Confirm',
-            "Are you sure you want to move these folders and all their contents to the Recycle Bin?\n\nThis will also remove the affected files from the database.",
+            self, T("cleanup.confirm_title"),
+            T("cleanup.confirm_msg"),
             QMessageBox.Yes | QMessageBox.No, QMessageBox.No
         )
         if reply == QMessageBox.No:
@@ -100,8 +101,8 @@ class CleanupDialog(QDialog):
                 error_count += 1
 
         if error_count > 0:
-            QMessageBox.warning(self, "Partial Success", f"Deleted {success_count} folders, {error_count} failed.")
+            QMessageBox.warning(self, T("history.undo_partial_title"), T("cleanup.partial_success", success=success_count, failed=error_count))
         else:
-            QMessageBox.information(self, "Done", "The leftover items have been moved to the Recycle Bin!")
+            QMessageBox.information(self, T("cleanup.done_title"), T("cleanup.done_msg"))
             
         self.accept()

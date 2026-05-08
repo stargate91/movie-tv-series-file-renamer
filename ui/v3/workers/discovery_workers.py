@@ -81,19 +81,26 @@ class DataLoader(QThread):
 
 class PosterPrefetcher(QThread):
     """Prefetches poster images in the background."""
+    progress = Signal(str)
+    
     def __init__(self, engine, poster_paths):
         super().__init__()
         self.engine = engine
-        self.poster_paths = poster_paths
+        self.poster_paths = list(set(poster_paths)) # Deduplicate
 
     def run(self):
         for path in self.poster_paths:
             if not path: continue
             try:
+                # Extract filename for display (e.g. /abc.jpg -> abc)
+                name = os.path.basename(path)
+                self.progress.emit(name)
+                
                 # Use LibraryManager which has the download logic
                 self.engine.resolver.library.pre_download_poster(path)
             except:
                 pass
+        self.progress.emit("") # Clear on finish
 
 class RenameWorker(QThread):
     """Handles the physical renaming process in the background."""
@@ -145,7 +152,10 @@ class UndoWorker(QThread):
                 return True
 
             success, failed, errors = self.engine.executor.undo_batch(self.batch_id, progress_callback=cb)
-            self.finished.emit({'success': success, 'failed': failed, 'errors': errors})
+            self.finished.emit({
+                'type': 'undo_complete',
+                'results': {'success': success, 'failed': failed, 'errors': errors}
+            })
         except Exception as e:
             self.finished.emit({'success': 0, 'failed': 1, 'errors': [str(e)]})
 
@@ -347,19 +357,20 @@ class SingleEnrichWorker(QThread):
     """Enriches a single media item with a specific language in the background."""
     finished = Signal()
 
-    def __init__(self, engine, tmdb_id, media_type, language):
+    def __init__(self, engine, tmdb_id, media_type, language, priority_seasons=None):
         super().__init__()
         self.engine = engine
         self.tmdb_id = tmdb_id
         self.media_type = media_type
         self.language = language
+        self.priority_seasons = priority_seasons
 
     def run(self):
         try:
             self.engine.resolver.library.store_result({
                 'tmdb_id': self.tmdb_id, 
                 'media_type': self.media_type
-            }, language_override=self.language)
+            }, language_override=self.language, priority_seasons=self.priority_seasons)
             self.finished.emit()
         except Exception as e:
             logger.error(f"SingleEnrichWorker Error: {e}")

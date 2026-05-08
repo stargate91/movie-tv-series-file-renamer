@@ -38,11 +38,11 @@ class PreviewPanel(QFrame):
 
     def update_info(self, res):
         try:
-            title = res.get('title') or res.get('name') or "Unknown Title"
+            title = res.get('title') or res.get('name') or T("manual_resolve.unknown_title")
             self.title.setText(str(title))
             
             mtype = res.get('media_type', 'unknown')
-            mtype_str = str(mtype).capitalize() if mtype else "Unknown"
+            mtype_str = T(f"common.types.{mtype}") if mtype else T("manual_resolve.unknown_type")
             
             meta = T("manual_resolve.type_label", type=mtype_str)
             if res.get('year'): meta += f" • {res['year']}"
@@ -61,7 +61,7 @@ class PreviewPanel(QFrame):
                 meta += f"\n{network}"
                 
             if res.get('collection'):
-                meta += f"\nCollection: {res['collection']}"
+                meta += f"\n" + T("manual_resolve.collection_label", name=res['collection'])
                 
             self.meta.setText(meta)
             self.overview.setText(str(res.get('overview', "")))
@@ -69,7 +69,7 @@ class PreviewPanel(QFrame):
             from utils.logger import setup_logger
             import logging
             logging.getLogger(__name__).error(f"Error updating preview info: {e}")
-            self.title.setText("Error loading preview")
+            self.title.setText(T("manual_resolve.error_preview"))
         
     def set_poster(self, pixmap):
         if not pixmap or pixmap.isNull():

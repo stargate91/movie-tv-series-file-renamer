@@ -1,6 +1,7 @@
 from PySide6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton
 from PySide6.QtCore import Qt
 from ui.v3.styles.theme import Theme
+from core.i18n import T
 
 class ModernDialog(QDialog):
     """
@@ -58,13 +59,13 @@ class ModernDialog(QDialog):
         btn_lay = QHBoxLayout()
         btn_lay.addStretch()
         
-        self.btn_no = QPushButton("Cancel")
+        self.btn_no = QPushButton(T("common.cancel"))
         self.btn_no.setFixedSize(100, 38)
         self.btn_no.setCursor(Qt.PointingHandCursor)
         self.btn_no.setStyleSheet(Theme.get_secondary_button_style())
         self.btn_no.clicked.connect(self.reject)
         
-        self.btn_yes = QPushButton("Confirm")
+        self.btn_yes = QPushButton(T("common.confirm"))
         self.btn_yes.setFixedSize(120, 38)
         self.btn_yes.setCursor(Qt.PointingHandCursor)
         self.btn_yes.setStyleSheet(Theme.get_primary_button_style() if icon_name != "alert" else Theme.get_danger_button_style())
@@ -85,7 +86,7 @@ class ModernDialog(QDialog):
     def show_message(parent, title, message, icon="check"):
         dlg = ModernDialog(title, message, icon, parent)
         dlg.btn_no.hide() # Hide cancel button for info messages
-        dlg.btn_yes.setText("OK")
+        dlg.btn_yes.setText(T("common.ok"))
         dlg.exec()
 
 from PySide6.QtWidgets import QFrame # Import QFrame for the container

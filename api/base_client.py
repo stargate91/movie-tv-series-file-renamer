@@ -43,9 +43,9 @@ class BaseClient:
                 time.sleep(self.min_interval - elapsed)
             self._last_request_time = time.time()
 
-    def _get_from_api(self, api_url, cache_key, headers=None, params=None, required_keys=None):
+    def _get_from_api(self, api_url, cache_key, headers=None, params=None, required_keys=None, bypass_cache=False):
         # 1. Cache Check
-        if self.db:
+        if self.db and not bypass_cache:
             cached_data = self.db.get_api_cache(cache_key)
             if cached_data:
                 if required_keys and isinstance(cached_data, dict):

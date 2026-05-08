@@ -101,4 +101,4 @@ class Executor:
 
     def undo_batch(self, batch_id, progress_callback=None):
         """Reverses a whole batch of operations."""
-        return self.history.undo_batch(batch_id, progress_callback)
+        return self.history.undo_batch(batch_id, self.settings, progress_callback)

@@ -58,8 +58,8 @@ class APIClient:
     def get_movie_details(self, movie_id, language="hu-HU"):
         return self.tmdb.get_movie_details(movie_id, language)
 
-    def get_tv_show_details(self, tv_id, language="hu-HU"):
-        return self.tmdb.get_tv_details(tv_id, language)
+    def get_tv_show_details(self, tv_id, language="hu-HU", force_refresh=False):
+        return self.tmdb.get_tv_details(tv_id, language, force_refresh)
 
     def get_from_tmdb_movie(self, title, year, language="hu-HU"):
         return self.tmdb.search_movie(title, year, language)
@@ -79,8 +79,12 @@ class APIClient:
     def get_from_tmdb_episode(self, id, season_number, episode_number, language="hu-HU"):
         return self.tmdb.get_episode_details(id, season_number, episode_number, language)
 
-    def get_from_tmdb_season(self, id, season_number, language="hu-HU"):
-        return self.tmdb.get_season_details(id, season_number, language)
+    def get_from_tmdb_season(self, id, season_number, language="hu-HU", force_refresh=False):
+        return self.tmdb.get_season_details(id, season_number, language, force_refresh)
 
-    def get_from_tmdb(self, id, media_type, language="hu-HU"):
-        return self.tmdb.get_full_details(id, media_type, language)
+    def get_from_tmdb(self, id, media_type, language="hu-HU", force_refresh=False):
+        if media_type == 'movie':
+            return self.tmdb.get_movie_details(id, language, force_refresh)
+        elif media_type == 'tv':
+            return self.tmdb.get_tv_details(id, language, force_refresh)
+        return None

@@ -3,6 +3,10 @@
         "name": "RENDA",
         "subtitle": "Smart Media Organizer"
     },
+    "common": {
+        "back": "Back",
+        "syncing": "Syncing"
+    },
     "sidebar": {
         "dashboard": "Dashboard",
         "workspace": "Renaming Workspace",
@@ -11,6 +15,32 @@
         "settings": "Settings",
         "restart": "Restart App",
         "support": "Say Thanks"
+    },
+    "manual_resolve": {
+        "title": "Manual Resolve",
+        "search_placeholder": "Search for Movie or TV Show...",
+        "no_selection": "No selection",
+        "select_result": "Select a result to see details",
+        "type_label": "Type: {type}",
+        "collection_label": "Collection: {name}",
+        "no_poster": "No Poster",
+        "error_preview": "Error loading preview",
+        "unknown_title": "Unknown Title",
+        "unknown_type": "Unknown",
+        "basket": "Selected Matches",
+        "clear": "Clear All",
+        "confirm_all": "Apply All Selected"
+    },
+    "cleanup": {
+        "title": "Cleanup Leftovers",
+        "header": "Rename successful! Left with {dirs} folder(s) containing a total of {files} potentially unnecessary file(s).",
+        "btn_leave": "Leave them be",
+        "btn_delete": "Move to Recycle Bin",
+        "confirm_title": "Confirm Cleanup",
+        "confirm_msg": "Are you sure you want to move these folders and all their contents to the Recycle Bin?\n\nThis will also remove the affected files from the database.",
+        "partial_success": "Deleted {success} folders, {failed} failed.",
+        "done_title": "Done",
+        "done_msg": "The leftover items have been moved to the Recycle Bin!"
     },
     "greeting": {
         "morning": "Good morning",
@@ -549,7 +579,9 @@
             "primary_role": "Primary Role:",
             "type": "Type:",
             "season": "Season:",
+            "season_short": "S:",
             "episode": "Episode:",
+            "episode_short": "E:",
             "edition": "Edition:",
             "part": "Part:",
             "language": "Audio/Sub Language:",
@@ -598,6 +630,13 @@
         "title": "Media Gallery",
         "subtitle": "Browse your organized collection",
         "search_placeholder": "Search in your library...",
+        "tabs": {
+            "movies": "Movies",
+            "tv": "TV Shows"
+        },
+        "page": "Page",
+        "prev_page": "Previous",
+        "next_page": "Next",
         "empty_title": "Your Library is empty",
         "empty_desc": "Start organizing your files to see them here in all their glory.",
         "movie_count": "{count} Movies",
@@ -607,6 +646,12 @@
         "re_identify": "Change Identification"
     },
     "common": {
+        "ok": "OK",
+        "confirm": "Confirm",
+        "cancel": "Cancel",
+        "error": "Error",
+        "done": "Done",
+        "loading": "Loading...",
         "browse": "Browse",
         "more": "More",
         "none": "None",
@@ -646,13 +691,9 @@
             "remastered": "Remastered",
             "uncut": "Uncut"
         },
-        "ok": "OK",
-        "cancel": "Cancel",
         "yes": "Yes",
         "no": "No",
-        "error": "Error",
         "warning": "Warning",
-        "loading": "Loading...",
         "success": "Success",
         "undo": "Undo",
         "close": "Close",
