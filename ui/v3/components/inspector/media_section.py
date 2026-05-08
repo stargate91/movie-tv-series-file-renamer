@@ -106,8 +106,13 @@ class MediaSection(QWidget):
         self.overview_lbl.setText(overview)
 
     def update_episode(self, media_data, ep_data_list):
-        if not media_data or not ep_data_list: return
+        if not media_data: return
         self.clear()
+        if not ep_data_list:
+            # Fallback to series info if no episodes linked
+            self.update_movie(media_data)
+            return
+            
         if not isinstance(ep_data_list, list): ep_data_list = [ep_data_list]
         
         # 1. Series Title
@@ -170,17 +175,29 @@ class MediaSection(QWidget):
     def _get_translated(self, data, field, default=""):
         if not data: return default
         details_json = data.get('details_json')
+        
+        # 1. Try from localized JSON store
         if details_json:
             try:
                 details = json.loads(details_json)
-                if isinstance(details, dict) and self._preferred_language in details:
-                    lang_data = details[self._preferred_language]
-                    # TMDB fields: title (movie) vs name (tv/episode)
-                    if field in ('title', 'name'):
-                        val = lang_data.get('title') or lang_data.get('name')
-                    else:
-                        val = lang_data.get(field)
-                    if val: return val
+                if isinstance(details, dict):
+                    # Robust language lookup: try exact match, then 2-letter prefix
+                    lang_key = self._preferred_language
+                    if lang_key not in details:
+                        lang_key = lang_key.split('-')[0]
+                    
+                    if lang_key in details:
+                        lang_data = details[lang_key]
+                        # TMDB uses 'name' for TV/Episodes and 'title' for Movies
+                        if field in ('title', 'name'):
+                            val = lang_data.get('title') or lang_data.get('name')
+                        else:
+                            val = lang_data.get(field)
+                        if val: return val
             except: pass
+        
+        # 2. Fallback to column data (usually original or first-fetched language)
+        if field in ('title', 'name'):
+            return data.get('title') or data.get('name') or default
         return data.get(field, default)
 

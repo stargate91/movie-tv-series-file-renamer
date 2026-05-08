@@ -53,7 +53,8 @@ class IconManager:
         "edit-3": '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>',
         "info": '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>',
         "globe": '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>',
-        "undo": '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>'
+        "undo": '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>',
+        "chevron-down": '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>'
     }
 
     @staticmethod
@@ -80,3 +81,34 @@ class IconManager:
     def get_icon(name, size=24, color="#000000"):
         """Returns a QIcon for the given icon name."""
         return QIcon(IconManager.get_pixmap(name, size, color))
+
+    @staticmethod
+    def get_icon_path(name, size=24, color="#000000"):
+        """
+        Saves the icon to a cache directory and returns the absolute path.
+        Used primarily for QSS (Qt Style Sheets) which require file paths.
+        """
+        import os
+        # icons.py is in ui/v3/styles/
+        current_file = os.path.abspath(__file__)
+        styles_dir = os.path.dirname(current_file) # ui/v3/styles
+        v3_dir = os.path.dirname(styles_dir)      # ui/v3
+        ui_dir = os.path.dirname(v3_dir)          # ui
+        base_dir = os.path.dirname(ui_dir)        # root
+        
+        cache_dir = os.path.join(base_dir, 'data', 'cache', 'icons')
+        os.makedirs(cache_dir, exist_ok=True)
+        
+        # Create a safe filename based on name, size, and color (remove #)
+        clean_color = color.replace("#", "")
+        filename = f"{name}_{size}_{clean_color}.png"
+        file_path = os.path.join(cache_dir, filename)
+        
+        if not os.path.exists(file_path):
+            pixmap = IconManager.get_pixmap(name, size, color)
+            pixmap.save(file_path, "PNG")
+            print(f" [ICON] Saved icon to: {file_path}")
+            
+        # Return path with file:/// prefix for CSS compatibility on Windows
+        res_path = "file:///" + file_path.replace("\\", "/")
+        return res_path

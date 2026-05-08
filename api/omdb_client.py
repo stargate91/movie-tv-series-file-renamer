@@ -8,7 +8,7 @@ class OMDBClient(BaseClient, BaseMediaProvider):
     """
     def __init__(self, api_key, db=None):
         super().__init__(db=db, min_interval=0.5) # Throttled slightly more
-        self.api_key = api_key
+        self.api_key = str(api_key).strip(' "\'') if api_key else ""
 
     def get_by_imdb_id(self, imdb_id):
         if not imdb_id: return None

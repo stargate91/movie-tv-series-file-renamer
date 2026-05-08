@@ -190,6 +190,8 @@
                 "renumber_ep": "Renumber Episodes (Top to Bottom)",
                 "start_ep": "Start Episode:",
                 "renumber_parts": "Renumber as Parts (CD1, CD2...)",
+                "set_sequential_parts": "Set Sequential Parts (CD1, CD2...)",
+                "start_val": "Start Number:",
                 "set_edition": "Set Edition:",
                 "edition_label": "Edition:",
                 "override_lang": "Override Audio/Sub Language:",
@@ -545,7 +547,8 @@
             "part": "Part:",
             "language": "Audio/Sub Language:",
             "metadata_language": "Metadata Language:",
-            "linked_to": "Linked to Parent Video:"
+            "linked_to": "Linked to Parent Video:",
+            "parent_link": "Link to Parent Video:"
         },
         "roles": {
             "movie": "Movie",

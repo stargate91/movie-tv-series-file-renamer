@@ -22,7 +22,7 @@ class EditFileDialog(QDialog):
         
         self.setWindowTitle(T("edit_file.title", filename=file_data['file_name']))
         self.setMinimumSize(500, 600)
-        self.setStyleSheet(Theme.get_main_stylesheet())
+        self.setStyleSheet(Theme.get_main_stylesheet() + Theme.get_accent_combobox_style())
         
         self._init_ui()
         self._load_data()
@@ -255,6 +255,7 @@ class EditFileDialog(QDialog):
         if hasattr(self, 'lbl_edition'): self.lbl_edition.setVisible(has_edition)
 
         self.lang_group.setVisible('language' in visible_fields)
+        self.metadata_lang_group.setVisible('target_lang' in visible_fields)
         self.link_group.setVisible('linking' in visible_fields)
         
         # Update sub-type items if category changed

@@ -163,22 +163,25 @@ class DiscoveryController(QObject):
     # --- Internal Worker Helpers ---
 
     def _run_worker(self, worker, finish_callback):
+        # Cleanup finished workers
+        self.active_workers = [w for w in self.active_workers if w.isRunning()]
+        
         self.active_workers.append(worker)
         worker.progress.connect(self.progress_updated.emit)
         worker.finished.connect(finish_callback)
         worker.start()
 
     def _on_fetch_finished(self):
-        self.refresh_requested.emit()
         self.operation_finished.emit({'type': 'fetch'})
+        self.refresh_requested.emit()
 
     def _on_scan_finished(self):
-        self.refresh_requested.emit()
         self.operation_finished.emit({'type': 'scan'})
+        self.refresh_requested.emit()
 
     def _on_operation_finished_with_results(self, results):
-        self.refresh_requested.emit()
         self.operation_finished.emit(results)
+        self.refresh_requested.emit()
 
     def abort_all(self):
         for worker in self.active_workers:

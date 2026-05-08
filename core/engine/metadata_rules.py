@@ -11,9 +11,9 @@ class MetadataRules:
     # Define which sections are relevant for each category/media_type combination
     FIELD_VISIBILITY = {
         'video': {
-            'movie': ['edition', 'parts'],
-            'tv': ['season', 'episodes', 'parts'],
-            'unknown': ['parts']
+            'movie': ['edition', 'parts', 'target_lang'],
+            'tv': ['season', 'episodes', 'parts', 'target_lang'],
+            'unknown': ['parts', 'target_lang']
         },
         'audio': {
             'any': ['sub_type', 'language', 'linking']

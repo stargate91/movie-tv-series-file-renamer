@@ -29,7 +29,7 @@ class BatchResolveDialog(QDialog):
 
         self.setWindowTitle(T("discovery.batch_resolve.title", count=len(selected_files)))
         self.setMinimumSize(1100, 800)
-        self.setStyleSheet(Theme.get_main_stylesheet())
+        self.setStyleSheet(Theme.get_main_stylesheet() + Theme.get_accent_combobox_style())
         
         self._init_ui()
         self._populate_file_list()
@@ -229,11 +229,21 @@ class BatchResolveDialog(QDialog):
 
     def _on_search_clicked(self, mode="search", parent_id=None, season_num=None, title=None):
         query = self.search_input.text().strip()
-        if not query and mode == "search": return
+        logger.info(f"_on_search_clicked called. Mode: {mode}, Query: '{query}'")
+        
+        if not query and mode == "search":
+            logger.warning("Empty query, skipping search.")
+            return
 
+        # Safely handle existing worker
         if self.search_worker and self.search_worker.isRunning():
-            self.search_worker.results_found.disconnect()
-            self.search_worker.terminate()
+            logger.info("Previous search worker still running. Disconnecting and ignoring it.")
+            try:
+                self.search_worker.results_found.disconnect()
+                # We don't use terminate() as it's unstable. We just let it finish quietly.
+                self.search_worker.wait(100) # Short wait
+            except Exception as e:
+                logger.debug(f"Error disconnecting old worker: {e}")
 
         self.results_list.clear()
         self.results_list.addItem(T("discovery.batch_resolve.searching"))
@@ -241,10 +251,10 @@ class BatchResolveDialog(QDialog):
         if mode == "search":
             self.nav_stack = []
             self.back_btn.setVisible(False)
-            self.nav_label.setText(T("discovery.batch_resolve.search_results"))
+            self.nav_label.setText(T("discovery.batch_resolve.searching"))
         else:
             self.back_btn.setVisible(True)
-            self.nav_label.setText(title or T("discovery.batch_resolve.searching")) # Or Browsing
+            self.nav_label.setText(title or T("discovery.batch_resolve.searching"))
 
         # Search Type from combo
         search_type = self.search_type_combo.currentData()
@@ -277,10 +287,22 @@ class BatchResolveDialog(QDialog):
         self.search_worker.start()
 
     def _on_worker_finished(self):
-        # If the list is still showing "Searching...", it means no results were found or an error occurred
-        if self.results_list.count() > 0 and self.results_list.item(0).text() == T("discovery.batch_resolve.searching"):
-            self.results_list.clear()
-            self.results_list.addItem(T("manual_resolve.no_matches"))
+        count = self.results_list.count()
+        logger.info(f"SearchWorker finished. Current list count: {count}")
+        
+        if count > 0:
+            first_item = self.results_list.item(0)
+            text = first_item.text() if first_item else "None"
+            logger.info(f"First item text: '{text}' (Searching text: '{T('discovery.batch_resolve.searching')}')")
+            
+            if first_item and text == T("discovery.batch_resolve.searching"):
+                logger.info("List still showing 'Searching...', clearing and showing 'No matches'.")
+                self.results_list.clear()
+                self.results_list.addItem(T("manual_resolve.no_matches"))
+        
+        # Reset nav label if we were searching
+        if self.nav_label.text() == T("discovery.batch_resolve.searching"):
+            self.nav_label.setText(T("discovery.batch_resolve.search_results"))
 
     def _on_search_type_changed(self):
         stype = self.search_type_combo.currentData()
@@ -290,6 +312,7 @@ class BatchResolveDialog(QDialog):
 
     @Slot(list, str)
     def _on_search_results(self, results, mode):
+        logger.info(f"BatchResolveDialog received {len(results)} results (mode: {mode})")
         self.results_list.clear()
         
         if not results:

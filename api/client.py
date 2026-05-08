@@ -12,10 +12,14 @@ class APIClient:
     def __init__(self, omdb_key, tmdb_key, tmdb_bearer_token, db=None):
         self.tmdb = TMDBClient(tmdb_key, tmdb_bearer_token, db)
         self.omdb = OMDBClient(omdb_key, db)
-        self.session = self.tmdb._session # Shared session
         
         # Unified Provider List
         self.providers = [self.tmdb, self.omdb]
+
+    @property
+    def session(self):
+        """Always return the shared session from the underlying clients."""
+        return self.tmdb._session
 
     def search_unified(self, query, year=None, media_type='movie', language='hu-HU'):
         """Aggregates results from all providers."""

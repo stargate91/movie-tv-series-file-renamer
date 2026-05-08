@@ -2,6 +2,7 @@
 v3.1 Resolver: Orchestrates matching using MatchingEngine and LibraryManager.
 """
 
+import os
 import logging
 import re
 import concurrent.futures
@@ -22,6 +23,21 @@ class Resolver:
         self.s = settings
         self.matcher = MatchingEngine(db, settings)
         self.library = LibraryManager(db, settings)
+
+    def refresh_settings(self, settings):
+        """Propagates new settings to children."""
+        self.s = settings
+        self.matcher.s = settings
+        # Re-init API clients to pick up new keys
+        from api.client import APIClient
+        new_api = APIClient(
+            omdb_key=settings.omdb_key,
+            tmdb_key=settings.tmdb_key,
+            tmdb_bearer_token=settings.tmdb_bearer_token,
+            db=self.db
+        )
+        self.matcher.api = new_api
+        self.library.refresh_settings(settings)
 
     def resolve_all(self, progress_callback=None):
         """Runs the full matching pipeline concurrently on all unmatched parent videos."""
@@ -74,11 +90,21 @@ class Resolver:
             self._resolve_single(vid)
 
     def _resolve_single(self, vid):
-        """Runs the waterfall for a single file."""
+        """Runs the refined deep waterfall for a single file."""
         file_id = vid['id']
-        target_lang = vid.get('target_language') # Per-file override
+        target_lang = vid.get('target_language') or self.s.metadata_language
+        all_results = []
+        seen_ids = set()
 
-        # ── Tier 1: NFO IMDB ID (trusted) ──
+        def _add_results(results, source):
+            nonlocal all_results, seen_ids
+            for r in results:
+                if r['tmdb_id'] not in seen_ids:
+                    r['_source'] = source
+                    all_results.append(r)
+                    seen_ids.add(r['tmdb_id'])
+
+        # ── Tier 1: NFO IMDB ID (Trusted) ──
         if vid['nfo_imdb_id']:
             result = self.matcher.resolve_by_imdb(vid['nfo_imdb_id'], language_override=target_lang)
             if result:
@@ -86,64 +112,98 @@ class Resolver:
                 self._finalize_match(file_id, media_item_id, result, vid, 'matched', language_override=target_lang)
                 return
 
-        # ── Tier 2: FFmpeg internal title ──
-        if vid['internal_title']:
-            title, year = self.matcher.parse_title_year(vid['internal_title'])
-            if title:
-                search_type = self.matcher.guess_search_type(vid)
-                results = self.matcher.search_api(title, year, search_type, language_override=target_lang)
-                outcome = self._evaluate_results(results, title, year, file_id, 'internal_title', vid, language_override=target_lang)
-                if outcome == 'matched': return
-
-        # ── Tier 3: Filename GuessIt ──
+        # ── Step A: Filename Analysis ──
         if vid['fn_title']:
             search_type = vid['fn_media_type'] or self.matcher.guess_search_type(vid)
-            results = self.matcher.search_api(vid['fn_title'], vid['fn_year'], search_type, language_override=target_lang)
-            outcome = self._evaluate_results(results, vid['fn_title'], vid['fn_year'], file_id, 'filename', vid, language_override=target_lang)
-            if outcome == 'matched': return
+            fn_results = self.matcher.search_api(vid['fn_title'], vid['fn_year'], search_type, language_override=target_lang)
+            outcome, best_res = self._check_confidence(fn_results, vid['fn_title'], vid['fn_year'])
+            if outcome == 'matched':
+                media_item_id = self.library.store_result(best_res, language_override=target_lang)
+                self._finalize_match(file_id, media_item_id, best_res, vid, 'matched', language_override=target_lang)
+                return
+            _add_results(fn_results, 'filename')
 
-        # ── Tier 4: Foldername GuessIt ──
+        # ── Step B: Folder Check ──
         if vid['fd_title']:
             search_type = vid['fd_media_type'] or self.matcher.guess_search_type(vid)
-            results = self.matcher.search_api(vid['fd_title'], vid['fd_year'], search_type, language_override=target_lang)
-            outcome = self._evaluate_results(results, vid['fd_title'], vid['fd_year'], file_id, 'foldername', vid, language_override=target_lang)
-            if outcome == 'matched': return
+            fd_results = self.matcher.search_api(vid['fd_title'], vid['fd_year'], search_type, language_override=target_lang)
+            outcome, best_res = self._check_confidence(fd_results, vid['fd_title'], vid['fd_year'])
+            if outcome == 'matched':
+                media_item_id = self.library.store_result(best_res, language_override=target_lang)
+                self._finalize_match(file_id, media_item_id, best_res, vid, 'matched', language_override=target_lang)
+                return
+            _add_results(fd_results, 'foldername')
 
-        # ── If we collected candidates across tiers, mark as multiple ──
-        # Use MatchRepository
-        candidates = self.db.matches.get_candidates(file_id)
-        if candidates:
-            # Use FileRepository
+        # ── Step C: Internal Title Check ──
+        it_year = None
+        if vid['internal_title']:
+            clean_fn = os.path.splitext(vid['file_name'])[0]
+            if vid['internal_title'] != clean_fn and vid['internal_title'] != vid['file_name']:
+                title, it_year = self.matcher.parse_with_guessit(vid['internal_title'])
+                if title:
+                    search_type = self.matcher.guess_search_type(vid)
+                    it_results = self.matcher.search_api(title, it_year, search_type, language_override=target_lang)
+                    outcome, best_res = self._check_confidence(it_results, title, it_year)
+                    if outcome == 'matched':
+                        media_item_id = self.library.store_result(best_res, language_override=target_lang)
+                        self._finalize_match(file_id, media_item_id, best_res, vid, 'matched', language_override=target_lang)
+                        return
+                    _add_results(it_results, 'internal_title')
+
+        # ── Final Fallback: Single Match, Multiple or No Match ──
+        if len(all_results) == 1:
+            best_res = all_results[0]
+            media_item_id = self.library.store_result(best_res, language_override=target_lang)
+            
+            # Smart status: if year matches ANY of our detected years, it's high confidence
+            res_year = str(best_res.get('year'))
+            detected_years = [str(vid.get('fn_year') or ''), str(vid.get('fd_year') or ''), str(it_year or '')]
+            
+            status = 'matched' if (res_year and res_year in detected_years and res_year != '') else 'uncertain'
+            
+            self._finalize_match(file_id, media_item_id, best_res, vid, status, language_override=target_lang)
+            return
+        elif len(all_results) > 1:
+            self._add_candidates_deduped(file_id, all_results, 'waterfall_merged', language_override=target_lang)
             self.db.files.update_file(file_id, match_status='multiple')
             return
-
-        # ── Tier 5: Hail Mary (no confidence check) ──
-        all_unfiltered = []
-        seen_ids = set()
-        for title, year, source in self.matcher.get_all_search_terms(vid):
-            search_type = self.matcher.guess_search_type(vid)
-            results = self.matcher.search_api(title, year, search_type, language_override=target_lang)
-            for r in results:
-                if r['tmdb_id'] not in seen_ids:
-                    r['_source'] = source
-                    all_unfiltered.append(r)
-                    seen_ids.add(r['tmdb_id'])
-        
-        if len(all_unfiltered) == 1:
-            r = all_unfiltered[0]
-            status = 'matched' if str(r.get('year')) == str(vid.get('fn_year') or vid.get('fd_year')) else 'uncertain'
-            media_item_id = self.library.store_result(r, language_override=target_lang)
-            self._finalize_match(file_id, media_item_id, r, vid, status, language_override=target_lang)
-        elif len(all_unfiltered) > 1:
-            for r in all_unfiltered:
-                # Use MatchRepository
-                self.db.matches.add_candidate(file_id, r['tmdb_id'], r['title'], r.get('year'),
-                                    r['media_type'], r.get('poster_path'), r.get('_source', 'hail_mary'))
-            # Use FileRepository
-            self.db.files.update_file(file_id, match_status='multiple')
         else:
-            # Use FileRepository
             self.db.files.update_file(file_id, match_status='no_match')
+            return
+
+    def _check_confidence(self, results, search_title, search_year):
+        """Helper to evaluate search results. Returns (outcome, best_result)."""
+        if not results: return 'none', None
+
+        # 1. Look for a single perfect match (Super Confident)
+        super_confident = []
+        year_matches = []
+        
+        for r in results:
+            is_conf, is_super = self.matcher.confidence_check(r, search_title, search_year)
+            if is_super:
+                super_confident.append(r)
+            
+            # Check if year matches exactly (even if title is fuzzy)
+            res_year = str(r.get('year') or '')
+            if search_year and res_year == str(search_year):
+                year_matches.append(r)
+
+        if len(super_confident) == 1:
+            return 'matched', super_confident[0]
+        
+        # 2. If we have multiple results, but only ONE matches the year exactly, pick it!
+        if search_year and len(year_matches) == 1:
+            return 'matched', year_matches[0]
+            
+        # 3. Fallback to general confidence
+        confident = [r for r in results if self.matcher.confidence_check(r, search_title, search_year)[0]]
+        if len(confident) == 1:
+            return 'matched', confident[0]
+        elif len(confident) > 1:
+            return 'multiple', None
+            
+        return 'none', None
 
     def _evaluate_results(self, results, search_title, search_year, file_id, source, vid, language_override=None):
         """Evaluates search results with confidence check."""

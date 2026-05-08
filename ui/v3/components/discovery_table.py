@@ -49,7 +49,6 @@ class DiscoveryTable(QTableWidget):
     open_folder_requested = Signal(str)
     clear_match_requested = Signal(int)
     ignore_requested = Signal(int)
-    batch_ignore_requested = Signal()
     batch_identify_requested = Signal()
     batch_edit_requested = Signal()
     fetch_language_requested = Signal(list) # item_ids
@@ -405,8 +404,9 @@ class DiscoveryTable(QTableWidget):
 
     def keyPressEvent(self, event):
         if event.key() == Qt.Key_Delete:
-            if self.selectedItems():
-                self.batch_ignore_requested.emit()
+            ids = self.get_selected_ids()
+            if ids:
+                self.action_triggered.emit('ignore', ids)
         elif event.key() == Qt.Key_A and event.modifiers() == Qt.ControlModifier:
             self.selectAll()
         else:

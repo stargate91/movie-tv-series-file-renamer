@@ -18,7 +18,7 @@ def setup_logger(name="MediaRenamer"):
     
     # Create logger
     logger = logging.getLogger()
-    logger.setLevel(logging.INFO)
+    logger.setLevel(logging.DEBUG)
     
     # Avoid duplicate handlers if setup is called multiple times
     if logger.handlers:
@@ -30,12 +30,12 @@ def setup_logger(name="MediaRenamer"):
     # 1. File Handler (Rotating: 5MB per file, keep 3 old logs)
     file_handler = RotatingFileHandler(log_file, maxBytes=5*1024*1024, backupCount=3, encoding='utf-8')
     file_handler.setFormatter(log_format)
-    file_handler.setLevel(logging.INFO)
+    file_handler.setLevel(logging.DEBUG)
     
     # 2. Console Handler
     console_handler = logging.StreamHandler()
     console_handler.setFormatter(log_format)
-    console_handler.setLevel(logging.INFO)
+    console_handler.setLevel(logging.DEBUG)
     
     # Add handlers to the root logger
     logger.addHandler(file_handler)

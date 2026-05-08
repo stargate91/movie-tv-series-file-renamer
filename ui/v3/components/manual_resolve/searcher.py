@@ -36,7 +36,7 @@ class SearchWorker(QThread):
                 
                 clean_query = re.sub(r'[sS]\d+|[eE]\d+', '', self.query).strip()
                 
-                results = self.engine.resolver.matcher.search_api(clean_query, self.year, self.search_type)
+                results = self.engine.resolver.matcher.search_api(clean_query, self.year, self.search_type, language_override=lang)
                 
                 # Auto-drill into TV episodes if hints found
                 if self.search_type in ("tv", "both") and results and (s_num is not None or e_num is not None):
@@ -62,6 +62,7 @@ class SearchWorker(QThread):
                             self.results_found.emit(ep_results, "episodes")
                             return
 
+                logger.info(f"SearchWorker emitting {len(results)} results for query '{clean_query}' (mode: search)")
                 self.results_found.emit(results, "search")
 
             elif self.mode == "seasons":

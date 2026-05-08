@@ -18,16 +18,24 @@ logger = logging.getLogger(__name__)
 
 class SaveWorker(QThread):
     finished = Signal()
+    error = Signal(str)
+
     def __init__(self, engine):
         super().__init__()
         self.engine = engine
+
     def run(self):
-        self.engine.config.save()
-        self.finished.emit()
+        try:
+            self.engine.config.save()
+            self.finished.emit()
+        except Exception as e:
+            logger.error(f"Failed to save settings: {e}")
+            self.error.emit(str(e))
 
 class SettingsPage(QWidget):
     database_wiped = Signal()
     settings_changed = Signal()
+    error_occurred = Signal(str, str) # title, message
 
     def __init__(self, engine, parent=None):
         super().__init__(parent)
@@ -124,13 +132,21 @@ class SettingsPage(QWidget):
         
         self.save_worker = SaveWorker(self.engine)
         self.save_worker.finished.connect(self._on_save_finished)
+        self.save_worker.error.connect(self._on_save_failed)
         self.save_worker.start()
 
     def _on_save_finished(self):
-        self.save_btn.setEnabled(True)
-        self.save_btn.setText(T("settings.save_btn"))
+        self._reset_save_button()
         self.settings_changed.emit()
         logger.info("Settings saved successfully.")
+
+    def _on_save_failed(self, error_msg):
+        self._reset_save_button()
+        self.error_occurred.emit("Save Error", f"Failed to save settings: {error_msg}")
+
+    def _reset_save_button(self):
+        self.save_btn.setEnabled(True)
+        self.save_btn.setText(T("settings.save_btn"))
 
     def refresh_style(self):
         """Forces a re-application of styles to handling theme changes."""

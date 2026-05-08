@@ -9,9 +9,11 @@ class TMDBClient(BaseClient, BaseMediaProvider):
     """
     def __init__(self, api_key, bearer_token, db=None):
         super().__init__(db=db, min_interval=0.1) # 10 requests per second
-        self.api_key = api_key
-        self.bearer_token = bearer_token
-        self.headers = {"Authorization": f"Bearer {self.bearer_token}"}
+        self.api_key = str(api_key).strip(' "\'') if api_key else ""
+        self.bearer_token = str(bearer_token).strip(' "\'') if bearer_token else ""
+        # If we have a bearer token, we should use it for all requests via headers.
+        # TMDB allows using either api_key (v3) in query OR Bearer token (v4) in header.
+        self.headers = {"Authorization": f"Bearer {self.bearer_token}"} if self.bearer_token else {}
 
     def get_external_id_raw(self, external_id, source="imdb_id", language="hu-HU"):
         cache_key = f"find-{external_id}-{language}"
@@ -21,7 +23,11 @@ class TMDBClient(BaseClient, BaseMediaProvider):
     def search_movie(self, title, year="unknown", language="hu-HU"):
         cache_key = f"movie-{title}-{year}-{language}"
         api_url = "https://api.themoviedb.org/3/search/movie"
-        params = {"api_key": self.api_key, "query": title, "language": language}
+        # Always include api_key if available, as it's the most stable for v3 endpoints
+        params = {"query": title.strip(), "language": language}
+        if self.api_key:
+            params["api_key"] = self.api_key
+            
         if year and year != "unknown":
             params["year"] = year
         return self._get_from_api(api_url, cache_key, self.headers, params=params)
@@ -29,7 +35,10 @@ class TMDBClient(BaseClient, BaseMediaProvider):
     def search_tv(self, title, year="unknown", language="hu-HU"):
         cache_key = f"tv-{title}-{year}-{language}"
         api_url = "https://api.themoviedb.org/3/search/tv"
-        params = {"api_key": self.api_key, "query": title, "language": language}
+        params = {"query": title.strip(), "language": language}
+        if self.api_key:
+            params["api_key"] = self.api_key
+            
         if year and year != "unknown":
             params["first_air_date_year"] = year
         return self._get_from_api(api_url, cache_key, self.headers, params=params)

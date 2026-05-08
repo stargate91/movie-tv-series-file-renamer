@@ -30,6 +30,17 @@ class LibraryManager:
         self._omdb_limit_reached = False
         self._enriched_ids = set()
 
+    def refresh_settings(self, settings):
+        """Re-initializes API client with new settings."""
+        self.s = settings
+        from api.client import APIClient
+        self.api = APIClient(
+            omdb_key=settings.omdb_key,
+            tmdb_key=settings.tmdb_key,
+            tmdb_bearer_token=settings.tmdb_bearer_token,
+            db=self.db
+        )
+
     @property
     def language(self):
         """Always get the current language from settings."""
@@ -48,7 +59,9 @@ class LibraryManager:
         fetched = (existing.get('fetched_languages') or "") if existing else ""
         fetched_list = [l.strip() for l in fetched.split(',') if l.strip()]
         
-        if existing and target_lang in fetched_list:
+        # Robust check: if it's a TV show, we might need to refresh seasons/episodes even if series exists
+        is_tv = result.get('media_type') == 'tv' or (existing and existing.get('media_type') == 'tv')
+        if existing and target_lang in fetched_list and not is_tv:
             return existing['id']
 
         # Enrichment
@@ -133,20 +146,20 @@ class LibraryManager:
                 genres = ", ".join(genre_list)
                 
                 countries = full_data.get('origin_country', [])
-                if not countries and 'production_countries' in full_data:
+                if not countries and full_data.get('production_countries'):
                     countries = [c['iso_3166_1'] for c in full_data['production_countries']]
                 origin_country = ", ".join(countries) if isinstance(countries, list) else str(countries)
 
                 directors = []
                 if media_type == 'movie':
-                    crew = full_data.get('credits', {}).get('crew', [])
+                    crew = (full_data.get('credits') or {}).get('crew', [])
                     directors = [p['name'] for p in crew if p.get('job') == 'Director']
                 else:
                     creators = full_data.get('created_by', [])
                     directors = [p['name'] for p in creators]
                 director = ", ".join(directors[:2]) if directors else ""
                 
-                cast_list = full_data.get('credits', {}).get('cast', [])
+                cast_list = (full_data.get('credits') or {}).get('cast', [])
                 actors = [p['name'] for p in cast_list[:6]]
                 cast = ", ".join(actors) if actors else ""
                 
@@ -157,7 +170,7 @@ class LibraryManager:
                     collection = full_data['belongs_to_collection'].get('name')
                 
                 if not imdb_id:
-                    imdb_id = full_data.get('imdb_id') or full_data.get('external_ids', {}).get('imdb_id', '')
+                    imdb_id = full_data.get('imdb_id') or (full_data.get('external_ids') or {}).get('imdb_id', '')
 
         except Exception as e:
             logger.warning(f"TMDB enrichment failed for {media_type} {tmdb_id}: {e}")
@@ -186,7 +199,8 @@ class LibraryManager:
                     logger.error("OMDb API Limit Reached! Further enrichment will be skipped for this session.")
                 logger.warning(f"OMDB enrichment failed: {e}")
 
-        if target_lang not in fetched_list:
+        # Only mark as fetched if we actually got data from TMDB
+        if full_data and target_lang not in fetched_list:
             fetched_list.append(target_lang)
         fetched_languages = ", ".join(fetched_list)
 
@@ -216,8 +230,12 @@ class LibraryManager:
             
         if media_type == 'tv':
             try:
-                details_json = json.loads(media_data.get('details_json', '{}'))
-                details = details_json.get(target_lang) if isinstance(details_json, dict) else details_json
+                details_all = json.loads(media_data.get('details_json', '{}'))
+                l_key = target_lang
+                if isinstance(details_all, dict) and l_key not in details_all:
+                    l_key = l_key.split('-')[0]
+                
+                details = details_all.get(l_key) if isinstance(details_all, dict) else details_all
                 if details and 'seasons' in details:
                     for s in details['seasons']:
                         s_num = s.get('season_number')
@@ -236,8 +254,8 @@ class LibraryManager:
             fetched = (existing_season.get('fetched_languages') or "") if existing_season else ""
             fetched_list = [l.strip() for l in fetched.split(',') if l.strip()]
             
-            if existing_season and target_lang in fetched_list:
-                return
+            # We proceed to update episodes/details even if the season record exists, 
+            # to ensure all languages are synchronized.
 
             data = self.api.tmdb.get_season_details(tmdb_id, season_number, target_lang)
             if not data: return

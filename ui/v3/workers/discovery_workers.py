@@ -121,13 +121,15 @@ class PlanWorker(QThread):
     error = Signal(str)
     progress = Signal(int, str)
 
-    def __init__(self, engine):
+    def __init__(self, engine, videos):
         super().__init__()
         self.engine = engine
+        self.videos = videos
 
     def run(self):
         try:
-            plan = self.engine.get_rename_plan()
+            file_ids = [v['id'] for v in self.videos] if self.videos else None
+            plan = self.engine.get_rename_plan(file_ids=file_ids)
             self.finished.emit(plan)
         except Exception as e:
             self.error.emit(str(e))
@@ -265,9 +267,23 @@ class LanguageFetchWorker(QThread):
             for item in media_items:
                 fetched_langs = item.get('fetched_languages', '')
                 fetched_list = [l.strip() for l in fetched_langs.split(',') if l.strip()]
-                if target_lang not in fetched_list:
+                needs_fetch = target_lang not in fetched_list
+                
+                # Check episodes if it's a TV show and series claims to be fetched
+                if not needs_fetch and item.get('media_type') == 'tv':
+                    # Instead of checking all links, check some episodes of this series
+                    eps = self.engine.db._get_connection().execute(
+                        "SELECT fetched_languages FROM tv_episodes WHERE media_item_id = ? LIMIT 20",
+                        (item['id'],)
+                    ).fetchall()
+                    for ep in eps:
+                        ep_f = [l.strip() for l in (ep['fetched_languages'] or "").split(',') if l.strip()]
+                        if target_lang not in ep_f:
+                            needs_fetch = True
+                            break
+
+                if needs_fetch:
                     to_fetch.append(item)
-                    
             total = len(to_fetch)
             if total == 0:
                 self.progress.emit(100, T("discovery.messages.up_to_date") if T("discovery.messages.up_to_date") != "discovery.messages.up_to_date" else "Language metadata is already up to date.")
@@ -291,4 +307,26 @@ class LanguageFetchWorker(QThread):
             self.finished.emit()
         except Exception as e:
             logger.error(f"LanguageFetchWorker Error: {e}")
+            self.finished.emit()
+
+class SingleEnrichWorker(QThread):
+    """Enriches a single media item with a specific language in the background."""
+    finished = Signal()
+
+    def __init__(self, engine, tmdb_id, media_type, language):
+        super().__init__()
+        self.engine = engine
+        self.tmdb_id = tmdb_id
+        self.media_type = media_type
+        self.language = language
+
+    def run(self):
+        try:
+            self.engine.resolver.library.store_result({
+                'tmdb_id': self.tmdb_id, 
+                'media_type': self.media_type
+            }, language_override=self.language)
+            self.finished.emit()
+        except Exception as e:
+            logger.error(f"SingleEnrichWorker Error: {e}")
             self.finished.emit()

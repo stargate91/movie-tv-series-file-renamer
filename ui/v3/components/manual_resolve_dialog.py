@@ -35,7 +35,7 @@ class ManualResolveDialog(QDialog):
 
         self.setWindowTitle(T("manual_resolve.title", filename=self.file_name))
         self.setMinimumSize(850, 750)
-        self.setStyleSheet(Theme.get_main_stylesheet())
+        self.setStyleSheet(Theme.get_main_stylesheet() + Theme.get_accent_combobox_style())
         
         self._init_ui()
         self._prefill_from_data(file_data)
@@ -78,12 +78,12 @@ class ManualResolveDialog(QDialog):
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText(T("manual_resolve.search_placeholder"))
         self.search_input.setFixedHeight(40)
-        self.search_input.returnPressed.connect(self._on_search_clicked)
+        self.search_input.returnPressed.connect(lambda: self._on_search_clicked())
         
         self.search_btn = QPushButton(T("manual_resolve.search_btn"))
         self.search_btn.setFixedHeight(40)
         self.search_btn.setFixedWidth(100)
-        self.search_btn.clicked.connect(self._on_search_clicked)
+        self.search_btn.clicked.connect(lambda: self._on_search_clicked())
         
         self.search_type_combo = QComboBox()
         self.search_type_combo.addItem(T("common.types.movie"), "movie")
@@ -117,6 +117,13 @@ class ManualResolveDialog(QDialog):
         for code in ["hu-HU", "en-US", "de-DE", "fr-FR", "es-ES", "it-IT", "ja-JP", "ko-KR"]:
             self.lang_combo.addItem(code, code)
         self.lang_combo.setFixedWidth(140)
+        
+        # Pre-select global language
+        global_lang = self.engine.config.settings.metadata_language
+        idx = self.lang_combo.findData(global_lang)
+        if idx >= 0:
+            self.lang_combo.setCurrentIndex(idx)
+        
         filters_row.addWidget(self.lang_combo)
         
         tools.addLayout(filters_row)
@@ -190,13 +197,21 @@ class ManualResolveDialog(QDialog):
 
     def _on_search_clicked(self, mode="search", parent_id=None, season_num=None, title=None):
         query = self.search_input.text().strip()
-        if not query and mode == "search": return
+        logger.info(f"ManualResolveDialog search clicked. Mode: {mode}, Query: '{query}'")
+        
+        if not query and mode == "search":
+            logger.warning("Empty query, skipping search.")
+            return
 
         # Safely stop previous search worker
-        if self.search_worker and self.search_worker.isRunning():
-            self.search_worker.results_found.disconnect()
-            self.search_worker.stop()
-            self.search_worker.wait()
+        if hasattr(self, 'search_worker') and self.search_worker and self.search_worker.isRunning():
+            try:
+                self.search_worker.results_found.disconnect()
+                # Move to graveyard to prevent GC crash
+                if not hasattr(self, '_worker_graveyard'): self._worker_graveyard = []
+                self._worker_graveyard.append(self.search_worker)
+                self._worker_graveyard = [w for w in self._worker_graveyard if w.isRunning()]
+            except: pass
 
         self.results_list.clear()
         self.results_list.addItem(T("manual_resolve.searching"))
@@ -205,10 +220,10 @@ class ManualResolveDialog(QDialog):
         if mode == "search":
             self.nav_stack = []
             self.back_btn.setVisible(False)
-            self.nav_label.setText(T("manual_resolve.search_results"))
+            self.nav_label.setText(T("manual_resolve.searching"))
         else:
             self.back_btn.setVisible(True)
-            self.nav_label.setText(title or T("manual_resolve.browsing"))
+            self.nav_label.setText(title or T("manual_resolve.searching"))
 
         vals = self.tv_selector.get_values()
         m_type = self.search_type_combo.currentData()
@@ -226,8 +241,11 @@ class ManualResolveDialog(QDialog):
 
     @Slot(list, str)
     def _on_search_results(self, results, mode):
+        logger.info(f"ManualResolveDialog received {len(results)} results (mode: {mode})")
         self.results_list.clear()
-        if mode == "candidates": self.nav_label.setText(T("manual_resolve.candidates_found", count=len(results)))
+        
+        if mode == "candidates": 
+            self.nav_label.setText(T("manual_resolve.candidates_found", count=len(results)))
         
         for res in results:
             item = QListWidgetItem()
@@ -240,7 +258,10 @@ class ManualResolveDialog(QDialog):
             
         if not results:
             self.results_list.addItem(T("manual_resolve.no_results"))
-            return
+            
+        # Reset nav label if we were searching
+        if self.nav_label.text() == T("manual_resolve.searching"):
+            self.nav_label.setText(T("manual_resolve.search_results"))
 
     def _on_selection_changed(self):
         items = self.results_list.selectedItems()
@@ -360,12 +381,13 @@ class ManualResolveDialog(QDialog):
             self._on_poster_loaded(QPixmap(local_path))
             return
             
-        # Safely stop previous poster downloader
+        # Safely handle previous poster downloader
         if hasattr(self, 'poster_worker') and self.poster_worker and self.poster_worker.isRunning():
-            self.poster_worker.finished.disconnect()
-            self.poster_worker.terminate()
-            self.poster_worker.wait()
-            self.poster_worker = None
+            try:
+                self.poster_worker.finished.disconnect()
+                if not hasattr(self, '_worker_graveyard'): self._worker_graveyard = []
+                self._worker_graveyard.append(self.poster_worker)
+            except: pass
 
         url = f"https://image.tmdb.org/t/p/w200{poster_path}"
         self.preview_panel.set_loading()

@@ -21,6 +21,7 @@ class BatchOperationsDialog(QDialog):
         super().__init__(parent)
         self.engine = engine
         self.selected_files = selected_files
+        self.files_map = {f['id']: f for f in selected_files}
         
         # Detect if we should use unified classification (all video/extra)
         self.is_video_batch = all(f.get('category') in ['video', 'extra'] for f in self.selected_files)
@@ -28,7 +29,7 @@ class BatchOperationsDialog(QDialog):
         self.setWindowTitle(T("discovery.batch_operations.title", count=len(self.selected_files)))
         self.setMinimumSize(1000, 700)
         self.setWindowFlags(self.windowFlags() | Qt.WindowMaximizeButtonHint | Qt.WindowMinimizeButtonHint)
-        self.setStyleSheet(Theme.get_main_stylesheet())
+        self.setStyleSheet(Theme.get_main_stylesheet() + Theme.get_accent_combobox_style())
         
         self._init_ui()
         self._populate_list()
@@ -290,10 +291,27 @@ class BatchOperationsDialog(QDialog):
         show_sorter = not self.is_video_batch or cls in ["movie", "episode"]
         self.left_pane_widget.setVisible(show_sorter)
         
+        visible_fields = MetadataRules.get_visible_fields(cat, media)
+        
         self.tv_card.setVisible(cat == 'video' and media == 'tv')
         self.part_card.setVisible(cat == 'video')
-        self.combo_edition.setVisible(cat == 'video' and media == 'movie')
-        self.chk_edition.setVisible(cat == 'video' and media == 'movie')
+        
+        has_edition = 'edition' in visible_fields
+        self.combo_edition.setVisible(has_edition)
+        self.chk_edition.setVisible(has_edition)
+        
+        # Language fields
+        has_lang = 'language' in visible_fields
+        self.chk_lang.setVisible(has_lang)
+        self.combo_lang.setVisible(has_lang)
+        
+        has_target_lang = 'target_lang' in visible_fields
+        self.chk_metadata_lang.setVisible(has_target_lang)
+        self.combo_metadata_lang.setVisible(has_target_lang)
+        
+        has_linking = 'linking' in visible_fields
+        self.chk_parent.setVisible(has_linking)
+        self.combo_parent.setVisible(has_linking)
         
         # Update sub-types with placeholder logic
         self.combo_sub_category.blockSignals(True)
@@ -319,7 +337,7 @@ class BatchOperationsDialog(QDialog):
     def _populate_list(self):
         for f in self.selected_files:
             item = QListWidgetItem(f['file_name'])
-            item.setData(Qt.UserRole, f)
+            item.setData(Qt.UserRole, f['id'])
             self.list_widget.addItem(item)
 
     def _populate_parents(self):
@@ -341,8 +359,11 @@ class BatchOperationsDialog(QDialog):
         current_part = self.spin_part_start.value()
 
         for i in range(self.list_widget.count()):
-            f = self.list_widget.item(i).data(Qt.UserRole)
-            updates = {'id': f['id']}
+            file_id = self.list_widget.item(i).data(Qt.UserRole)
+            f = self.files_map.get(file_id)
+            if not f: continue
+            
+            updates = {'id': file_id}
             
             if self.chk_category.isChecked(): 
                 updates['category'] = target_cat

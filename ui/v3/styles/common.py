@@ -1,5 +1,6 @@
 from PySide6.QtWidgets import QFrame
 from .palette import Palette
+from .icons import IconManager
 
 class CommonStyles:
     @staticmethod
@@ -194,16 +195,19 @@ class CommonStyles:
         }}
         QComboBox::drop-down {{
             subcontrol-origin: padding;
-            subcontrol-position: top right;
+            subcontrol-position: center right;
             width: 30px;
-            border-left: 1px solid {Palette.BORDER};
-            border-top-right-radius: 8px;
-            border-bottom-right-radius: 8px;
+            border: none;
         }}
         QComboBox::down-arrow {{
-            image: url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiM5NGEzYjgiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHBvbHlsaW5lIHBvaW50cz0iNiA5IDEyIDE1IDE4IDkiPjwvcG9seWxpbmU+PC9zdmc+);
-            width: 16px;
-            height: 16px;
+            image: none;
+            border-left: 4px solid transparent;
+            border-right: 4px solid transparent;
+            border-top: 5px solid {Palette.TEXT_MUTED};
+            width: 0;
+            height: 0;
+            subcontrol-position: center center;
+            margin-top: 4px;
         }}
         QComboBox QLineEdit {{
             background: transparent;

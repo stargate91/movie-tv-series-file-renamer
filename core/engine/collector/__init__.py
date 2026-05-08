@@ -25,10 +25,36 @@ class Collector:
         self.guesser = FilenameParser()
 
     def collect_all(self, progress_callback=None):
-        """Runs all three collection phases sequentially."""
-        self._phase_nfo(progress_callback)
-        self._phase_ffmpeg(progress_callback)
-        self._phase_guessit(progress_callback)
+        """Runs all three collection phases sequentially with unified progress reporting."""
+        # Calculate total workload
+        nfo_targets = [f for f in self.db.files.get_files_by_category('metadata') if f['extension'] == '.nfo' and f['parent_file_id']]
+        media_files = self.db.files.get_files_by_category('video', 'audio')
+        ffmpeg_targets = [v for v in media_files if not v.get('video_codec')]
+        guessit_targets = [v for v in self.db.files.get_files_by_category('video', 'audio', 'subtitle') if not v.get('fn_title')]
+        
+        total_tasks = len(nfo_targets) + len(ffmpeg_targets) + len(guessit_targets)
+        if total_tasks == 0:
+            if progress_callback: progress_callback("Local data synced.", 1, 1)
+            return
+
+        current_task_offset = 0
+
+        def unified_cb(msg, cur, tot):
+            if progress_callback:
+                # Use the phase-specific progress added to the global offset
+                return progress_callback(msg, current_task_offset + cur, total_tasks)
+            return True
+
+        # Phase 1: NFO
+        self._phase_nfo(unified_cb, nfo_targets)
+        current_task_offset += len(nfo_targets)
+
+        # Phase 2: FFmpeg
+        self._phase_ffmpeg(unified_cb, ffmpeg_targets)
+        current_task_offset += len(ffmpeg_targets)
+
+        # Phase 3: GuessIt
+        self._phase_guessit(unified_cb, guessit_targets)
 
     def collect_single_file(self, file_id):
         """Enriches a single file with technical and filename metadata."""
@@ -44,10 +70,11 @@ class Collector:
         data = self.guesser.parse(vid['current_path'])
         if data: self.db.files.update_file(file_id, **data)
 
-    def _phase_nfo(self, cb=None):
+    def _phase_nfo(self, cb=None, to_process=None):
         """Phase 1: IMDB IDs from .nfo files."""
-        nfo_files = self.db.files.get_files_by_category('metadata')
-        to_process = [f for f in nfo_files if f['extension'] == '.nfo' and f['parent_file_id']]
+        if to_process is None:
+            nfo_files = self.db.files.get_files_by_category('metadata')
+            to_process = [f for f in nfo_files if f['extension'] == '.nfo' and f['parent_file_id']]
         
         total = len(to_process)
         for i, nfo in enumerate(to_process):
@@ -61,14 +88,14 @@ class Collector:
                 if parent and not parent.get('nfo_imdb_id'):
                     self.db.files.update_file(nfo['parent_file_id'], nfo_imdb_id=imdb_id)
 
-    def _phase_ffmpeg(self, cb=None):
+    def _phase_ffmpeg(self, cb=None, media_files=None):
         """Phase 2: Technical data using ffprobe (Concurrent)."""
-        all_media = self.db.files.get_files_by_category('video', 'audio')
-        media_files = [v for v in all_media if not v.get('video_codec')]
+        if media_files is None:
+            all_media = self.db.files.get_files_by_category('video', 'audio')
+            media_files = [v for v in all_media if not v.get('video_codec')]
         
         total = len(media_files)
         if total == 0:
-            if cb: cb("Technical data synced.", 1, 1)
             return
 
         def _worker(vid):
@@ -91,14 +118,14 @@ class Collector:
         
         if updates: self.db.files.bulk_update_files(updates)
 
-    def _phase_guessit(self, cb=None):
+    def _phase_guessit(self, cb=None, media_files=None):
         """Phase 3: Filename analysis using GuessIt (Concurrent)."""
-        all_media = self.db.files.get_files_by_category('video', 'audio', 'subtitle')
-        media_files = [v for v in all_media if not v.get('fn_title')]
+        if media_files is None:
+            all_media = self.db.files.get_files_by_category('video', 'audio', 'subtitle')
+            media_files = [v for v in all_media if not v.get('fn_title')]
         
         total = len(media_files)
         if total == 0:
-            if cb: cb("Filename analysis synced.", 1, 1)
             return
 
         folder_cache = {}

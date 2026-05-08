@@ -122,8 +122,13 @@ class TagBuilder:
             if media.get('details_json'):
                 try:
                     details = json.loads(media['details_json'])
-                    if isinstance(details, dict) and language in details:
-                        title = details[language].get('title') or details[language].get('name') or title
+                    if isinstance(details, dict):
+                        lang_key = language
+                        if lang_key not in details:
+                            lang_key = lang_key.split('-')[0]
+                        
+                        if lang_key in details:
+                            title = details[lang_key].get('title') or details[lang_key].get('name') or title
                 except: pass
 
             data['items'].append(media)
@@ -142,8 +147,12 @@ class TagBuilder:
                         if ep.get('details_json'):
                             try:
                                 ep_details = json.loads(ep['details_json'])
-                                if isinstance(ep_details, dict) and language in ep_details:
-                                    ep_name = ep_details[language].get('name') or ep_name
+                                if isinstance(ep_details, dict):
+                                    l_key = language
+                                    if l_key not in ep_details:
+                                        l_key = l_key.split('-')[0]
+                                    if l_key in ep_details:
+                                        ep_name = ep_details[l_key].get('name') or ep_name
                             except: pass
                             
                         data['episodes'].append(ep)
@@ -167,14 +176,19 @@ class TagBuilder:
         if m.get('details_json'):
             try:
                 details_all = json.loads(m['details_json'])
-                if isinstance(details_all, dict) and language in details_all:
-                    details = details_all[language]
-                    tagline = details.get('tagline') or tagline
-                    overview = details.get('overview') or overview
+                if isinstance(details_all, dict):
+                    l_key = language
+                    if l_key not in details_all:
+                        l_key = l_key.split('-')[0]
                     
-                    if 'genres' in details:
-                        genre_list = [g['name'] for g in details['genres']]
-                        genres = ", ".join(genre_list) if genre_list else genres
+                    if l_key in details_all:
+                        details = details_all[l_key]
+                        tagline = details.get('tagline') or tagline
+                        overview = details.get('overview') or overview
+                        
+                        if 'genres' in details:
+                            genre_list = [g['name'] for g in details['genres']]
+                            genres = ", ".join(genre_list) if genre_list else genres
             except: pass
 
         context.update({
@@ -211,8 +225,12 @@ class TagBuilder:
         if m.get('details_json'):
             try:
                 details = json.loads(m['details_json'])
-                if isinstance(details, dict) and language in details:
-                    series_title = details[language].get('name') or series_title
+                if isinstance(details, dict):
+                    l_key = language
+                    if l_key not in details:
+                        l_key = l_key.split('-')[0]
+                    if l_key in details:
+                        series_title = details[l_key].get('name') or series_title
             except: pass
 
         context.update({
@@ -295,11 +313,16 @@ class TagBuilder:
             details_all = json.loads(media['details_json'])
             
             # If multi-language, get the correct language details
-            if isinstance(details_all, dict) and language in details_all:
-                details = details_all[language]
-            elif isinstance(details_all, dict):
-                # Fallback to first available
-                details = next(iter(details_all.values()))
+            if isinstance(details_all, dict):
+                l_key = language
+                if l_key not in details_all:
+                    l_key = l_key.split('-')[0]
+                
+                if l_key in details_all:
+                    details = details_all[l_key]
+                else:
+                    # Fallback to first available
+                    details = next(iter(details_all.values()))
             else:
                 details = details_all
 

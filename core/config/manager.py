@@ -155,12 +155,12 @@ class ConfigManager:
             raise APIKeyMissingError("Placeholder API keys detected. Please configure real keys in settings.")
 
     def save(self) -> None:
-        """Persist current settings back to SQLite."""
+        """Persist current settings back to SQLite using a single transaction."""
         settings_dict = asdict(self.settings)
-        for k, v in settings_dict.items():
-            # Store values as JSON strings to preserve types (ints, bools)
-            self.db.settings.set(k, json.dumps(v))
-        logger.info("Settings saved to LibraryDB user_settings.")
+        # Prepare data for set_many
+        data_to_save = {k: json.dumps(v) for k, v in settings_dict.items()}
+        self.db.settings.set_many(data_to_save)
+        logger.info("Settings saved to LibraryDB user_settings (bulk update).")
 
     def to_dict(self) -> dict:
         """Return all settings as a plain dict."""

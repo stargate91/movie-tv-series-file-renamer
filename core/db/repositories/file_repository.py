@@ -37,10 +37,15 @@ class FileRepository(BaseRepository):
         with self._get_connection() as conn:
             try:
                 for update in updates_list:
-                    file_id = update.pop('id')
-                    if not update: continue
-                    cols = ", ".join(f"{k} = ?" for k in update)
-                    vals = list(update.values()) + [file_id]
+                    file_id = update.get('id')
+                    if file_id is None: continue
+                    
+                    # Create columns list excluding 'id'
+                    fields = {k: v for k, v in update.items() if k != 'id'}
+                    if not fields: continue
+                    
+                    cols = ", ".join(f"{k} = ?" for k in fields)
+                    vals = list(fields.values()) + [file_id]
                     conn.execute(f"UPDATE media_files SET {cols} WHERE id = ?", vals)
                 conn.commit()
             except Exception as e:

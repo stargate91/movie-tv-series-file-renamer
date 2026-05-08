@@ -83,18 +83,21 @@ class MainWindowV3(QMainWindow):
 
     def _on_settings_changed(self):
         """Called when settings are saved."""
-        # 1. Update Theme
+        # 1. Propagate to Engine
+        self.engine.refresh_settings()
+
+        # 2. Update Theme
         new_theme = self.engine.config.settings.ui_theme
         self._apply_theme(new_theme)
         
-        # 2. Check for Language Change
+        # 3. Check for Language Change
         new_lang = self.engine.config.settings.metadata_language
         if new_lang != self._last_lang:
             self._last_lang = new_lang
             if hasattr(self.discovery_page, 'notify_language_changed'):
                 self.discovery_page.notify_language_changed(new_lang)
         
-        # 3. Refresh Data
+        # 4. Refresh Data
         self.discovery_page.refresh_data()
         self.dashboard_page.refresh_data()
 

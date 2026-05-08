@@ -9,6 +9,7 @@ from .inspector.poster_carousel import PosterCarousel
 from .inspector.media_section import MediaSection
 from .inspector.technical_section import TechnicalSection
 from .inspector.data_sheet import DataSheetDialog
+from ui.v3.workers.discovery_workers import SingleEnrichWorker
 from core.i18n import T
 
 logger = logging.getLogger(__name__)
@@ -18,6 +19,7 @@ class InspectorPanel(QFrame):
     Right-side panel orchestrator.
     Decomposed into specialized sections for Posters, Media Metadata, and Technical Info.
     """
+    enrichment_finished = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -89,8 +91,9 @@ class InspectorPanel(QFrame):
         self.media_section.clear()
         self.tech_section.clear()
 
-    def set_file(self, file_id: int, engine):
+    def set_file(self, file_id: int, engine, skip_enrich=False):
         """Main entry point to update inspector content based on a selection."""
+        self._last_engine = engine # Store for refresh
         self.set_empty()
         if not file_id: return
         
@@ -117,14 +120,57 @@ class InspectorPanel(QFrame):
         # 4. Fetch Detailed Metadata
         media_data = engine.db.media.get_media_item_by_id(media_id)
         if not media_data: return
+
+        # --- Language Check & Background Fetch ---
+        active_lang = file_data.get('target_language') or self._preferred_language
+        self.media_section.set_preferred_language(active_lang)
+        
+        fetched_langs = (media_data.get('fetched_languages') or "").split(',')
+        fetched_list = [l.strip() for l in fetched_langs if l.strip()]
+        
+        needs_enrich = active_lang not in fetched_list
+        
+        if not needs_enrich and media_data.get('media_type') == 'tv':
+            # Verify if linked episodes actually have the language (handles past partial-fetch bugs)
+            ep_links = [l for l in links if l.get('tv_episode_id')]
+            for el in ep_links:
+                ed = engine.db.media.get_episode_by_id(el['tv_episode_id'])
+                if ed:
+                    ep_f = [l.strip() for l in (ed.get('fetched_languages') or "").split(',') if l.strip()]
+                    if active_lang not in ep_f:
+                        needs_enrich = True
+                        break
+        
+        if not skip_enrich and needs_enrich:
+            # Safely handle previous worker to prevent "QThread: Destroyed while thread is still running"
+            if hasattr(self, 'enrich_worker') and self.enrich_worker and self.enrich_worker.isRunning():
+                try: self.enrich_worker.finished.disconnect()
+                except: pass
+                # Keep a reference in a temporary list so it's not GC'd while running
+                if not hasattr(self, '_worker_graveyard'): self._worker_graveyard = []
+                self._worker_graveyard.append(self.enrich_worker)
+                # Periodic cleanup of finished workers from graveyard
+                self._worker_graveyard = [w for w in self._worker_graveyard if w.isRunning()]
+
+            # Trigger background enrich
+            self.enrich_worker = SingleEnrichWorker(engine, media_data['tmdb_id'], media_data['media_type'], active_lang)
+            # Use a safe callback that only refreshes if the file is STILL selected
+            def on_enriched(fid=file_id):
+                if self._current_file_data and self._current_file_data.get('id') == fid:
+                    # Pass skip_enrich=True to prevent infinite loop
+                    self.set_file(fid, engine, skip_enrich=True)
+                    self.enrichment_finished.emit()
+            self.enrich_worker.finished.connect(on_enriched)
+            self.enrich_worker.start()
+            # Continue showing what we have (it will show original/fallback or column data)
         
         mtype = media_data.get('media_type')
         self._current_media_data = media_data
-        self.update_from_data(media_data)
+        self.update_from_data(media_data, lang=active_lang)
         
         # 5. Handle Episode/Series Hierarchy
         if mtype == 'tv':
-            series_pix = self._load_pixmap(self._get_translated(media_data, 'poster_path'))
+            series_pix = self._load_pixmap(self._get_translated(media_data, 'poster_path', lang=active_lang))
             season_pix = None
             all_episode_pix = []
             
@@ -137,7 +183,7 @@ class InspectorPanel(QFrame):
                 ed = engine.db.media.get_episode_by_id(el['tv_episode_id'])
                 if ed:
                     ep_data.append(ed)
-                    p_ep = self._load_pixmap(self._get_translated(ed, 'still_path', ed.get('still_path')))
+                    p_ep = self._load_pixmap(self._get_translated(ed, 'still_path', ed.get('still_path'), lang=active_lang))
                     if p_ep: all_episode_pix.append(p_ep)
                     
                     if not season_data:
@@ -152,15 +198,15 @@ class InspectorPanel(QFrame):
                 except: pass
                 
             if season_data:
-                season_pix = self._load_pixmap(self._get_translated(season_data, 'poster_path'))
-                self.update_episode_info(ep_data, season_data)
+                season_pix = self._load_pixmap(self._get_translated(season_data, 'poster_path', lang=active_lang))
+                self.update_episode_info(ep_data, season_data, lang=active_lang)
             else:
-                self.update_episode_info(ep_data)
+                self.update_episode_info(ep_data, lang=active_lang)
 
             self.poster_carousel.set_tv_posters(series_pix, season_pix, *all_episode_pix)
         else:
             # Movie Poster
-            pix = self._load_pixmap(self._get_translated(media_data, 'poster_path'))
+            pix = self._load_pixmap(self._get_translated(media_data, 'poster_path', lang=active_lang))
             self.poster_carousel.set_single_poster(pix)
 
         # 6. Fetch Linked Children (Extras, Subs)
@@ -179,32 +225,34 @@ class InspectorPanel(QFrame):
         # MediaSection.update_status is now a no-op as logic moved to poster
         self.media_section.update_status(status)
 
-    def update_from_data(self, media_data):
+    def update_from_data(self, media_data, lang=None):
         self._current_media_data = media_data
+        active_lang = lang or self._preferred_language
         
         # Reload posters for current language
         if media_data.get('media_type') == 'movie':
-            pix = self._load_pixmap(self._get_translated(media_data, 'poster_path'))
+            pix = self._load_pixmap(self._get_translated(media_data, 'poster_path', lang=active_lang))
             self.poster_carousel.set_single_poster(pix)
             self.media_section.update_movie(media_data)
         else:
             # For TV we need more context usually handled in refresh or update_episode_info
             # but we can do basic refresh here
-            series_pix = self._load_pixmap(self._get_translated(media_data, 'poster_path'))
+            series_pix = self._load_pixmap(self._get_translated(media_data, 'poster_path', lang=active_lang))
             self.poster_carousel.set_single_poster(series_pix) # Fallback
 
-    def update_episode_info(self, ep_data_list, season_data=None):
+    def update_episode_info(self, ep_data_list, season_data=None, lang=None):
         self._current_episode_data = ep_data_list
         self._current_season_data = season_data
+        active_lang = lang or self._preferred_language
         
         # Reload posters for current language
         if self._current_media_data:
-            series_pix = self._load_pixmap(self._get_translated(self._current_media_data, 'poster_path'))
-            season_pix = self._load_pixmap(self._get_translated(season_data, 'poster_path')) if season_data else None
+            series_pix = self._load_pixmap(self._get_translated(self._current_media_data, 'poster_path', lang=active_lang))
+            season_pix = self._load_pixmap(self._get_translated(season_data, 'poster_path', lang=active_lang)) if season_data else None
             
             all_ep_pix = []
             for ed in ep_data_list:
-                p_ep = self._load_pixmap(self._get_translated(ed, 'still_path', ed.get('still_path')))
+                p_ep = self._load_pixmap(self._get_translated(ed, 'still_path', ed.get('still_path'), lang=active_lang))
                 if p_ep: all_ep_pix.append(p_ep)
             
             self.poster_carousel.set_tv_posters(series_pix, season_pix, *all_ep_pix)
@@ -255,25 +303,48 @@ class InspectorPanel(QFrame):
     def set_preferred_language(self, lang):
         self._preferred_language = lang
         self.media_section.set_preferred_language(lang)
-        # If we have an active selection, refresh it
-        self.refresh()
+        # If we have an active selection, refresh it using full set_file logic
+        if self._current_file_data and hasattr(self, '_last_engine'):
+            self.set_file(self._current_file_data['id'], self._last_engine)
+        else:
+            self.refresh()
 
-    def _get_translated(self, data, field, default=""):
+    def _get_translated(self, data, field, default="", lang=None):
         if not data: return default
         details_json = data.get('details_json')
+        
+        # 1. Try from localized JSON store
         if details_json:
             try:
                 import json
                 details = json.loads(details_json)
-                if isinstance(details, dict) and self._preferred_language in details:
-                    lang_data = details[self._preferred_language]
-                    val = lang_data.get(field)
-                    if val: return val
+                if isinstance(details, dict):
+                    # Robust language lookup: try exact match, then 2-letter prefix
+                    lang_key = lang or self._preferred_language
+                    if lang_key not in details:
+                        lang_key = lang_key.split('-')[0]
+                    
+                    if lang_key in details:
+                        lang_data = details[lang_key]
+                        # TMDB uses 'name' for TV/Episodes and 'title' for Movies
+                        if field in ('title', 'name'):
+                            val = lang_data.get('title') or lang_data.get('name')
+                        else:
+                            val = lang_data.get(field)
+                        if val: return val
             except: pass
+        
+        # 2. Fallback to column data
+        if field in ('title', 'name'):
+            return data.get('title') or data.get('name') or default
         return data.get(field, default)
 
     def refresh(self):
-        if self._current_media_data:
+        """Re-fetches current data from DB and re-renders UI."""
+        if self._current_file_data and hasattr(self, '_last_engine'):
+            self.set_file(self._current_file_data['id'], self._last_engine, skip_enrich=True)
+        elif self._current_media_data:
+            # Fallback for when we only have media data but no file context
             if self._current_episode_data:
                 self.update_episode_info(self._current_episode_data, self._current_season_data)
             else:

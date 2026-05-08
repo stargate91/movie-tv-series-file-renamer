@@ -86,34 +86,52 @@ class MatchingEngine:
         results = []
         year_str = str(year) if year else "unknown"
         
-        try:
-            if search_type in ('movie', 'both', None):
+        # 1. Movie Search
+        if search_type in ('movie', 'both', None):
+            try:
                 data = self.api.search_movie(title, year_str, language)
-                for r in data.get('results', [])[:20]:
-                    results.append({
-                        'tmdb_id': r['id'],
-                        'title': r.get('title', ''),
-                        'original_title': r.get('original_title', ''),
-                        'year': self._extract_year(r.get('release_date', '')),
-                        'media_type': 'movie',
-                        'poster_path': r.get('poster_path'),
-                        'details_json': json.dumps(r, ensure_ascii=False)
-                    })
-            
-            if search_type in ('episode', 'tv', 'both', None):
+                if data and 'results' in data:
+                    res_count = len(data.get('results', []))
+                    logger.info(f"TMDB Movie search for '{title}' ({year_str}) returned {res_count} results.")
+                    for r in data.get('results', [])[:20]:
+                        results.append({
+                            'tmdb_id': r['id'],
+                            'title': r.get('title', ''),
+                            'original_title': r.get('original_title', ''),
+                            'year': self._extract_year(r.get('release_date', '')),
+                            'media_type': 'movie',
+                            'poster_path': r.get('poster_path'),
+                            'details_json': json.dumps(r, ensure_ascii=False)
+                        })
+                elif data:
+                    logger.warning(f"Unexpected response format from TMDB movie search: {list(data.keys())}")
+            except Exception as e:
+                logger.error(f"Movie search failed for '{title}': {e}")
+                # Don't raise, we might still have TV results or previous successes
+        
+        # 2. TV Search
+        # Optimization: If we found movies and search_type was None, we still check TV unless we have high confidence?
+        # For now, just ensure it doesn't crash the whole resolve if TV search fails.
+        if search_type in ('episode', 'tv', 'both', None):
+            try:
                 data = self.api.search_tv(title, year_str, language)
-                for r in data.get('results', [])[:20]:
-                    results.append({
-                        'tmdb_id': r['id'],
-                        'title': r.get('name', ''),
-                        'original_title': r.get('original_name', ''),
-                        'year': self._extract_year(r.get('first_air_date', '')),
-                        'media_type': 'tv',
-                        'poster_path': r.get('poster_path'),
-                        'details_json': json.dumps(r, ensure_ascii=False)
-                    })
-        except Exception as e:
-            logger.warning(f"API Search error for '{title}' in {language}: {e}")
+                if data and 'results' in data:
+                    res_count = len(data.get('results', []))
+                    logger.info(f"TMDB TV search for '{title}' ({year_str}) returned {res_count} results.")
+                    for r in data.get('results', [])[:20]:
+                        results.append({
+                            'tmdb_id': r['id'],
+                            'title': r.get('name', ''),
+                            'original_title': r.get('original_name', ''),
+                            'year': self._extract_year(r.get('first_air_date', '')),
+                            'media_type': 'tv',
+                            'poster_path': r.get('poster_path'),
+                            'details_json': json.dumps(r, ensure_ascii=False)
+                        })
+                elif data:
+                    logger.warning(f"Unexpected response format from TMDB tv search: {list(data.keys())}")
+            except Exception as e:
+                logger.error(f"TV search failed for '{title}': {e}")
         
         return results
 
@@ -192,6 +210,17 @@ class MatchingEngine:
             return 'episode'
         return None
 
+    def parse_with_guessit(self, text):
+        """Uses GuessIt to clean and parse any text string."""
+        if not text: return None, None
+        from guessit import guessit
+        g = guessit(text)
+        title = g.get('title')
+        if isinstance(title, list): title = title[0]
+        year = g.get('year')
+        if isinstance(year, list): year = year[0]
+        return title, year
+
     def parse_title_year(self, raw_title):
         """Splits 'Title (2006)'."""
         match = re.match(r'(.+?)\s*\((\d{4})\)\s*$', raw_title)
@@ -200,11 +229,14 @@ class MatchingEngine:
         return raw_title.strip(), None
 
     def get_all_search_terms(self, vid):
-        """Yields all available (title, year, source) tuples."""
-        if vid.get('internal_title'):
-            title, year = self.parse_title_year(vid['internal_title'])
-            if title: yield (title, year, 'internal_title')
+        """Yields all available (title, year, source) tuples, ordered by reliability."""
         if vid.get('fn_title'):
             yield (vid['fn_title'], vid.get('fn_year'), 'filename')
         if vid.get('fd_title'):
             yield (vid['fd_title'], vid.get('fd_year'), 'foldername')
+        if vid.get('internal_title'):
+            # Skip if internal title is just the filename
+            clean_fn = os.path.splitext(vid.get('file_name', ''))[0]
+            if vid['internal_title'] != clean_fn and vid['internal_title'] != vid.get('file_name'):
+                title, year = self.parse_with_guessit(vid['internal_title'])
+                if title: yield (title, year, 'internal_title')

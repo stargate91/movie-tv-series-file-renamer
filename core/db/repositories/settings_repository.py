@@ -13,6 +13,16 @@ class SettingsRepository(BaseRepository):
             """, (key, value))
             conn.commit()
 
+    def set_many(self, settings_dict):
+        """Bulk update settings in a single transaction."""
+        with self._get_connection() as conn:
+            conn.executemany("""
+                INSERT INTO user_settings (setting_key, setting_value)
+                VALUES (?, ?)
+                ON CONFLICT(setting_key) DO UPDATE SET setting_value = excluded.setting_value
+            """, [(k, v) for k, v in settings_dict.items()])
+            conn.commit()
+
     def get(self, key, default=None):
         with self._get_connection() as conn:
             row = conn.execute("SELECT setting_value FROM user_settings WHERE setting_key = ?", (key,)).fetchone()

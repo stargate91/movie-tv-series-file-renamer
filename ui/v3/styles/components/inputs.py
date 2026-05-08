@@ -1,4 +1,5 @@
 from ..palette import Palette
+from ..icons import IconManager
 
 class InputStyles:
     @staticmethod
@@ -67,22 +68,60 @@ class InputStyles:
             }}
             QComboBox::drop-down {{
                 border: none;
-                width: 20px;
+                width: 30px;
             }}
             QComboBox::down-arrow {{
-                image: none;
-                border-left: 5px solid transparent;
-                border-right: 5px solid transparent;
-                border-top: 5px solid {Palette.TEXT_MUTED};
-                width: 0;
-                height: 0;
-                margin-right: 8px;
+                image: url("{IconManager.get_icon_path("chevron-down", 14, Palette.TEXT_DIM)}");
+                width: 14px;
+                height: 14px;
+                margin-right: 10px;
             }}
             QComboBox QAbstractItemView {{
                 background-color: {Palette.BACKGROUND};
                 border: 1px solid {Palette.BORDER};
                 selection-background-color: {Palette.PRIMARY};
                 selection-color: white;
+                outline: none;
+            }}
+        """
+    @staticmethod
+    def get_accent_combobox_style():
+        return f"""
+            QComboBox {{
+                background-color: {Palette.SURFACE};
+                border: 1px solid {Palette.BORDER};
+                border-radius: 8px;
+                padding: 8px 35px 8px 12px;
+                color: {Palette.TEXT_MAIN};
+            }}
+            QComboBox:hover {{
+                border-color: {Palette.PRIMARY};
+            }}
+            QComboBox::drop-down {{
+                subcontrol-origin: padding;
+                subcontrol-position: top right;
+                width: 34px;
+                border-left: 1px solid {Palette.BORDER};
+                background-color: {Palette.SURFACE_DARK};
+                border-top-right-radius: 8px;
+                border-bottom-right-radius: 8px;
+            }}
+            QComboBox::down-arrow {{
+                image: none;
+                border-left: 4px solid transparent;
+                border-right: 4px solid transparent;
+                border-top: 5px solid {Palette.PRIMARY};
+                width: 0;
+                height: 0;
+                margin-top: 2px;
+            }}
+            QComboBox QAbstractItemView {{
+                background-color: {Palette.SURFACE} !important;
+                border: 1px solid {Palette.BORDER};
+                selection-background-color: {Palette.PRIMARY};
+                selection-color: white;
+                color: {Palette.TEXT_MAIN};
+                padding: 4px;
                 outline: none;
             }}
         """

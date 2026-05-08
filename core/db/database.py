@@ -251,6 +251,34 @@ class LibraryDB:
             
             conn.commit()
 
+            # 4. Migrations: Ensure newer columns exist in older DBs
+            self._migrate_schema(conn)
+
+    def _migrate_schema(self, conn):
+        """Checks for missing columns and adds them if necessary."""
+        cursor = conn.cursor()
+        
+        # Check media_files columns
+        cursor.execute("PRAGMA table_info(media_files)")
+        columns = [row['name'] for row in cursor.fetchall()]
+        
+        needed = {
+            'target_language': 'TEXT',
+            'part': 'TEXT',
+            'edition': 'TEXT',
+            'is_manual': 'INTEGER DEFAULT 0'
+        }
+        
+        for col, col_type in needed.items():
+            if col not in columns:
+                try:
+                    cursor.execute(f"ALTER TABLE media_files ADD COLUMN {col} {col_type}")
+                    logger.info(f"Migration: Added column {col} to media_files")
+                except Exception as e:
+                    logger.error(f"Migration failed for column {col}: {e}")
+        
+        conn.commit()
+
     # --- Backward Compatibility Wrappers (to avoid breaking the whole app at once) ---
     def get_file_by_id(self, fid): return self.files.get_file_by_id(fid)
     def get_file_by_path(self, path): return self.files.get_file_by_path(path)

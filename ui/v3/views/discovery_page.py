@@ -153,6 +153,7 @@ class DiscoveryPage(QWidget):
         
         self.inspector = InspectorPanel()
         self.inspector.set_preferred_language(self.engine.config.settings.metadata_language)
+        self.inspector.enrichment_finished.connect(self.controller.refresh_data)
         
         content_layout.addWidget(self.inspector, 3)
         layout.addLayout(content_layout)
@@ -171,7 +172,7 @@ class DiscoveryPage(QWidget):
         
         self.abort_btn = QPushButton(T("discovery.buttons.abort"))
         self.abort_btn.setObjectName("abort-btn")
-        self.abort_btn.setFixedSize(80, 24)
+        self.abort_btn.setFixedSize(130, 28)
         self.abort_btn.setStyleSheet(Theme.get_abort_button_style())
         self.abort_btn.clicked.connect(self._on_abort_clicked)
         self.abort_btn.hide()
@@ -481,6 +482,8 @@ class DiscoveryPage(QWidget):
         self.progress_bar.setValue(0)
         self.status_info.show()
         self.status_info.setText(message)
+        self.abort_btn.show()
+        self.abort_btn.setEnabled(True)
         self._set_controls_enabled(False)
 
     def _on_operation_finished(self, results: dict):

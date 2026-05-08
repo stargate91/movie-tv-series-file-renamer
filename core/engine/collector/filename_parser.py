@@ -8,7 +8,7 @@ class FilenameParser:
     def parse(self, file_path, folder_cache=None, lock=None):
         """Parses both filename and foldername and returns unified update dict."""
         update = {}
-        filename = os.path.splitext(os.path.basename(file_path))[0]
+        filename = os.path.basename(file_path)
         fn_guess = guessit(filename)
         
         # Map GuessIt results to DB columns

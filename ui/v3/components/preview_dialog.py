@@ -40,8 +40,6 @@ class PreviewDialog(QDialog):
         header_layout.addWidget(self.search_input)
         
         layout.addLayout(header_layout)
-
-        layout.addLayout(header_layout)
         layout.addSpacing(10)
 
         # List Header
@@ -169,7 +167,7 @@ class PreviewDialog(QDialog):
                 
             # Add a global Remove button to the far right for EVERY item
             btn_remove = QPushButton()
-            btn_remove.setIcon(Theme.get_icon("trash-2", size=16, color=Theme.TEXT_DANGER))
+            btn_remove.setIcon(Theme.get_icon("trash-2", size=16, color=Theme.ERROR))
             btn_remove.setCursor(Qt.PointingHandCursor)
             btn_remove.setFixedSize(28, 28)
             btn_remove.setToolTip(T("preview.remove_tooltip"))

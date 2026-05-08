@@ -1,7 +1,10 @@
+import logging
 from PySide6.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QLabel
 from PySide6.QtCore import Qt, QSize
 from ui.v3.styles.theme import Theme
 from core.i18n import T
+
+logger = logging.getLogger(__name__)
 
 class ResultItemWidget(QWidget):
     """
@@ -10,6 +13,7 @@ class ResultItemWidget(QWidget):
     def __init__(self, data, parent=None):
         super().__init__(parent)
         self.data = data
+        logger.info(f"Creating ResultItemWidget for '{self.data.get('title')}'")
         self._init_ui()
 
     def _init_ui(self):
@@ -24,8 +28,14 @@ class ResultItemWidget(QWidget):
         elif m_type == 'season': icon_name = "folder"
         elif m_type == 'episode': icon_name = "file-text"
         else: icon_name = "movie"
-        
-        icon_lbl.setPixmap(Theme.get_pixmap(icon_name, size=18, color=Theme.TEXT_MUTED))
+
+        try:
+            pix = Theme.get_pixmap(icon_name, size=18, color=Theme.TEXT_MUTED)
+            if pix and not pix.isNull(): 
+                icon_lbl.setPixmap(pix)
+        except Exception as e:
+            logger.warning(f"Failed to load icon '{icon_name}' for result widget: {e}")
+            
         layout.addWidget(icon_lbl)
 
         # 2. Text Info

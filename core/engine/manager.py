@@ -39,13 +39,28 @@ class RenamerEngineV3:
             self.resolver.library._omdb_limit_reached = False
 
     def refresh_settings(self):
-        """Resets engine state to pick up new settings (like API keys)."""
+        """Resets engine state and propagates new settings to all modules."""
+        s = self.config.settings
+        
+        # 1. Update Modules that store references to settings
+        self.scanner.settings = s
+        self.resolver.settings = s
+        self.executor.settings = s
+        self.collision_resolver.settings = s
+
+        # 2. Re-initialize API clients inside modules to pick up new keys
+        if hasattr(self.resolver, 'refresh_settings'):
+            self.resolver.refresh_settings(s)
+        
+        # 3. Global API session reset
         from api.base_client import BaseClient
         BaseClient.reset_session()
         
         if hasattr(self.resolver, 'library'):
             self.resolver.library._omdb_auth_failed = False
             self.resolver.library._omdb_limit_reached = False
+
+        logger.info("Engine settings refreshed and propagated.")
 
     @property
     def has_omdb_limit_reached(self):
