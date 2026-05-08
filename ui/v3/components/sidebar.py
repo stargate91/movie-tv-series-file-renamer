@@ -38,18 +38,20 @@ class Sidebar(QFrame):
 
         # 2. Navigation Area (Top)
         self.btn_dash = self._create_nav_btn(T("sidebar.dashboard"), 0, "home", True)
-        self.btn_lib = self._create_nav_btn(T("sidebar.library"), 1, "folder")
+        self.btn_work = self._create_nav_btn(T("sidebar.workspace"), 1, "edit-3")
+        self.btn_gall = self._create_nav_btn(T("sidebar.gallery"), 2, "film")
         self.btn_hist = self._create_nav_btn(T("sidebar.history"), 3, "history")
         self.btn_sett = self._create_nav_btn(T("sidebar.settings"), 4, "settings")
         
         layout.addWidget(self.btn_dash)
-        layout.addWidget(self.btn_lib)
+        layout.addWidget(self.btn_work)
+        layout.addWidget(self.btn_gall)
         layout.addWidget(self.btn_hist)
         layout.addWidget(self.btn_sett)
         
         # 3. Support Button (Part of Navigation)
         self.btn_support = QPushButton(f"  {T('sidebar.support')}")
-        self.btn_support.setIcon(Theme.get_icon("coffee", size=18, color="#000000"))
+        self.btn_support.setIcon(Theme.get_icon("heart", size=18, color="#ef4444"))
         self.btn_support.setIconSize(QSize(18, 18))
         self.btn_support.setStyleSheet(Theme.get_support_button_style())
         self.btn_support.setFixedHeight(45)
@@ -96,7 +98,8 @@ class Sidebar(QFrame):
         """Programmatically switches the active button state."""
         buttons = {
             0: self.btn_dash,
-            1: self.btn_lib,
+            1: self.btn_work,
+            2: self.btn_gall,
             3: self.btn_hist,
             4: self.btn_sett
         }
@@ -119,7 +122,8 @@ class Sidebar(QFrame):
         # 2. Nav Buttons
         nav_buttons = [
             (self.btn_dash, "home"),
-            (self.btn_lib, "folder"),
+            (self.btn_work, "edit-3"),
+            (self.btn_gall, "film"),
             (self.btn_hist, "history"),
             (self.btn_sett, "settings")
         ]
@@ -129,5 +133,6 @@ class Sidebar(QFrame):
 
         # 3. Support & System
         self.btn_support.setStyleSheet(Theme.get_support_button_style())
+        self.btn_support.setIcon(Theme.get_icon("heart", size=18, color="#ef4444"))
         self.btn_restart.setIcon(Theme.get_icon("refresh", size=16, color=Theme.TEXT_MUTED))
         self.btn_quit.setIcon(Theme.get_icon("logout", size=16, color=Theme.TEXT_MUTED))

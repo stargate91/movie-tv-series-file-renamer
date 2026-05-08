@@ -37,18 +37,19 @@ class NavigationStyles:
 
     @staticmethod
     def get_support_button_style():
-        return """
-            QPushButton {
-                background: #FFDD00;
-                color: #000000;
-                border: none;
+        return f"""
+            QPushButton {{
+                background: {Palette.SURFACE_LIGHT};
+                color: {Palette.TEXT_MAIN};
+                border: 1px solid {Palette.BORDER};
                 border-radius: 8px;
-                font-weight: 800;
+                font-weight: 700;
                 font-size: 13px;
                 padding: 10px 15px;
                 text-align: left;
-            }
-            QPushButton:hover {
-                background: #FFC400;
-            }
+            }}
+            QPushButton:hover {{
+                background: {Palette.SURFACE_LIGHTER};
+                border-color: {Palette.TEXT_DIM};
+            }}
         """

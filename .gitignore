@@ -69,3 +69,5 @@ v3_test_env/
 v3_target_env/
 *.db
 *.log
+scratch/
+.gemini/

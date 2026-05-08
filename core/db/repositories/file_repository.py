@@ -181,3 +181,27 @@ class FileRepository(BaseRepository):
         with self._get_connection() as conn:
             return [dict(row) for row in conn.execute(query, categories).fetchall()]
 
+    def get_library_files(self, search_query=None):
+        """Fetches all renamed or manually organized files with their metadata."""
+        query = """
+            SELECT f.*, 
+                   m.media_type as media_item_type, m.title as media_title, m.poster_path as media_poster,
+                   e.name as episode_title, e.still_path as episode_poster,
+                   s.name as season_name, s.poster_path as season_poster
+            FROM media_files f
+            LEFT JOIN file_media_links l ON f.id = l.file_id
+            LEFT JOIN media_items m ON l.media_item_id = m.id
+            LEFT JOIN tv_episodes e ON l.tv_episode_id = e.id
+            LEFT JOIN tv_seasons s ON e.season_id = s.id
+            WHERE f.category = 'video' 
+              AND f.status IN ('renamed', 'organized')
+        """
+        params = []
+        if search_query:
+            query += " AND (m.title LIKE ? OR f.file_name LIKE ?)"
+            params.extend([f"%{search_query}%", f"%{search_query}%"])
+            
+        query += " GROUP BY f.id ORDER BY f.id DESC"
+        
+        with self._get_connection() as conn:
+            return [dict(row) for row in conn.execute(query, params).fetchall()]

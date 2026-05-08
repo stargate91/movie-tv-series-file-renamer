@@ -176,7 +176,8 @@ class Formatter:
         full_path = os.path.join(target_dir, f"{file_name}{ext}")
         
         # Windows MAX_PATH safety (260)
-        return self._ensure_safe_path_length(full_path, target_dir, file_name, ext, folders, base_dir)
+        final_path = self._ensure_safe_path_length(full_path, target_dir, file_name, ext, folders, base_dir)
+        return os.path.normpath(final_path) if final_path else None
 
     def _apply_template(self, template, context):
         """Simple replacement for folder names."""

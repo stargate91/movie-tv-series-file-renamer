@@ -143,6 +143,17 @@ class DiscoveryController(QObject):
         except Exception as e:
             self.error_occurred.emit("Batch Error", str(e))
 
+    def batch_organize(self, file_ids: list):
+        """Moves files to organized status without physical rename."""
+        self.operation_started.emit("Adding items to Library collection...")
+        try:
+            for fid in file_ids:
+                self.engine.db.files.update_file(fid, status='organized')
+            self.refresh_requested.emit()
+            self.operation_finished.emit({'type': 'batch_update'})
+        except Exception as e:
+            self.error_occurred.emit("Batch Error", str(e))
+
     # --- Worker-based Operations ---
 
     def start_language_fetch(self, item_ids=None):

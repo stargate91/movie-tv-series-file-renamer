@@ -2,7 +2,7 @@ import os
 import logging
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
                              QLineEdit, QPushButton, QScrollArea, QFrame, 
-                             QApplication, QMessageBox)
+                             QApplication, QMessageBox, QProgressBar)
 from PySide6.QtCore import Qt, Signal
 from ui.v3.styles.theme import Theme
 from ui.v3.workers.discovery_workers import UndoWorker
@@ -99,6 +99,7 @@ class HistoryPage(QWidget):
     def __init__(self, engine, parent=None):
         super().__init__(parent)
         self.engine = engine
+        self.active_workers = []
         self._init_ui()
 
     def _init_ui(self):
@@ -143,6 +144,60 @@ class HistoryPage(QWidget):
         
         self.scroll.setWidget(self.content_container)
         layout.addWidget(self.scroll)
+
+        # Status Area (Progress Bar)
+        self._setup_status_area(layout)
+
+    def _setup_status_area(self, layout):
+        self.progress_container = QWidget()
+        self.progress_container.hide()
+        p_layout = QVBoxLayout(self.progress_container)
+        p_layout.setContentsMargins(0, 10, 0, 0)
+        p_layout.setSpacing(8)
+        
+        # Horizontal layout for Status + Abort
+        h_layout = QHBoxLayout()
+        self.status_info = QLabel("")
+        self.status_info.setStyleSheet(Theme.get_status_label_style())
+        
+        self.abort_btn = QPushButton(T("discovery.abort"))
+        self.abort_btn.setFixedWidth(100)
+        self.abort_btn.setStyleSheet(Theme.get_secondary_button_style())
+        self.abort_btn.setCursor(Qt.PointingHandCursor)
+        self.abort_btn.clicked.connect(self._on_abort_requested)
+        
+        h_layout.addWidget(self.status_info)
+        h_layout.addStretch()
+        h_layout.addWidget(self.abort_btn)
+        
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setFixedHeight(14)
+        self.progress_bar.setTextVisible(True)
+        self.progress_bar.setAlignment(Qt.AlignCenter)
+        self.progress_bar.setStyleSheet(Theme.get_progress_bar_detailed_style())
+        
+        p_layout.addLayout(h_layout)
+        p_layout.addWidget(self.progress_bar)
+        layout.addWidget(self.progress_container)
+
+    def _set_ui_locked(self, locked):
+        """Disables/Enables interactive elements during long operations."""
+        self.search_input.setEnabled(not locked)
+        # Disable all undo buttons on cards
+        for i in range(self.content_layout.count()):
+            widget = self.content_layout.itemAt(i).widget()
+            if isinstance(widget, HistoryBatchCard):
+                widget.undo_btn.setEnabled(not locked)
+
+    def refresh_style(self):
+        """Refreshes dynamic styles for the page."""
+        self.search_input.setStyleSheet(Theme.get_input_style())
+        self.scroll.setStyleSheet(Theme.get_scroll_area_style())
+        self.scroll.verticalScrollBar().setStyleSheet(Theme.get_scrollbar_style())
+        if hasattr(self, 'progress_bar'):
+            self.progress_bar.setStyleSheet(Theme.get_progress_bar_detailed_style())
+        if hasattr(self, 'status_info'):
+            self.status_info.setStyleSheet(Theme.get_status_label_style())
 
     def refresh_data(self):
         """Loads and groups history entries from the database."""
@@ -198,14 +253,46 @@ class HistoryPage(QWidget):
 
     def _on_undo_requested(self, batch_id):
         if QMessageBox.question(self, T("history.undo_btn"), T("discovery.messages.undo_confirm")) == QMessageBox.Yes:
-            self.undo_worker = UndoWorker(self.engine, batch_id)
-            self.undo_worker.finished.connect(self._on_undo_finished)
-            self.undo_worker.start()
+            self._set_ui_locked(True)
+            self.progress_container.show()
+            self.progress_bar.setValue(0)
+            self.status_info.setText(T("discovery.messages.restoring") if T("discovery.messages.restoring") != "discovery.messages.restoring" else "Restoring items...")
+            
+            worker = UndoWorker(self.engine, batch_id)
+            self.active_workers.append(worker)
+            worker.progress.connect(self._on_worker_progress)
+            worker.finished.connect(self._on_undo_finished)
+            worker.finished.connect(lambda: self.active_workers.remove(worker) if worker in self.active_workers else None)
+            worker.start()
+
+    def _on_abort_requested(self):
+        for worker in self.active_workers:
+            if isinstance(worker, UndoWorker):
+                worker.stop()
+        self.status_info.setText(T("discovery.messages.aborting"))
+        self.abort_btn.setEnabled(False)
+
+    def _on_worker_progress(self, val, text):
+        self.progress_bar.setValue(val)
+        self.status_info.setText(text)
 
     def _on_undo_finished(self, results):
-        if results.get('success', 0) > 0:
-            QMessageBox.information(self, T("history.undo_success_title"), T("discovery.messages.undo_success", count=results['success']))
+        self.progress_container.hide()
+        self._set_ui_locked(False)
+        self.abort_btn.setEnabled(True)
+        
+        success = results.get('success', 0)
+        failed = results.get('failed', 0)
+        
+        if success > 0 and failed == 0:
+            QMessageBox.information(self, T("history.undo_success_title"), T("discovery.messages.undo_success", count=success))
             self.refresh_data()
-        if results.get('failed', 0) > 0:
-            QMessageBox.warning(self, T("history.undo_partial_title"), T("discovery.messages.undo_errors_msg", count=results['failed']))
+        elif failed > 0:
+            QMessageBox.warning(self, T("history.undo_partial_title"), T("discovery.messages.undo_errors_msg", count=failed))
+            self.refresh_data()
+        else:
+            # Handle case where results are empty or success=0
+            errors = results.get('errors', [])
+            if errors:
+                QMessageBox.warning(self, T("history.undo_partial_title"), errors[0])
             self.refresh_data()

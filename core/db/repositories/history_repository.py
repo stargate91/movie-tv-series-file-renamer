@@ -29,3 +29,8 @@ class HistoryRepository(BaseRepository):
         with self._get_connection() as conn:
             conn.execute("DELETE FROM rename_history WHERE batch_id = ?", (batch_id,))
             conn.commit()
+
+    def delete_history_item(self, item_id):
+        with self._get_connection() as conn:
+            conn.execute("DELETE FROM rename_history WHERE id = ?", (item_id,))
+            conn.commit()

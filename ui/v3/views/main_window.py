@@ -8,6 +8,7 @@ from ui.v3.views.discovery_page import DiscoveryPage
 from ui.v3.views.settings_page import SettingsPage
 from ui.v3.views.dashboard_page import DashboardPage
 from ui.v3.views.history_page import HistoryPage
+from ui.v3.views.library_page import LibraryPage
 from ui.v3.components.sidebar import Sidebar
 from ui.v3.workers.scan_worker import ScanWorker
 from core.engine.manager import RenamerEngineV3
@@ -54,13 +55,13 @@ class MainWindowV3(QMainWindow):
         # Create Views
         self.dashboard_page = DashboardPage(self.engine)
         self.discovery_page = DiscoveryPage(self.engine)
-        self.library_view = QWidget() # Placeholder
+        self.library_page = LibraryPage(self.engine)
         self.history_page = HistoryPage(self.engine)
         self.settings_view = SettingsPage(self.engine)
 
         self.content_stack.addWidget(self.dashboard_page)
         self.content_stack.addWidget(self.discovery_page)
-        self.content_stack.addWidget(self.library_view)
+        self.content_stack.addWidget(self.library_page)
         self.content_stack.addWidget(self.history_page)
         self.content_stack.addWidget(self.settings_view)
 
@@ -119,6 +120,8 @@ class MainWindowV3(QMainWindow):
             self.dashboard_page.refresh_style()
         if hasattr(self, 'history_page') and hasattr(self.history_page, 'refresh_style'):
             self.history_page.refresh_style()
+        if hasattr(self, 'library_page') and hasattr(self.library_page, 'refresh_style'):
+            self.library_page.refresh_style()
         if hasattr(self, 'settings_view') and hasattr(self.settings_view, 'refresh_style'):
             self.settings_view.refresh_style()
             
@@ -128,6 +131,8 @@ class MainWindowV3(QMainWindow):
         self.content_stack.setCurrentIndex(index)
         if index == 0: # Dashboard
             self.dashboard_page.refresh_data()
+        elif index == 2: # Gallery
+            self.library_page.refresh_data()
         elif index == 3: # History
             self.history_page.refresh_data()
 

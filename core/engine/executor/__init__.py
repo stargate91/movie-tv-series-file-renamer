@@ -80,6 +80,10 @@ class Executor:
 
                 ok, err = self.op.move_file(orig, dest, progress_callback=sub_cb)
                 if ok:
+                    # Normalize for DB consistency
+                    orig = os.path.normpath(orig)
+                    dest = os.path.normpath(dest)
+                    
                     # Update DB
                     self.db.files.update_file(p['file_id'], last_path=orig, current_path=dest, status='renamed')
                     # Record for Undo

@@ -177,7 +177,8 @@ class DiscoveryTable(QTableWidget):
                 is_trash = status == 'IGNORED'
                 
                 # 1. Primary Buttons
-                primary_actions = ActionRegistry.get_actions_for_surface('row_primary', raw_cat, is_trash, is_multi=False)
+                is_matched = status == 'MATCHED'
+                primary_actions = ActionRegistry.get_actions_for_surface('row_primary', raw_cat, is_trash, is_multi=False, is_matched=is_matched)
                 for action in primary_actions:
                     btn_style = action.style
                     if action.id == 'fix' and status == 'CONFLICT':
@@ -188,7 +189,7 @@ class DiscoveryTable(QTableWidget):
                     actions_layout.addWidget(btn)
 
                 # 2. Overflow Menu (if any)
-                overflow_actions = ActionRegistry.get_actions_for_surface('row_overflow', raw_cat, is_trash, is_multi=False)
+                overflow_actions = ActionRegistry.get_actions_for_surface('row_overflow', raw_cat, is_trash, is_multi=False, is_matched=is_matched)
                 if overflow_actions:
                     overflow_btn = self._create_action_btn("more-horizontal", "common.more")
                     overflow_btn.clicked.connect(lambda checked=False, b=overflow_btn, v=vid: self._show_row_menu(b, v))
@@ -270,7 +271,16 @@ class DiscoveryTable(QTableWidget):
         is_trash = status == 'IGNORED'
         
         surface = 'context' if is_context else 'row_overflow'
-        available_actions = ActionRegistry.get_actions_for_surface(surface, raw_cat, is_trash, is_multi=is_multi)
+        is_matched = status == 'MATCHED'
+        if is_multi:
+            # For multi-select, all must be matched
+            is_matched = True
+            for r in selected_rows:
+                if self.item(r, 0).data(Qt.UserRole) != 'MATCHED':
+                    is_matched = False
+                    break
+        
+        available_actions = ActionRegistry.get_actions_for_surface(surface, raw_cat, is_trash, is_multi=is_multi, is_matched=is_matched)
         
         for action in available_actions:
             # Separator Logic
@@ -291,11 +301,22 @@ class DiscoveryTable(QTableWidget):
             if is_multi:
                 # Batch connection
                 act.triggered.connect(lambda checked=False, aid=action.id: self.action_triggered.emit(aid, self.get_selected_ids()))
+                
+                # Batch enable check
+                if action.requires_matched:
+                    all_m = True
+                    for r in selected_rows:
+                        if self.item(r, 0).data(Qt.UserRole) != 'MATCHED':
+                            all_m = False
+                            break
+                    act.setEnabled(all_m)
             else:
                 # Single connection
                 act.triggered.connect(lambda checked=False, aid=action.id, v=vid if vid else {'id': file_id, 'current_path': path}: self._trigger_action(aid, v))
+                if action.requires_matched:
+                    act.setEnabled(status == 'MATCHED')
 
-            # Enable/Disable logic
+            # Enable/Disable logic (Legacy / Specific overrides)
             if action.id == 'clear_match':
                 act.setEnabled(status == 'MATCHED')
         
@@ -376,17 +397,30 @@ class DiscoveryTable(QTableWidget):
         if raw_cat == 'video':
             return T("common.types.movie") if mtype == 'movie' else T("common.types.tv") if mtype == 'tv' else T("common.types.video")
         
-        # Generic lookup for other categories (extra, subtitle, image, meta)
-        cat_display = T(f"discovery.batch_operations.options.categories.{raw_cat}")
-        if cat_display == f"discovery.batch_operations.options.categories.{raw_cat}":
-            cat_display = raw_cat.capitalize()
+        # Mapping for better display names using localized keys (singular for table)
+        cat_map = {
+            'extra': T("discovery.extras.display.bonus"),
+            'subtitle': T("discovery.extras.display.subtitle"),
+            'audio': T("discovery.extras.display.audio"),
+            'image': T("discovery.extras.display.image"),
+            'metadata': T("discovery.extras.display.metadata")
+        }
         
-        if sub_cat and sub_cat != raw_cat:
+        cat_display = cat_map.get(raw_cat, raw_cat.capitalize())
+        
+        # If we have a sub-type, and it's not the same as the category
+        if sub_cat and sub_cat.lower() != raw_cat.lower():
+            # If sub_cat is "movie" or "tv", ignore it for extras
+            if sub_cat.lower() in ("movie", "tv"):
+                return cat_display
+                
             sub_display = T(f"discovery.extras.subtypes.{sub_cat}")
             if sub_display == f"discovery.extras.subtypes.{sub_cat}":
                 sub_display = sub_cat.title()
-            return f"{cat_display} ({sub_display})"
-        
+            
+            # Return sub-type only if it's meaningful, else category
+            return f"{sub_display}" # Just show "Trailer" or "Forced" if it's known
+            
         return cat_display
 
     def get_selected_ids(self):

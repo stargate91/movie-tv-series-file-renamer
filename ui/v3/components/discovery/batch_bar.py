@@ -14,6 +14,7 @@ class BatchBar(QFrame):
     restore_requested = Signal()
     clear_requested = Signal()
     ignore_requested = Signal()
+    organize_requested = Signal()
     open_folder_requested = Signal()
 
     def __init__(self, parent=None):
@@ -42,10 +43,14 @@ class BatchBar(QFrame):
         self.btn_identify.clicked.connect(self.identify_requested.emit)
 
         self.btn_restore = QPushButton(T("discovery.actions.restore_multi"))
-        self.btn_restore.setIcon(Theme.get_icon("undo", size=16, color=Theme.TEXT_MAIN))
-        self.btn_restore.setStyleSheet(Theme.get_batch_button_style('success'))
         self.btn_restore.clicked.connect(self.restore_requested.emit)
         self.btn_restore.hide()
+
+        self.btn_organize = QPushButton(T("discovery.actions.organize_multi"))
+        self.btn_organize.setIcon(Theme.get_icon("check-square", size=16, color=Theme.TEXT_MAIN))
+        self.btn_organize.setStyleSheet(Theme.get_batch_button_style('success'))
+        self.btn_organize.clicked.connect(self.organize_requested.emit)
+        self.btn_organize.hide()
 
         # Overflow Menu
         self.btn_more = QPushButton()
@@ -74,19 +79,21 @@ class BatchBar(QFrame):
         layout.addWidget(self.label)
         layout.addStretch()
         layout.addWidget(self.btn_restore)
+        layout.addWidget(self.btn_organize)
         layout.addWidget(self.btn_more)
         layout.addSpacing(6)
         layout.addWidget(self.btn_identify)
         layout.addSpacing(6)
         layout.addWidget(self.btn_actions)
 
-    def set_selection_count(self, count, is_trash=False, category='video'):
+    def set_selection_count(self, count, is_trash=False, category='video', all_matched=False):
         self.label.setText(T("discovery.messages.items_selected", count=count))
         self.btn_restore.setVisible(is_trash)
         
         # Category-based visibility
         is_video = category == 'video'
         self.btn_identify.setVisible(not is_trash and is_video)
+        self.btn_organize.setVisible(not is_trash and is_video and all_matched)
         
         # Batch Actions and More menu
         self.btn_actions.setVisible(not is_trash)

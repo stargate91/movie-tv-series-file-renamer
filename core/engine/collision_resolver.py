@@ -66,15 +66,16 @@ class CollisionResolver:
                 part_val = match.group(1).upper()
                 found_parts.add(part_val)
                 item['_detected_part'] = part_val
-            else:
-                # If even one file is missing a part identifier, we can't safely auto-resolve
-                return None
-                
         # Make sure they are actually different parts (e.g. no two CD1s)
-        if len(found_parts) != len(collision_group):
-            return None
+        if len(found_parts) == len(collision_group):
+            return self._apply_part_formatting(collision_group)
             
-        return self._apply_part_formatting(collision_group)
+        # Fallback: ONLY for non-video categories (extras, audio, subtitle, etc)
+        is_video = any(item.get('category') == 'video' for item in collision_group)
+        if not is_video:
+            return self.force_resolve_group(collision_group)
+            
+        return None # Return None for videos to keep collision status
 
     def force_resolve_group(self, collision_group):
         """
@@ -94,7 +95,10 @@ class CollisionResolver:
             formatted_val = self._format_part_val(part_val, self.s.multi_part_style)
             
             # Formatting based on User Settings
-            keyword = self.s.multi_part_keyword if self.s.multi_part_keyword not in ("None", "") else ""
+            is_video = item.get('category') == 'video'
+            keyword = ""
+            if is_video:
+                keyword = self.s.multi_part_keyword if self.s.multi_part_keyword not in ("None", "") else ""
             
             # Separator mapping
             sep_map = {"space": " ", "dot": ".", "dash": "-", "underscore": "_", "none": ""}

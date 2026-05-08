@@ -57,7 +57,7 @@ class EditFileDialog(QDialog):
         st_lay.setContentsMargins(0, 5, 0, 0)
         st_lay.addWidget(QLabel(T("edit_file.fields.type"), styleSheet=Theme.get_status_label_style()))
         self.combo_sub_type = QComboBox()
-        self.combo_sub_type.setEditable(True)
+        self.combo_sub_type.setEditable(False)
         st_lay.addWidget(self.combo_sub_type)
 
         self.cat_card.layout().addWidget(QLabel(T("edit_file.fields.primary_role"), styleSheet=Theme.get_card_header_style()))
@@ -88,13 +88,13 @@ class EditFileDialog(QDialog):
         self.lbl_edition = QLabel(T("edit_file.fields.edition"))
         mv_lay.addWidget(self.lbl_edition)
         self.combo_edition = QComboBox()
-        self.combo_edition.setEditable(True)
-        self.combo_edition.addItem("")
-        self.combo_edition.addItem(T("edit_file.editions.theatrical"), "Theatrical")
-        self.combo_edition.addItem(T("edit_file.editions.directors_cut"), "Director's Cut")
-        self.combo_edition.addItem(T("edit_file.editions.extended"), "Extended")
-        self.combo_edition.addItem(T("edit_file.editions.remastered"), "Remastered")
-        self.combo_edition.addItem(T("edit_file.editions.uncut"), "Uncut")
+        self.combo_edition.setEditable(False)
+        self.combo_edition.addItem("", None)
+        self.combo_edition.addItem(T("common.editions.theatrical"), "Theatrical")
+        self.combo_edition.addItem(T("common.editions.directors_cut"), "Director's Cut")
+        self.combo_edition.addItem(T("common.editions.extended"), "Extended")
+        self.combo_edition.addItem(T("common.editions.remastered"), "Remastered")
+        self.combo_edition.addItem(T("common.editions.uncut"), "Uncut")
         mv_lay.addWidget(self.combo_edition)
         
         part_lay = QVBoxLayout()
@@ -111,7 +111,8 @@ class EditFileDialog(QDialog):
         lang_lay.setContentsMargins(0, 0, 0, 0)
         lang_lay.addWidget(QLabel(T("edit_file.fields.language")))
         self.combo_lang = QComboBox()
-        self.combo_lang.setEditable(True)
+        self.combo_lang.setEditable(False)
+        self.combo_lang.addItem("", None)
         for code in ["eng", "hun", "ger", "fra", "spa", "ita", "jpn"]:
             self.combo_lang.addItem(T(f"common.languages.{code}"), code.upper())
         lang_lay.addWidget(self.combo_lang)
@@ -206,15 +207,32 @@ class EditFileDialog(QDialog):
             self.combo_category.show()
 
         # Sub-type
-        self.combo_sub_type.setCurrentText(f.get('sub_category') or "")
+        idx = self.combo_sub_type.findData(f.get('sub_category'))
+        if idx >= 0: self.combo_sub_type.setCurrentIndex(idx)
+        else: self.combo_sub_type.setCurrentIndex(0)
         
         # Details
         self.spin_season.setValue(f.get('fn_season') or 0)
         ep_val = f.get('fn_episode')
         self.spin_episode.setValue(int(ep_val) if str(ep_val or "").isdigit() else 0)
-        self.combo_edition.setCurrentText(f.get('edition') or "")
+        idx = self.combo_edition.findData(f.get('edition'))
+        if idx >= 0: self.combo_edition.setCurrentIndex(idx)
+        else: self.combo_edition.setCurrentIndex(0) # Default to None
         self.edit_part.setText(str(f.get('part') or ""))
-        self._set_combo_by_data(self.combo_lang, (f.get('language') or "ENG").upper())
+        lang_val = (f.get('language') or "").upper()
+        if lang_val:
+            # Try exact match first
+            idx = self.combo_lang.findData(lang_val)
+            if idx < 0:
+                # Try 2-to-3 letter mapping (simple common ones)
+                mapping = {"HU": "HUN", "EN": "ENG", "DE": "GER", "FR": "FRA", "ES": "SPA", "IT": "ITA", "JA": "JPN"}
+                mapped = mapping.get(lang_val)
+                if mapped: idx = self.combo_lang.findData(mapped)
+            
+            if idx >= 0: self.combo_lang.setCurrentIndex(idx)
+            else: self.combo_lang.setCurrentIndex(0)
+        else:
+            self.combo_lang.setCurrentIndex(0)
         self._set_combo_by_data(self.combo_metadata_lang, f.get('target_language'))
         
         # Update visibility
@@ -261,22 +279,29 @@ class EditFileDialog(QDialog):
         # Update sub-type items if category changed
         self.combo_sub_type.blockSignals(True)
         config = MetadataRules.get_sub_type_config(cat_internal)
-        current = self.combo_sub_type.currentText()
+        
+        # Capture CURRENT selected data before clearing
+        current_data = self.combo_sub_type.currentData()
+        # Fallback to file data if nothing selected yet (initial load)
+        if current_data is None:
+            current_data = self.file_data.get('sub_category')
+
         self.combo_sub_type.clear()
+        self.combo_sub_type.addItem("", None)
         for item_key in config['items']:
             label = T(f"discovery.extras.subtypes.{item_key}")
             if label == f"discovery.extras.subtypes.{item_key}":
                 label = item_key.title()
             self.combo_sub_type.addItem(label, item_key)
         
-        if not current:
-            if config['default']:
-                idx = self.combo_sub_type.findData(config['default'])
-                if idx >= 0: self.combo_sub_type.setCurrentIndex(idx)
-        else:
-            idx = self.combo_sub_type.findText(current)
+        # Restore selection by DATA
+        if current_data:
+            idx = self.combo_sub_type.findData(current_data)
             if idx >= 0: self.combo_sub_type.setCurrentIndex(idx)
-            else: self.combo_sub_type.setCurrentText(current)
+            else: self.combo_sub_type.setCurrentIndex(0)
+        else:
+            self.combo_sub_type.setCurrentIndex(0)
+            
         self.combo_sub_type.blockSignals(False)
 
     def _populate_parents(self):
@@ -309,13 +334,13 @@ class EditFileDialog(QDialog):
             updates['fn_media_type'] = "tv" if self.combo_classification.currentData() == "episode" else "movie"
             updates['fn_season'] = self.spin_season.value() if updates['fn_media_type'] == 'tv' else None
             updates['fn_episode'] = str(self.spin_episode.value()) if updates['fn_media_type'] == 'tv' else None
-            updates['edition'] = self.combo_edition.currentText() if updates['fn_media_type'] == 'movie' else None
+            updates['edition'] = self.combo_edition.currentData() if updates['fn_media_type'] == 'movie' else None
             updates['part'] = self.edit_part.text().strip()
             updates['parent_file_id'] = None
             updates['sub_category'] = None
             updates['match_status'] = 'PENDING'
         elif target_cat == 'extra':
-            updates['sub_category'] = self.combo_sub_type.currentText()
+            updates['sub_category'] = self.combo_sub_type.currentData()
             updates['parent_file_id'] = self.combo_parent.currentData()
             updates['language'] = None
             updates['match_status'] = None

@@ -11,13 +11,36 @@ class FileOperator:
     def move_file(self, source, destination, progress_callback=None):
         """Safely moves a file, creating parent directories if needed. Supports intra-file progress."""
         try:
+            # Normalize paths for cross-platform and slash consistency
+            source = os.path.normpath(source)
+            destination = os.path.normpath(destination)
+            
+            logger.debug(f"Attempting move: {source} -> {destination}")
+            
             if not os.path.exists(source):
-                raise FileNotFoundError(f"Source missing: {source}")
+                # Check for common Windows path issues (trailing spaces/dots)
+                alt_source = source.strip(". ")
+                if os.path.exists(alt_source):
+                    source = alt_source
+                else:
+                    raise FileNotFoundError(f"Source missing: {source}")
             
             os.makedirs(os.path.dirname(destination), exist_ok=True)
             
             # Check if it's the same device
-            if hasattr(os, 'stat') and os.stat(os.path.dirname(source)).st_dev == os.stat(os.path.dirname(destination)).st_dev:
+            source_dir = os.path.dirname(source)
+            dest_dir = os.path.dirname(destination)
+            
+            # Ensure we have a valid directory for dev check (handle root drives)
+            if not source_dir: source_dir = os.getcwd()
+            if not dest_dir: dest_dir = os.getcwd()
+
+            is_same_dev = False
+            try:
+                is_same_dev = os.stat(source_dir).st_dev == os.stat(dest_dir).st_dev
+            except: pass
+
+            if is_same_dev:
                 shutil.move(source, destination)
                 if progress_callback: progress_callback(1.0)
             else:

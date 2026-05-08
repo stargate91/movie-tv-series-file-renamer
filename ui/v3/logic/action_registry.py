@@ -12,6 +12,7 @@ class ActionDefinition:
     
     # Requirements
     requires_video: bool = False
+    requires_matched: bool = False
     
     # Library View (Pending / Conflict)
     row_primary: bool = False
@@ -117,6 +118,19 @@ class ActionRegistry:
             context_single=True,
             context_batch=True,
             batch_bar=True
+        ),
+        'organize': ActionDefinition(
+            id='organize',
+            label_key='discovery.actions.organize',
+            label_key_multi='discovery.actions.organize_multi',
+            icon='check-square',
+            style='success',
+            requires_video=True,
+            requires_matched=True,
+            row_overflow=True,
+            context_single=True,
+            context_batch=True,
+            batch_bar=True
         )
     }
 
@@ -125,7 +139,7 @@ class ActionRegistry:
         return cls.ACTIONS.get(action_id)
 
     @classmethod
-    def get_actions_for_surface(cls, surface: str, category: str, is_trash: bool, is_multi: bool) -> List[ActionDefinition]:
+    def get_actions_for_surface(cls, surface: str, category: str, is_trash: bool, is_multi: bool, is_matched: bool = True) -> List[ActionDefinition]:
         """
         The new 'Smart' filtering logic.
         Returns actions that match the specific surface, tab, and selection mode.
@@ -148,7 +162,11 @@ class ActionRegistry:
             if not visible:
                 continue
                 
-            # 3. Batch Bar specifically only shows if is_multi
+            # 3. Match requirement check
+            if action.requires_matched and not is_matched:
+                continue
+
+            # 4. Batch Bar specifically only shows if is_multi
             if surface == 'batch_bar' and not is_multi:
                 continue
 

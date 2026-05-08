@@ -44,6 +44,11 @@ class TagBuilder:
         cat = file_data.get("category", "")
         sub_cat = file_data.get("sub_category", "")
         
+        # Refined ExtraCategory logic: avoid "Movie" or "Tv" suffix for extras
+        extra_cat_val = (sub_cat or cat).capitalize() if cat not in ("video", None) else ""
+        if extra_cat_val in ("Movie", "Tv"):
+            extra_cat_val = ""
+            
         context.update({
             "Resolution": self._map_resolution(file_data.get("resolution", "")),
             "VideoCodec": self._map_video_codec(file_data.get("video_codec", "")),
@@ -54,14 +59,14 @@ class TagBuilder:
             "Framerate": file_data.get("framerate", ""),
             "Original": os.path.splitext(file_data.get("file_name", ""))[0],
             "Language": (file_data.get("language") or "").upper() if cat != "video" else "",
-            "ExtraCategory": (sub_cat or cat).capitalize() if cat not in ("video", None) else "",
+            "ExtraCategory": extra_cat_val,
             "Category": cat.capitalize() if cat else "",
             "SubType": sub_cat.capitalize() if sub_cat else "",
             "Custom": custom_variable,
             "VideoBitrate": f"{file_data['video_bitrate'] // 1000}kbps" if file_data.get('video_bitrate') else "",
             "Edition": file_data.get("edition", ""),
             "PartRaw": file_data.get("part", ""),
-            "Part": self._format_part(file_data.get("part"), self.db.db_path) # Need settings here?
+            "Part": self._format_part(file_data.get("part"), self.db.db_path)
         })
 
     def _format_part(self, val, db_path):
@@ -125,7 +130,10 @@ class TagBuilder:
                     if isinstance(details, dict):
                         lang_key = language
                         if lang_key not in details:
-                            lang_key = lang_key.split('-')[0]
+                            # Try prefix match (e.g. 'en' for 'en-US') or vice versa
+                            short_lang = lang_key.split('-')[0]
+                            match = next((k for k in details if k.startswith(short_lang)), None)
+                            if match: lang_key = match
                         
                         if lang_key in details:
                             title = details[lang_key].get('title') or details[lang_key].get('name') or title
@@ -150,7 +158,9 @@ class TagBuilder:
                                 if isinstance(ep_details, dict):
                                     l_key = language
                                     if l_key not in ep_details:
-                                        l_key = l_key.split('-')[0]
+                                        short_l = l_key.split('-')[0]
+                                        match = next((k for k in ep_details if k.startswith(short_l)), None)
+                                        if match: l_key = match
                                     if l_key in ep_details:
                                         ep_name = ep_details[l_key].get('name') or ep_name
                             except: pass
@@ -179,12 +189,20 @@ class TagBuilder:
                 if isinstance(details_all, dict):
                     l_key = language
                     if l_key not in details_all:
-                        l_key = l_key.split('-')[0]
+                        short_l = l_key.split('-')[0]
+                        match = next((k for k in details_all if k.startswith(short_l)), None)
+                        if match: l_key = match
                     
                     if l_key in details_all:
                         details = details_all[l_key]
                         tagline = details.get('tagline') or tagline
                         overview = details.get('overview') or overview
+                        
+                        # Collection Localization
+                        if 'belongs_to_collection' in details and details['belongs_to_collection']:
+                            coll_data = details['belongs_to_collection']
+                            if isinstance(coll_data, dict):
+                                m['collection'] = coll_data.get('name') or m.get('collection', "")
                         
                         if 'genres' in details:
                             genre_list = [g['name'] for g in details['genres']]

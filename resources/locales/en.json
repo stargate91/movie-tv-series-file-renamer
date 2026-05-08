@@ -5,11 +5,12 @@
     },
     "sidebar": {
         "dashboard": "Dashboard",
-        "library": "Renaming Workspace",
+        "workspace": "Renaming Workspace",
+        "gallery": "Media Gallery",
         "history": "History",
         "settings": "Settings",
         "restart": "Restart App",
-        "support": "Buy me a Coffee"
+        "support": "Say Thanks"
     },
     "greeting": {
         "morning": "Good morning",
@@ -41,7 +42,7 @@
             "library": "Review Center",
             "all": "Pending Review",
             "conflicts": "Name Clashes",
-            "extras": "Attached Files",
+            "extras": "Extras",
             "dropped": "Just Ingested",
             "trash": "Trash"
         },
@@ -73,7 +74,9 @@
             "clear_match": "Reset Metadata",
             "clear_match_multi": "Reset Metadata (Batch)",
             "fetch": "Fetch Language",
-            "fetch_multi": "Fetch Language (Batch)"
+            "fetch_multi": "Fetch Language (Batch)",
+            "organize": "Mark as Organized",
+            "organize_multi": "Mark as Organized (Batch)"
         },
         "buttons": {
             "abort": "Stop Process"
@@ -82,7 +85,8 @@
             "identify": "Smart Match",
             "fetch_language": "Fetch Language",
             "clear": "Reset Metadata",
-            "ignore": "Move to Trash"
+            "ignore": "Move to Trash",
+            "organize": "Mark as Organized"
         },
         "dropped": {
             "import_all": "Move All to Review",
@@ -108,6 +112,7 @@
             "batch_ignore_confirm": "Move {count} selected files to the Trash?",
             "restore_confirm": "Move {count} files back to the Review Center?",
             "batch_restore_confirm": "Move {count} selected files back to the Review Center?",
+            "batch_organize_confirm": "Add {count} selected files to your Library collection?",
             "delete_confirm": "Permanently remove '{filename}' from the database?",
             "batch_delete_confirm": "Permanently remove {count} selected files from the database?",
             "clear_confirm": "Are you sure you want to reset the identification for {count} files?",
@@ -144,11 +149,18 @@
         },
         "extras": {
             "tabs": {
-                "bonus": "Bonus / Extras",
-                "images": "Images / Posters",
-                "metadata": "Metadata / NFO",
+                "bonus": "Bonus Videos",
+                "images": "Images",
+                "metadata": "Metadata",
                 "subtitles": "Subtitles",
-                "audio": "Audio Tracks"
+                "audio": "Audio"
+            },
+            "display": {
+                "bonus": "Bonus Video",
+                "image": "Image",
+                "metadata": "Metadata",
+                "subtitle": "Subtitle",
+                "audio": "Audio"
             },
             "subtypes": {
                 "all": "All",
@@ -211,7 +223,7 @@
                     "subtitle": "Subtitle",
                     "audio": "Audio",
                     "image": "Image",
-                    "meta": "NFO / Meta"
+                    "meta": "Metadata"
                 },
                 "media_types": {
                     "movie": "Movie",
@@ -221,11 +233,6 @@
                     "part": "Part",
                     "cd": "CD",
                     "disk": "Disk"
-                },
-                "editions": {
-                    "theatrical": "Theatrical",
-                    "directors_cut": "Director's Cut",
-                    "extended": "Extended"
                 }
             },
             "apply_btn": "Apply to Selected"
@@ -555,13 +562,6 @@
             "episode": "Episode",
             "bonus": "Bonus Video"
         },
-        "editions": {
-            "theatrical": "Theatrical",
-            "directors_cut": "Director's Cut",
-            "extended": "Extended",
-            "remastered": "Remastered",
-            "uncut": "Uncut"
-        },
         "parts": {
             "part": "Part",
             "cd": "CD",
@@ -593,6 +593,18 @@
         "unknown_date": "Unknown date",
         "undo_success_title": "Success",
         "undo_partial_title": "Partial Success"
+    },
+    "library": {
+        "title": "Media Gallery",
+        "subtitle": "Browse your organized collection",
+        "search_placeholder": "Search in your library...",
+        "empty_title": "Your Library is empty",
+        "empty_desc": "Start organizing your files to see them here in all their glory.",
+        "movie_count": "{count} Movies",
+        "series_count": "{count} Series",
+        "open_folder": "Show in Folder",
+        "send_back": "Send back to Workspace",
+        "re_identify": "Change Identification"
     },
     "common": {
         "browse": "Browse",
@@ -626,6 +638,13 @@
             "spa": "Spanish",
             "ita": "Italian",
             "jpn": "Japanese"
+        },
+        "editions": {
+            "theatrical": "Theatrical",
+            "directors_cut": "Director's Cut",
+            "extended": "Extended",
+            "remastered": "Remastered",
+            "uncut": "Uncut"
         },
         "ok": "OK",
         "cancel": "Cancel",

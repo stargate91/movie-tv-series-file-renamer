@@ -77,6 +77,7 @@ class DiscoveryPage(QWidget):
         self.batch_bar.restore_requested.connect(self._on_batch_restore_requested)
         self.batch_bar.clear_requested.connect(self._on_batch_clear_requested)
         self.batch_bar.ignore_requested.connect(self._on_batch_ignore_requested)
+        self.batch_bar.organize_requested.connect(self._on_batch_organize_requested)
         self.batch_bar.open_folder_requested.connect(self._on_batch_open_folder)
         layout.addWidget(self.batch_bar)
 
@@ -279,6 +280,10 @@ class DiscoveryPage(QWidget):
                 self.controller.batch_clear_matches(item_ids)
         elif action_id == 'fetch_language':
             self.controller.start_language_fetch(item_ids)
+        elif action_id == 'organize':
+            confirm_msg = T("discovery.messages.batch_organize_confirm", count=len(item_ids))
+            if len(item_ids) == 1 or QMessageBox.question(self, T("discovery.actions.organize"), confirm_msg) == QMessageBox.Yes:
+                self.controller.batch_organize(item_ids)
         elif action_id == 'fix':
             if len(item_ids) == 1:
                 self._on_fix_requested({'id': item_ids[0]})
@@ -319,13 +324,30 @@ class DiscoveryPage(QWidget):
         if tab_idx == 2:  # Extras tab
             category = 'extra'
         elif tab_idx == 1:  # Conflicts - check active sub-tab
-            if self.conflicts_view._has_subtabs and self.conflicts_view.tabs.currentIndex() == 1:
-                category = 'extra'
+            if self.conflicts_view._has_subtabs:
+                if self.conflicts_view.tabs.currentIndex() == 1:
+                    category = 'extra'
+            else:
+                # If no subtabs, determine category from the selection
+                first_row = unique_rows.copy().pop()
+                cat_item = table.item(first_row, 2)
+                if cat_item and cat_item.data(Qt.UserRole) != 'video':
+                    category = 'extra'
         elif tab_idx == 3:  # Dropped - check active sub-tab
-            if self.dropped_view._has_subtabs and self.dropped_view.tabs.currentIndex() == 1:
-                category = 'extra'
+            if self.dropped_view._has_subtabs:
+                if self.dropped_view.tabs.currentIndex() == 1:
+                    category = 'extra'
+            else:
+                first_row = unique_rows.copy().pop()
+        # Check if all selected items are matched
+        all_matched = True
+        for r in unique_rows:
+            st_item = table.item(r, 0)
+            if st_item and st_item.data(Qt.UserRole) != 'MATCHED':
+                all_matched = False
+                break
             
-        self.batch_bar.set_selection_count(len(unique_rows), is_trash, category)
+        self.batch_bar.set_selection_count(len(unique_rows), is_trash, category, all_matched=all_matched)
 
     # --- Rename Flow ---
     def _on_apply_clicked(self):
@@ -474,6 +496,16 @@ class DiscoveryPage(QWidget):
         ids = table.get_selected_ids()
         if not ids: return
         self.controller.start_language_fetch(ids)
+
+    def _on_batch_organize_requested(self):
+        table = self._get_active_table()
+        if not table: return
+        ids = table.get_selected_ids()
+        if not ids: return
+        
+        confirm_msg = T("discovery.messages.batch_organize_confirm", count=len(ids))
+        if QMessageBox.question(self, T("discovery.actions.organize"), confirm_msg) == QMessageBox.Yes:
+            self.controller.batch_organize(ids)
 
     def _on_operation_started(self, message: str):
         self.progress_container.show()

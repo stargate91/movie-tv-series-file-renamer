@@ -1,5 +1,6 @@
-requests
-python-dotenv
-ffmpeg-python
-guessit
-pycountry
+PySide6>=6.5.0
+requests>=2.31.0
+python-dotenv>=1.0.0
+ffmpeg-python>=0.2.0
+guessit>=3.7.0
+pycountry>=22.3.5

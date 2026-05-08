@@ -27,13 +27,24 @@ class DataLoader(QThread):
 
             # Collect poster paths and generate preview names here (off main thread)
             poster_paths = []
+            rename_plan = []
+            
             for vid in videos:
                 try:
                     # Pre-generate the new name for the preview column using prefetched data
                     new_name = self.engine.formatter.generate_name(vid['id'], self.engine.config.settings, prefetched_data=prefetched_map)
                     if new_name:
                         ext = vid.get('extension', '')
-                        vid['_new_name'] = f"{new_name}{ext}"
+                        proposed_full = f"{new_name}{ext}"
+                        vid['_new_name'] = proposed_full
+                        
+                        # Add to a plan for collision detection
+                        rename_plan.append({
+                            'file_id': vid['id'],
+                            'original_path': vid['current_path'],
+                            'proposed_path': proposed_full,
+                            'category': vid.get('category', 'video')
+                        })
                         
                     # Poster paths from our joined query
                     if vid.get('media_poster'):
@@ -44,6 +55,24 @@ class DataLoader(QThread):
                         poster_paths.append(vid['season_poster'])
                 except:
                     pass
+
+            # --- Auto-Resolve Collisions for Preview ---
+            if rename_plan:
+                from core.engine.collision_resolver import CollisionResolver
+                resolver = CollisionResolver(self.engine.config.settings)
+                safe, collisions = resolver.detect_collisions(rename_plan)
+                
+                # Try to auto-resolve each collision group
+                for group in collisions.values():
+                    resolved = resolver.auto_resolve_group(group)
+                    if resolved:
+                        # Update the _new_name in our main videos list
+                        for item in resolved:
+                            vid = prefetched_map.get(item['file_id'])
+                            if vid:
+                                vid['_new_name'] = item['proposed_path']
+                                # Mark as resolved so split_data knows it's no longer a conflict
+                                vid['_is_resolved_collision'] = True
 
             self.finished.emit(videos, poster_paths)
         except Exception as e:
@@ -102,10 +131,15 @@ class UndoWorker(QThread):
         super().__init__()
         self.engine = engine
         self.batch_id = batch_id
+        self._is_cancelled = False
+
+    def stop(self):
+        self._is_cancelled = True
 
     def run(self):
         try:
             def cb(curr, total, path):
+                if self._is_cancelled: return False
                 pct = int((curr / total) * 100)
                 self.progress.emit(pct, f"Restoring: {os.path.basename(path)}")
                 return True

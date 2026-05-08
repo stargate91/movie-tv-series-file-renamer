@@ -25,6 +25,11 @@ class BatchOperationsDialog(QDialog):
         
         # Detect if we should use unified classification (all video/extra)
         self.is_video_batch = all(f.get('category') in ['video', 'extra'] for f in self.selected_files)
+        self.is_pure_extra = all(f.get('category') not in ['video', 'extra'] for f in self.selected_files)
+        
+        # Determine if we can override category (only if mixed or unknown)
+        first_cat = self.selected_files[0].get('category') if self.selected_files else 'video'
+        self.can_override_cat = all(f.get('category') == first_cat for f in self.selected_files)
         
         self.setWindowTitle(T("discovery.batch_operations.title", count=len(self.selected_files)))
         self.setMinimumSize(1000, 700)
@@ -92,7 +97,7 @@ class BatchOperationsDialog(QDialog):
 
         self.chk_sub_category = QCheckBox(T("discovery.batch_operations.fields.override_sub"))
         self.combo_sub_category = QComboBox()
-        self.combo_sub_category.setEditable(True)
+        self.combo_sub_category.setEditable(False)
         # Populate later in update_ui_visibility
         self.combo_sub_category.setEnabled(False)
         self.chk_sub_category.toggled.connect(self.combo_sub_category.setEnabled)
@@ -113,11 +118,29 @@ class BatchOperationsDialog(QDialog):
         self.cat_card.layout().addWidget(self.chk_media_type)
         self.cat_card.layout().addWidget(self.combo_media_type)
         scroll_layout.addWidget(self.cat_card)
+        
+        # Populate categories based on first item if consistent
+        if self.can_override_cat:
+            cat = self.selected_files[0].get('category')
+            allowed = MetadataRules.get_allowed_categories(cat)
+            self.combo_category.clear()
+            for k in allowed:
+                label = T(f"discovery.batch_operations.options.categories.{k}")
+                if label == f"discovery.batch_operations.options.categories.{k}": label = k.capitalize()
+                self.combo_category.addItem(label, k)
+            
+            # If only one category is allowed (e.g. audio), disable the override checkbox
+            if len(allowed) <= 1:
+                self.chk_category.setEnabled(False)
+                self.chk_category.setChecked(False)
+                self.chk_category.setToolTip("Category is fixed for these asset types.")
 
         if self.is_video_batch:
             self.combo_category.hide()
             self.combo_media_type.hide()
             self.chk_media_type.hide()
+        elif self.is_pure_extra:
+            self.combo_classification.hide()
         else:
             self.combo_classification.hide()
 
@@ -170,17 +193,21 @@ class BatchOperationsDialog(QDialog):
         self.chk_edition = QCheckBox(T("discovery.batch_operations.fields.set_edition"))
         self.lbl_edition = QLabel(T("discovery.batch_operations.fields.edition_label")) # Backing for edit_dialog similarity
         self.combo_edition = QComboBox()
-        self.combo_edition.setEditable(True)
-        self.combo_edition.addItem("")
-        self.combo_edition.addItem(T("discovery.batch_operations.options.editions.theatrical"), "Theatrical")
-        self.combo_edition.addItem(T("discovery.batch_operations.options.editions.directors_cut"), "Director's Cut")
-        self.combo_edition.addItem(T("discovery.batch_operations.options.editions.extended"), "Extended")
+        self.combo_edition.setEditable(False)
+        self.combo_edition.addItem("", None)
+        self.combo_edition.addItem(T("common.editions.theatrical"), "Theatrical")
+        self.combo_edition.addItem(T("common.editions.directors_cut"), "Director's Cut")
+        self.combo_edition.addItem(T("common.editions.extended"), "Extended")
+        self.combo_edition.addItem(T("common.editions.remastered"), "Remastered")
+        self.combo_edition.addItem(T("common.editions.uncut"), "Uncut")
         self.combo_edition.setEnabled(False)
         self.chk_edition.toggled.connect(self.combo_edition.setEnabled)
 
         self.chk_lang = QCheckBox(T("discovery.batch_operations.fields.override_lang"))
         self.combo_lang = QComboBox()
-        for code in ["eng", "hun", "ger", "fra", "spa"]:
+        self.combo_lang.setEditable(False)
+        self.combo_lang.addItem("", None)
+        for code in ["eng", "hun", "ger", "fra", "spa", "ita", "jpn"]:
             label = T(f"common.languages.{code}")
             self.combo_lang.addItem(label, code.upper())
         self.combo_lang.setEnabled(False)
@@ -225,30 +252,64 @@ class BatchOperationsDialog(QDialog):
         self._load_initial_data()
         self._update_ui_visibility()
 
+    def _get_consensus(self, key):
+        values = set()
+        for f in self.selected_files:
+            val = f.get(key)
+            # Normalize language for comparison
+            if key == 'language':
+                val = (val or "").upper()
+                # 2-to-3 map for consensus check
+                mapping = {"HU": "HUN", "EN": "ENG", "DE": "GER", "FR": "FRA", "ES": "SPA", "IT": "ITA", "JA": "JPN"}
+                val = mapping.get(val, val)
+            values.add(val)
+        return list(values)[0] if len(values) == 1 else None
+
     def _load_initial_data(self):
         if not self.selected_files: return
-        f = self.selected_files[0]
-        cat = f.get('category', 'video')
         
-        # Category
-        self._set_combo_by_data(self.combo_category, cat)
-        if self.is_video_batch:
-            if cat == 'extra': self._set_combo_by_data(self.combo_classification, "bonus")
-            elif f.get('fn_media_type') == 'tv': self._set_combo_by_data(self.combo_classification, "episode")
-            else: self._set_combo_by_data(self.combo_classification, "movie")
+        # 1. Category Consensus
+        cat = self._get_consensus('category')
+        if cat:
+            self._set_combo_by_data(self.combo_category, cat)
+            if self.is_video_batch:
+                if cat == 'extra': self._set_combo_by_data(self.combo_classification, "bonus")
+                else:
+                    mtype = self._get_consensus('fn_media_type')
+                    if mtype == 'tv': self._set_combo_by_data(self.combo_classification, "episode")
+                    elif mtype == 'movie': self._set_combo_by_data(self.combo_classification, "movie")
+        
+        # 2. Sub-type Consensus
+        sub = self._get_consensus('sub_category')
+        if sub:
+            idx = self.combo_sub_category.findData(sub)
+            if idx >= 0: self.combo_sub_category.setCurrentIndex(idx)
+        else:
+            self.combo_sub_category.setCurrentIndex(0)
+            
+        # 3. TV Info Consensus
+        season = self._get_consensus('fn_season')
+        if season is not None: self.spin_season.setValue(int(season))
+        
+        # 4. Edition Consensus
+        ed = self._get_consensus('edition')
+        if ed:
+            idx = self.combo_edition.findData(ed)
+            if idx >= 0: self.combo_edition.setCurrentIndex(idx)
+        else:
+            self.combo_edition.setCurrentIndex(0)
 
-        # Sub-type
-        self.combo_sub_category.setCurrentText(f.get('sub_category') or "")
+        # 5. Language Consensus
+        lang = self._get_consensus('language')
+        if lang:
+            # We already normalized it in _get_consensus to 3-letter if it was in map
+            self._set_combo_by_data(self.combo_lang, lang)
+        else:
+            self.combo_lang.setCurrentIndex(0)
         
-        # TV/Movie
-        self.spin_season.setValue(f.get('fn_season') or 0)
-        self.combo_edition.setCurrentText(f.get('edition') or "")
-        self._set_combo_by_data(self.combo_lang, (f.get('language') or "ENG").upper())
-        
-        # Parent
-        parent_id = f.get('parent_file_id')
+        # 6. Parent Consensus
+        parent_id = self._get_consensus('parent_file_id')
         if parent_id:
-            # We'll set this after parents are populated
             self._initial_parent_id = parent_id
 
     def _on_classification_changed(self):
@@ -288,51 +349,86 @@ class BatchOperationsDialog(QDialog):
         
         # Sorter List Visibility: Only for Movie and Episode roles
         cls = self.combo_classification.currentData() if self.is_video_batch else None
-        show_sorter = not self.is_video_batch or cls in ["movie", "episode"]
+        show_sorter = (self.is_video_batch and cls in ["movie", "episode"])
         self.left_pane_widget.setVisible(show_sorter)
         
         visible_fields = MetadataRules.get_visible_fields(cat, media)
         
-        self.tv_card.setVisible(cat == 'video' and media == 'tv')
-        self.part_card.setVisible(cat == 'video')
+        # Hide Category Card if no interactive fields are visible (except the fixed category info)
+        has_sub_type = 'sub_type' in visible_fields
+        has_media_type = ('media_type' in visible_fields or (cat == 'video')) and not self.is_pure_extra
+        
+        # If we can't override category and have no sub-type or media-type to show, hide the card
+        if hasattr(self, 'cat_card'):
+            allowed_cats = MetadataRules.get_allowed_categories(cat)
+            # We show it ONLY if:
+            # 1. We can actually switch to another category (len > 1)
+            # 2. OR we have a sub-type to configure
+            # 3. OR we have a media type to configure (videos only)
+            show_cat_card = (len(allowed_cats) > 1) or has_sub_type or has_media_type
+            
+            # Special case: if is_video_batch is true, we always show it because classification combo is there
+            if self.is_video_batch:
+                show_cat_card = True
+                
+            self.cat_card.setVisible(show_cat_card)
+
+        if hasattr(self, 'tv_card'):
+            self.tv_card.setVisible(cat == 'video' and media == 'tv')
+        if hasattr(self, 'part_card'):
+            self.part_card.setVisible(cat == 'video')
+        
+        has_sub_type = 'sub_type' in visible_fields
+        if hasattr(self, 'chk_sub_category'): self.chk_sub_category.setVisible(has_sub_type)
+        if hasattr(self, 'combo_sub_category'): self.combo_sub_category.setVisible(has_sub_type)
         
         has_edition = 'edition' in visible_fields
-        self.combo_edition.setVisible(has_edition)
-        self.chk_edition.setVisible(has_edition)
+        if hasattr(self, 'combo_edition'): self.combo_edition.setVisible(has_edition)
+        if hasattr(self, 'chk_edition'): self.chk_edition.setVisible(has_edition)
         
         # Language fields
         has_lang = 'language' in visible_fields
-        self.chk_lang.setVisible(has_lang)
-        self.combo_lang.setVisible(has_lang)
+        if hasattr(self, 'chk_lang'): self.chk_lang.setVisible(has_lang)
+        if hasattr(self, 'combo_lang'): self.combo_lang.setVisible(has_lang)
         
         has_target_lang = 'target_lang' in visible_fields
-        self.chk_metadata_lang.setVisible(has_target_lang)
-        self.combo_metadata_lang.setVisible(has_target_lang)
+        if hasattr(self, 'chk_metadata_lang'): self.chk_metadata_lang.setVisible(has_target_lang)
+        if hasattr(self, 'combo_metadata_lang'): self.combo_metadata_lang.setVisible(has_target_lang)
         
         has_linking = 'linking' in visible_fields
-        self.chk_parent.setVisible(has_linking)
-        self.combo_parent.setVisible(has_linking)
+        if hasattr(self, 'chk_parent'): self.chk_parent.setVisible(has_linking)
+        if hasattr(self, 'combo_parent'): self.combo_parent.setVisible(has_linking)
+
+        # Media Type (Videos only)
+        # Note: metadata_rules.py returns this for 'video' category.
+        # But here we should also check if it's explicitly allowed.
+        has_media_type = 'media_type' in visible_fields or (cat == 'video')
+        # However, for pure extras (metadata, etc), we definitely want to hide it.
+        if self.is_pure_extra: has_media_type = False
+        
+        if hasattr(self, 'chk_media_type'): self.chk_media_type.setVisible(has_media_type)
+        if hasattr(self, 'combo_media_type'): self.combo_media_type.setVisible(has_media_type)
         
         # Update sub-types with placeholder logic
-        self.combo_sub_category.blockSignals(True)
-        config = MetadataRules.get_sub_type_config(cat)
-        current = self.combo_sub_category.currentText()
-        self.combo_sub_category.clear()
-        for item_key in config['items']:
-            label = T(f"discovery.extras.subtypes.{item_key}")
-            if label == f"discovery.extras.subtypes.{item_key}":
-                label = item_key.title()
-            self.combo_sub_category.addItem(label, item_key)
-        
-        if not current:
-            if config['default']:
-                idx = self.combo_sub_category.findData(config['default'])
+        if hasattr(self, 'combo_sub_category'):
+            self.combo_sub_category.blockSignals(True)
+            config = MetadataRules.get_sub_type_config(cat)
+            current_data = self.combo_sub_category.currentData()
+            self.combo_sub_category.clear()
+            self.combo_sub_category.addItem("", None)
+            for item_key in config['items']:
+                label = T(f"discovery.extras.subtypes.{item_key}")
+                if label == f"discovery.extras.subtypes.{item_key}":
+                    label = item_key.title()
+                self.combo_sub_category.addItem(label, item_key)
+            
+            if current_data:
+                idx = self.combo_sub_category.findData(current_data)
                 if idx >= 0: self.combo_sub_category.setCurrentIndex(idx)
-        else:
-            idx = self.combo_sub_category.findText(current)
-            if idx >= 0: self.combo_sub_category.setCurrentIndex(idx)
-            else: self.combo_sub_category.setCurrentText(current)
-        self.combo_sub_category.blockSignals(False)
+                else: self.combo_sub_category.setCurrentIndex(0)
+            else:
+                self.combo_sub_category.setCurrentIndex(0) # Default to empty
+            self.combo_sub_category.blockSignals(False)
 
     def _populate_list(self):
         for f in self.selected_files:
@@ -385,7 +481,7 @@ class BatchOperationsDialog(QDialog):
             if self.chk_parts.isChecked():
                 updates['part'] = str(current_part)
                 current_part += 1
-            if self.chk_edition.isChecked(): updates['edition'] = self.combo_edition.currentText()
+            if self.chk_edition.isChecked(): updates['edition'] = self.combo_edition.currentData()
             if self.chk_lang.isChecked(): updates['language'] = self.combo_lang.currentData()
             if self.chk_metadata_lang.isChecked(): updates['target_language'] = self.combo_metadata_lang.currentData()
             if self.chk_parent.isChecked(): updates['parent_file_id'] = self.combo_parent.currentData()

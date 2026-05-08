@@ -30,22 +30,26 @@ class HistoryManager:
 
         for i, entry in enumerate(history):
             if progress_callback:
-                progress_callback(i, total, entry.get('new_path'))
+                if progress_callback(i, total, entry.get('new_path')) is False:
+                    errors.append("Undo aborted by user.")
+                    break
             
             ok, msg = self.undo_single(entry)
-            if ok: success += 1
+            if ok: 
+                success += 1
+                # Remove only the successful entry from history
+                self.db.history.delete_history_item(entry['id'])
             else:
                 failed += 1
                 errors.append(msg)
 
-        # Cleanup batch history after attempt
-        self.db.history.delete_batch(batch_id)
         return success, failed, errors
 
     def undo_single(self, history_entry):
         """Reverses a single rename operation."""
-        old_path = history_entry['old_path'] # Original source
-        new_path = history_entry['new_path'] # Current location
+        import os
+        old_path = os.path.normpath(history_entry['old_path']) # Original source
+        new_path = os.path.normpath(history_entry['new_path']) # Current location
         
         ok, error = self.operator.move_file(new_path, old_path)
         if ok:
